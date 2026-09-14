@@ -13,7 +13,7 @@ scipy>=1.13,<2.0
 pyscf>=2.6.0,<3.0
 qiskit==2.3.0
 qiskit-aer==0.17.2
-qiskit-addon-sqd==0.12.1
+qiskit-addon-sqd==0.13.1
 qiskit-ibm-runtime==0.45.1
 qiskit-qasm3-import>=0.6,<1.0
 ffsim==0.0.68
