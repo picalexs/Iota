@@ -1,0 +1,3082 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MoleculeDetailPage > responsive layoutSnapShots > renders with responsive constraints on desktop (1280px) > desktop-1280px 1`] = `
+<div>
+  <div
+    class="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 overflow-x-hidden"
+  >
+    <div
+      class="flex flex-col gap-6"
+    >
+      <button
+        aria-label="Go back"
+        class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-left size-4"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m15 18-6-6 6-6"
+          />
+        </svg>
+        Back
+      </button>
+      <div
+        class="flex flex-col gap-4 w-full overflow-x-hidden px-2 min-w-0"
+        data-testid="molecule-detail"
+      >
+        <div
+          class="w-full"
+        />
+        <div
+          class="flex items-end justify-between gap-4 flex-wrap shrink-0"
+        >
+          <div
+            class="flex flex-col gap-1.5 min-w-0 flex-1"
+          >
+            <h1
+              class="text-3xl font-bold tracking-tight"
+            >
+              H2
+            </h1>
+            <div
+              class="flex items-center gap-2.5 flex-wrap"
+            >
+              <span
+                class="inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 font-mono"
+                data-slot="badge"
+                data-variant="secondary"
+              >
+                H₂
+              </span>
+            </div>
+          </div>
+          <div
+            class="flex items-center gap-2 shrink-0 flex-wrap"
+          >
+            <a
+              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-primary/35 bg-primary text-primary-foreground shadow-[var(--shadow-button-primary)] hover:bg-primary/92 hover:shadow-[var(--shadow-elevation-raised)] active:bg-primary/95 active:shadow-[var(--shadow-button-primary-pressed)] rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0 h-8 text-xs"
+              data-size="sm"
+              data-slot="button"
+              data-variant="default"
+              href="/runs/new?molecule_id=a1b2c3d4-0000-0000-0000-000000000001"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-plus size-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="M12 5v14"
+                />
+              </svg>
+              New run
+            </a>
+            <button
+              aria-label="Edit layout"
+              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0 h-8 text-xs"
+              data-size="sm"
+              data-slot="button"
+              data-variant="outline"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-pen size-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                />
+              </svg>
+              Edit layout
+            </button>
+          </div>
+        </div>
+        <div
+          class="relative w-full overflow-x-hidden"
+        >
+          <div
+            class="react-grid-layout"
+            style="height: 2503px;"
+          >
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,0px); -webkit-transform: translate(0px,0px); width: 0px; height: 643px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      3D Structure
+                    </div>
+                    <div
+                      class="ml-auto flex items-center gap-2 shrink-0"
+                    >
+                      <div
+                        class="flex items-center gap-2 shrink-0"
+                      >
+                        <button
+                          aria-label="Download 3D structure image"
+                          class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed size-8"
+                          data-size="icon"
+                          data-slot="button"
+                          data-variant="outline"
+                          title="Download 3D structure image"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            class="lucide lucide-download size-3.5"
+                            fill="none"
+                            height="24"
+                            stroke="currentColor"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            viewBox="0 0 24 24"
+                            width="24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M12 15V3"
+                            />
+                            <path
+                              d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                            />
+                            <path
+                              d="m7 10 5 5 5-5"
+                            />
+                          </svg>
+                        </button>
+                        <div
+                          class="flex items-center gap-1.5 flex-wrap"
+                        >
+                          <div
+                            class="flex items-center rounded-md border overflow-hidden shrink-0"
+                          >
+                            <button
+                              aria-pressed="false"
+                              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-transparent bg-transparent shadow-none hover:bg-accent hover:text-accent-foreground active:bg-accent/90 dark:hover:bg-accent/60 has-[>svg]:px-2.5 rounded-none border-0 h-8 px-3 gap-1.5"
+                              data-size="sm"
+                              data-slot="button"
+                              data-variant="ghost"
+                            >
+                              <svg
+                                aria-hidden="true"
+                                class="lucide lucide-layout-grid size-3.5"
+                                fill="none"
+                                height="24"
+                                stroke="currentColor"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                                width="24"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="3"
+                                  y="3"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="14"
+                                  y="3"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="14"
+                                  y="14"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="3"
+                                  y="14"
+                                />
+                              </svg>
+                              2D
+                            </button>
+                            <button
+                              aria-pressed="true"
+                              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-primary/35 bg-primary text-primary-foreground shadow-[var(--shadow-button-primary)] hover:bg-primary/92 hover:shadow-[var(--shadow-elevation-raised)] active:bg-primary/95 active:shadow-[var(--shadow-button-primary-pressed)] has-[>svg]:px-2.5 rounded-none border-0 h-8 px-3 gap-1.5"
+                              data-size="sm"
+                              data-slot="button"
+                              data-variant="default"
+                            >
+                              <svg
+                                aria-hidden="true"
+                                class="lucide lucide-box size-3.5"
+                                fill="none"
+                                height="24"
+                                stroke="currentColor"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                                width="24"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"
+                                />
+                                <path
+                                  d="m3.3 7 8.7 5 8.7-5"
+                                />
+                                <path
+                                  d="M12 22V12"
+                                />
+                              </svg>
+                              3D
+                            </button>
+                          </div>
+                          <button
+                            aria-label="Hide bonds"
+                            aria-pressed="true"
+                            class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed h-8 rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0"
+                            data-size="sm"
+                            data-slot="button"
+                            data-variant="outline"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-eye size-3.5"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                              />
+                              <circle
+                                cx="12"
+                                cy="12"
+                                r="3"
+                              />
+                            </svg>
+                            <span>
+                              Bonds
+                            </span>
+                          </button>
+                          <button
+                            aria-autocomplete="none"
+                            aria-controls="radix-_r_41_"
+                            aria-expanded="false"
+                            aria-label="Viewer style"
+                            class="data-[placeholder]:text-muted-foreground dark:data-[placeholder]:text-foreground/75 [&_svg:not([class*='text-'])]:text-muted-foreground dark:[&_svg:not([class*='text-'])]:text-foreground/72 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-input bg-surface-raised shadow-none transition-[background-color,border-color,color,box-shadow] duration-200 hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed focus-visible:outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] w-32 shrink-0"
+                            data-size="sm"
+                            data-slot="select-trigger"
+                            data-state="closed"
+                            dir="ltr"
+                            role="combobox"
+                            type="button"
+                          >
+                            <span
+                              data-slot="select-value"
+                              style="pointer-events: none;"
+                            >
+                              Ball & Stick
+                            </span>
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-chevron-down size-4 opacity-50"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="m6 9 6 6 6-6"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            aria-label="Reset camera view"
+                            class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed h-8 rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0"
+                            data-size="sm"
+                            data-slot="button"
+                            data-variant="outline"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-rotate-ccw size-3.5"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+                              />
+                              <path
+                                d="M3 3v5h5"
+                              />
+                            </svg>
+                            <span>
+                              Reset
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      aria-label="Expand 3D Structure fullscreen"
+                      class=" p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="p-0 flex-1 min-h-0"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="h-full min-h-0"
+                  >
+                    <div
+                      class="rounded-b-lg overflow-hidden h-full"
+                      data-testid="molecule-viewer-3d"
+                      style="width: 100%; height: 100%; position: relative; background-color: var(--card);"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,651px); -webkit-transform: translate(0px,651px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Properties
+                    </div>
+                    <button
+                      aria-label="Expand Properties fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="contents"
+                  >
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Formula
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        <span
+                          class="font-mono"
+                        >
+                          H₂
+                        </span>
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Molecular Weight
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        2.016 Da
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Charge
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        Neutral (0)
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Multiplicity
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        1
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Atoms
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        2
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Bonds (est.)
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        1
+                      </span>
+                    </div>
+                    <div
+                      class="border-t pt-2 mt-1 flex flex-col gap-2"
+                    >
+                      <div
+                        class="flex flex-col gap-1"
+                      >
+                        <span
+                          class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                        >
+                          Added
+                        </span>
+                        <span
+                          class="text-sm"
+                        >
+                          6/1/2025, 3:00:00 AM
+                        </span>
+                      </div>
+                      <div
+                        class="flex flex-col gap-1"
+                      >
+                        <span
+                          class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                        >
+                          Updated
+                        </span>
+                        <span
+                          class="text-sm"
+                        >
+                          6/1/2025, 3:00:00 AM
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,1116px); -webkit-transform: translate(0px,1116px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Description
+                    </div>
+                    <button
+                      aria-label="Expand Description fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <p
+                    class="text-sm text-muted-foreground italic"
+                  >
+                    No description available.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,1581px); -webkit-transform: translate(0px,1581px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Identifiers
+                    </div>
+                    <button
+                      aria-label="Expand Identifiers fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <p
+                    class="text-sm text-muted-foreground italic"
+                  >
+                    No identifiers available.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,2046px); -webkit-transform: translate(0px,2046px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Atom Coordinates
+                    </div>
+                    <span
+                      class="inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 font-mono tabular-nums"
+                      data-slot="badge"
+                      data-variant="secondary"
+                    >
+                      2
+                    </span>
+                    <div
+                      class="ml-auto flex items-center gap-2 shrink-0"
+                    >
+                      <button
+                        aria-label="Download XYZ coordinates"
+                        class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed size-8"
+                        data-size="icon"
+                        data-slot="button"
+                        data-variant="outline"
+                        title="Download XYZ coordinates"
+                        type="button"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-download size-3.5"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M12 15V3"
+                          />
+                          <path
+                            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                          />
+                          <path
+                            d="m7 10 5 5 5-5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <button
+                      aria-label="Expand Atom Coordinates fullscreen"
+                      class=" p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="p-0 flex-1 min-h-0 overflow-hidden flex flex-col"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="border-t h-full overflow-y-auto flex-1"
+                  >
+                    <table
+                      aria-label="Atom coordinates"
+                      class="w-full"
+                    >
+                      <thead>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-2 border-b bg-muted/40 sticky top-0 z-10"
+                        >
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            #
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Sym
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            X (Å)
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Y (Å)
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Z (Å)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-1.5 border-b last:border-0 hover:bg-muted/40 transition-colors"
+                        >
+                          <td
+                            class="text-xs text-muted-foreground tabular-nums"
+                          >
+                            1
+                          </td>
+                          <td
+                            class="text-sm font-medium"
+                          >
+                            H
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                        </tr>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-1.5 border-b last:border-0 hover:bg-muted/40 transition-colors"
+                        >
+                          <td
+                            class="text-xs text-muted-foreground tabular-nums"
+                          >
+                            2
+                          </td>
+                          <td
+                            class="text-sm font-medium"
+                          >
+                            H
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.740
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`MoleculeDetailPage > responsive layoutSnapShots > renders with responsive constraints on mobile (375px) > mobile-375px 1`] = `
+<div>
+  <div
+    class="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 overflow-x-hidden"
+  >
+    <div
+      class="flex flex-col gap-6"
+    >
+      <button
+        aria-label="Go back"
+        class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-left size-4"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m15 18-6-6 6-6"
+          />
+        </svg>
+        Back
+      </button>
+      <div
+        class="flex flex-col gap-4 w-full overflow-x-hidden px-2 min-w-0"
+        data-testid="molecule-detail"
+      >
+        <div
+          class="w-full"
+        />
+        <div
+          class="flex items-end justify-between gap-4 flex-wrap shrink-0"
+        >
+          <div
+            class="flex flex-col gap-1.5 min-w-0 flex-1"
+          >
+            <h1
+              class="text-3xl font-bold tracking-tight"
+            >
+              H2
+            </h1>
+            <div
+              class="flex items-center gap-2.5 flex-wrap"
+            >
+              <span
+                class="inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 font-mono"
+                data-slot="badge"
+                data-variant="secondary"
+              >
+                H₂
+              </span>
+            </div>
+          </div>
+          <div
+            class="flex items-center gap-2 shrink-0 flex-wrap"
+          >
+            <a
+              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-primary/35 bg-primary text-primary-foreground shadow-[var(--shadow-button-primary)] hover:bg-primary/92 hover:shadow-[var(--shadow-elevation-raised)] active:bg-primary/95 active:shadow-[var(--shadow-button-primary-pressed)] rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0 h-8 text-xs"
+              data-size="sm"
+              data-slot="button"
+              data-variant="default"
+              href="/runs/new?molecule_id=a1b2c3d4-0000-0000-0000-000000000001"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-plus size-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="M12 5v14"
+                />
+              </svg>
+              New run
+            </a>
+            <button
+              aria-label="Edit layout"
+              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0 h-8 text-xs"
+              data-size="sm"
+              data-slot="button"
+              data-variant="outline"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-pen size-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                />
+              </svg>
+              Edit layout
+            </button>
+          </div>
+        </div>
+        <div
+          class="relative w-full overflow-x-hidden"
+        >
+          <div
+            class="react-grid-layout"
+            style="height: 2503px;"
+          >
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,0px); -webkit-transform: translate(0px,0px); width: 0px; height: 643px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      3D Structure
+                    </div>
+                    <div
+                      class="ml-auto flex items-center gap-2 shrink-0"
+                    >
+                      <div
+                        class="flex items-center gap-2 shrink-0"
+                      >
+                        <button
+                          aria-label="Download 3D structure image"
+                          class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed size-8"
+                          data-size="icon"
+                          data-slot="button"
+                          data-variant="outline"
+                          title="Download 3D structure image"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            class="lucide lucide-download size-3.5"
+                            fill="none"
+                            height="24"
+                            stroke="currentColor"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            viewBox="0 0 24 24"
+                            width="24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M12 15V3"
+                            />
+                            <path
+                              d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                            />
+                            <path
+                              d="m7 10 5 5 5-5"
+                            />
+                          </svg>
+                        </button>
+                        <div
+                          class="flex items-center gap-1.5 flex-wrap"
+                        >
+                          <div
+                            class="flex items-center rounded-md border overflow-hidden shrink-0"
+                          >
+                            <button
+                              aria-pressed="false"
+                              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-transparent bg-transparent shadow-none hover:bg-accent hover:text-accent-foreground active:bg-accent/90 dark:hover:bg-accent/60 has-[>svg]:px-2.5 rounded-none border-0 h-8 px-3 gap-1.5"
+                              data-size="sm"
+                              data-slot="button"
+                              data-variant="ghost"
+                            >
+                              <svg
+                                aria-hidden="true"
+                                class="lucide lucide-layout-grid size-3.5"
+                                fill="none"
+                                height="24"
+                                stroke="currentColor"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                                width="24"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="3"
+                                  y="3"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="14"
+                                  y="3"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="14"
+                                  y="14"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="3"
+                                  y="14"
+                                />
+                              </svg>
+                              2D
+                            </button>
+                            <button
+                              aria-pressed="true"
+                              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-primary/35 bg-primary text-primary-foreground shadow-[var(--shadow-button-primary)] hover:bg-primary/92 hover:shadow-[var(--shadow-elevation-raised)] active:bg-primary/95 active:shadow-[var(--shadow-button-primary-pressed)] has-[>svg]:px-2.5 rounded-none border-0 h-8 px-3 gap-1.5"
+                              data-size="sm"
+                              data-slot="button"
+                              data-variant="default"
+                            >
+                              <svg
+                                aria-hidden="true"
+                                class="lucide lucide-box size-3.5"
+                                fill="none"
+                                height="24"
+                                stroke="currentColor"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                                width="24"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"
+                                />
+                                <path
+                                  d="m3.3 7 8.7 5 8.7-5"
+                                />
+                                <path
+                                  d="M12 22V12"
+                                />
+                              </svg>
+                              3D
+                            </button>
+                          </div>
+                          <button
+                            aria-label="Hide bonds"
+                            aria-pressed="true"
+                            class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed h-8 rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0"
+                            data-size="sm"
+                            data-slot="button"
+                            data-variant="outline"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-eye size-3.5"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                              />
+                              <circle
+                                cx="12"
+                                cy="12"
+                                r="3"
+                              />
+                            </svg>
+                            <span>
+                              Bonds
+                            </span>
+                          </button>
+                          <button
+                            aria-autocomplete="none"
+                            aria-controls="radix-_r_2r_"
+                            aria-expanded="false"
+                            aria-label="Viewer style"
+                            class="data-[placeholder]:text-muted-foreground dark:data-[placeholder]:text-foreground/75 [&_svg:not([class*='text-'])]:text-muted-foreground dark:[&_svg:not([class*='text-'])]:text-foreground/72 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-input bg-surface-raised shadow-none transition-[background-color,border-color,color,box-shadow] duration-200 hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed focus-visible:outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] w-32 shrink-0"
+                            data-size="sm"
+                            data-slot="select-trigger"
+                            data-state="closed"
+                            dir="ltr"
+                            role="combobox"
+                            type="button"
+                          >
+                            <span
+                              data-slot="select-value"
+                              style="pointer-events: none;"
+                            >
+                              Ball & Stick
+                            </span>
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-chevron-down size-4 opacity-50"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="m6 9 6 6 6-6"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            aria-label="Reset camera view"
+                            class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed h-8 rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0"
+                            data-size="sm"
+                            data-slot="button"
+                            data-variant="outline"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-rotate-ccw size-3.5"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+                              />
+                              <path
+                                d="M3 3v5h5"
+                              />
+                            </svg>
+                            <span>
+                              Reset
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      aria-label="Expand 3D Structure fullscreen"
+                      class=" p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="p-0 flex-1 min-h-0"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="h-full min-h-0"
+                  >
+                    <div
+                      class="rounded-b-lg overflow-hidden h-full"
+                      data-testid="molecule-viewer-3d"
+                      style="width: 100%; height: 100%; position: relative; background-color: var(--card);"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,651px); -webkit-transform: translate(0px,651px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Properties
+                    </div>
+                    <button
+                      aria-label="Expand Properties fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="contents"
+                  >
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Formula
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        <span
+                          class="font-mono"
+                        >
+                          H₂
+                        </span>
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Molecular Weight
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        2.016 Da
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Charge
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        Neutral (0)
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Multiplicity
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        1
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Atoms
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        2
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Bonds (est.)
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        1
+                      </span>
+                    </div>
+                    <div
+                      class="border-t pt-2 mt-1 flex flex-col gap-2"
+                    >
+                      <div
+                        class="flex flex-col gap-1"
+                      >
+                        <span
+                          class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                        >
+                          Added
+                        </span>
+                        <span
+                          class="text-sm"
+                        >
+                          6/1/2025, 3:00:00 AM
+                        </span>
+                      </div>
+                      <div
+                        class="flex flex-col gap-1"
+                      >
+                        <span
+                          class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                        >
+                          Updated
+                        </span>
+                        <span
+                          class="text-sm"
+                        >
+                          6/1/2025, 3:00:00 AM
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,1116px); -webkit-transform: translate(0px,1116px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Description
+                    </div>
+                    <button
+                      aria-label="Expand Description fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <p
+                    class="text-sm text-muted-foreground italic"
+                  >
+                    No description available.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,1581px); -webkit-transform: translate(0px,1581px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Identifiers
+                    </div>
+                    <button
+                      aria-label="Expand Identifiers fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <p
+                    class="text-sm text-muted-foreground italic"
+                  >
+                    No identifiers available.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,2046px); -webkit-transform: translate(0px,2046px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Atom Coordinates
+                    </div>
+                    <span
+                      class="inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 font-mono tabular-nums"
+                      data-slot="badge"
+                      data-variant="secondary"
+                    >
+                      2
+                    </span>
+                    <div
+                      class="ml-auto flex items-center gap-2 shrink-0"
+                    >
+                      <button
+                        aria-label="Download XYZ coordinates"
+                        class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed size-8"
+                        data-size="icon"
+                        data-slot="button"
+                        data-variant="outline"
+                        title="Download XYZ coordinates"
+                        type="button"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-download size-3.5"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M12 15V3"
+                          />
+                          <path
+                            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                          />
+                          <path
+                            d="m7 10 5 5 5-5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <button
+                      aria-label="Expand Atom Coordinates fullscreen"
+                      class=" p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="p-0 flex-1 min-h-0 overflow-hidden flex flex-col"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="border-t h-full overflow-y-auto flex-1"
+                  >
+                    <table
+                      aria-label="Atom coordinates"
+                      class="w-full"
+                    >
+                      <thead>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-2 border-b bg-muted/40 sticky top-0 z-10"
+                        >
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            #
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Sym
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            X (Å)
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Y (Å)
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Z (Å)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-1.5 border-b last:border-0 hover:bg-muted/40 transition-colors"
+                        >
+                          <td
+                            class="text-xs text-muted-foreground tabular-nums"
+                          >
+                            1
+                          </td>
+                          <td
+                            class="text-sm font-medium"
+                          >
+                            H
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                        </tr>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-1.5 border-b last:border-0 hover:bg-muted/40 transition-colors"
+                        >
+                          <td
+                            class="text-xs text-muted-foreground tabular-nums"
+                          >
+                            2
+                          </td>
+                          <td
+                            class="text-sm font-medium"
+                          >
+                            H
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.740
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`MoleculeDetailPage > responsive layoutSnapShots > renders with responsive constraints on tablet (768px) > tablet-768px 1`] = `
+<div>
+  <div
+    class="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 overflow-x-hidden"
+  >
+    <div
+      class="flex flex-col gap-6"
+    >
+      <button
+        aria-label="Go back"
+        class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-chevron-left size-4"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="m15 18-6-6 6-6"
+          />
+        </svg>
+        Back
+      </button>
+      <div
+        class="flex flex-col gap-4 w-full overflow-x-hidden px-2 min-w-0"
+        data-testid="molecule-detail"
+      >
+        <div
+          class="w-full"
+        />
+        <div
+          class="flex items-end justify-between gap-4 flex-wrap shrink-0"
+        >
+          <div
+            class="flex flex-col gap-1.5 min-w-0 flex-1"
+          >
+            <h1
+              class="text-3xl font-bold tracking-tight"
+            >
+              H2
+            </h1>
+            <div
+              class="flex items-center gap-2.5 flex-wrap"
+            >
+              <span
+                class="inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 font-mono"
+                data-slot="badge"
+                data-variant="secondary"
+              >
+                H₂
+              </span>
+            </div>
+          </div>
+          <div
+            class="flex items-center gap-2 shrink-0 flex-wrap"
+          >
+            <a
+              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-primary/35 bg-primary text-primary-foreground shadow-[var(--shadow-button-primary)] hover:bg-primary/92 hover:shadow-[var(--shadow-elevation-raised)] active:bg-primary/95 active:shadow-[var(--shadow-button-primary-pressed)] rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0 h-8 text-xs"
+              data-size="sm"
+              data-slot="button"
+              data-variant="default"
+              href="/runs/new?molecule_id=a1b2c3d4-0000-0000-0000-000000000001"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-plus size-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12h14"
+                />
+                <path
+                  d="M12 5v14"
+                />
+              </svg>
+              New run
+            </a>
+            <button
+              aria-label="Edit layout"
+              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0 h-8 text-xs"
+              data-size="sm"
+              data-slot="button"
+              data-variant="outline"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-pen size-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+                />
+              </svg>
+              Edit layout
+            </button>
+          </div>
+        </div>
+        <div
+          class="relative w-full overflow-x-hidden"
+        >
+          <div
+            class="react-grid-layout"
+            style="height: 2503px;"
+          >
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,0px); -webkit-transform: translate(0px,0px); width: 0px; height: 643px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      3D Structure
+                    </div>
+                    <div
+                      class="ml-auto flex items-center gap-2 shrink-0"
+                    >
+                      <div
+                        class="flex items-center gap-2 shrink-0"
+                      >
+                        <button
+                          aria-label="Download 3D structure image"
+                          class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed size-8"
+                          data-size="icon"
+                          data-slot="button"
+                          data-variant="outline"
+                          title="Download 3D structure image"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            class="lucide lucide-download size-3.5"
+                            fill="none"
+                            height="24"
+                            stroke="currentColor"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            viewBox="0 0 24 24"
+                            width="24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M12 15V3"
+                            />
+                            <path
+                              d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                            />
+                            <path
+                              d="m7 10 5 5 5-5"
+                            />
+                          </svg>
+                        </button>
+                        <div
+                          class="flex items-center gap-1.5 flex-wrap"
+                        >
+                          <div
+                            class="flex items-center rounded-md border overflow-hidden shrink-0"
+                          >
+                            <button
+                              aria-pressed="false"
+                              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-transparent bg-transparent shadow-none hover:bg-accent hover:text-accent-foreground active:bg-accent/90 dark:hover:bg-accent/60 has-[>svg]:px-2.5 rounded-none border-0 h-8 px-3 gap-1.5"
+                              data-size="sm"
+                              data-slot="button"
+                              data-variant="ghost"
+                            >
+                              <svg
+                                aria-hidden="true"
+                                class="lucide lucide-layout-grid size-3.5"
+                                fill="none"
+                                height="24"
+                                stroke="currentColor"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                                width="24"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="3"
+                                  y="3"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="14"
+                                  y="3"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="14"
+                                  y="14"
+                                />
+                                <rect
+                                  height="7"
+                                  rx="1"
+                                  width="7"
+                                  x="3"
+                                  y="14"
+                                />
+                              </svg>
+                              2D
+                            </button>
+                            <button
+                              aria-pressed="true"
+                              class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-primary/35 bg-primary text-primary-foreground shadow-[var(--shadow-button-primary)] hover:bg-primary/92 hover:shadow-[var(--shadow-elevation-raised)] active:bg-primary/95 active:shadow-[var(--shadow-button-primary-pressed)] has-[>svg]:px-2.5 rounded-none border-0 h-8 px-3 gap-1.5"
+                              data-size="sm"
+                              data-slot="button"
+                              data-variant="default"
+                            >
+                              <svg
+                                aria-hidden="true"
+                                class="lucide lucide-box size-3.5"
+                                fill="none"
+                                height="24"
+                                stroke="currentColor"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                                width="24"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"
+                                />
+                                <path
+                                  d="m3.3 7 8.7 5 8.7-5"
+                                />
+                                <path
+                                  d="M12 22V12"
+                                />
+                              </svg>
+                              3D
+                            </button>
+                          </div>
+                          <button
+                            aria-label="Hide bonds"
+                            aria-pressed="true"
+                            class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed h-8 rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0"
+                            data-size="sm"
+                            data-slot="button"
+                            data-variant="outline"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-eye size-3.5"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                              />
+                              <circle
+                                cx="12"
+                                cy="12"
+                                r="3"
+                              />
+                            </svg>
+                            <span>
+                              Bonds
+                            </span>
+                          </button>
+                          <button
+                            aria-autocomplete="none"
+                            aria-controls="radix-_r_3e_"
+                            aria-expanded="false"
+                            aria-label="Viewer style"
+                            class="data-[placeholder]:text-muted-foreground dark:data-[placeholder]:text-foreground/75 [&_svg:not([class*='text-'])]:text-muted-foreground dark:[&_svg:not([class*='text-'])]:text-foreground/72 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-input bg-surface-raised shadow-none transition-[background-color,border-color,color,box-shadow] duration-200 hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed focus-visible:outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] w-32 shrink-0"
+                            data-size="sm"
+                            data-slot="select-trigger"
+                            data-state="closed"
+                            dir="ltr"
+                            role="combobox"
+                            type="button"
+                          >
+                            <span
+                              data-slot="select-value"
+                              style="pointer-events: none;"
+                            >
+                              Ball & Stick
+                            </span>
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-chevron-down size-4 opacity-50"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="m6 9 6 6 6-6"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            aria-label="Reset camera view"
+                            class="inline-flex cursor-pointer items-center justify-center whitespace-nowrap border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed h-8 rounded-md px-3 has-[>svg]:px-2.5 gap-1.5 shrink-0"
+                            data-size="sm"
+                            data-slot="button"
+                            data-variant="outline"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              class="lucide lucide-rotate-ccw size-3.5"
+                              fill="none"
+                              height="24"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              viewBox="0 0 24 24"
+                              width="24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+                              />
+                              <path
+                                d="M3 3v5h5"
+                              />
+                            </svg>
+                            <span>
+                              Reset
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      aria-label="Expand 3D Structure fullscreen"
+                      class=" p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="p-0 flex-1 min-h-0"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="h-full min-h-0"
+                  >
+                    <div
+                      class="rounded-b-lg overflow-hidden h-full"
+                      data-testid="molecule-viewer-3d"
+                      style="width: 100%; height: 100%; position: relative; background-color: var(--card);"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,651px); -webkit-transform: translate(0px,651px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Properties
+                    </div>
+                    <button
+                      aria-label="Expand Properties fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="contents"
+                  >
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Formula
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        <span
+                          class="font-mono"
+                        >
+                          H₂
+                        </span>
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Molecular Weight
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        2.016 Da
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Charge
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        Neutral (0)
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Multiplicity
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        1
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Atoms
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        2
+                      </span>
+                    </div>
+                    <div
+                      class="flex flex-col gap-1"
+                    >
+                      <span
+                        class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                      >
+                        Bonds (est.)
+                      </span>
+                      <span
+                        class="text-sm"
+                      >
+                        1
+                      </span>
+                    </div>
+                    <div
+                      class="border-t pt-2 mt-1 flex flex-col gap-2"
+                    >
+                      <div
+                        class="flex flex-col gap-1"
+                      >
+                        <span
+                          class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                        >
+                          Added
+                        </span>
+                        <span
+                          class="text-sm"
+                        >
+                          6/1/2025, 3:00:00 AM
+                        </span>
+                      </div>
+                      <div
+                        class="flex flex-col gap-1"
+                      >
+                        <span
+                          class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                        >
+                          Updated
+                        </span>
+                        <span
+                          class="text-sm"
+                        >
+                          6/1/2025, 3:00:00 AM
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,1116px); -webkit-transform: translate(0px,1116px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Description
+                    </div>
+                    <button
+                      aria-label="Expand Description fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <p
+                    class="text-sm text-muted-foreground italic"
+                  >
+                    No description available.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,1581px); -webkit-transform: translate(0px,1581px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Identifiers
+                    </div>
+                    <button
+                      aria-label="Expand Identifiers fullscreen"
+                      class="ml-auto p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0 px-4 py-3"
+                  data-slot="card-content"
+                >
+                  <p
+                    class="text-sm text-muted-foreground italic"
+                  >
+                    No identifiers available.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              class="react-grid-item cssTransforms react-resizable-hide react-resizable"
+              style="transform: translate(0px,2046px); -webkit-transform: translate(0px,2046px); width: 0px; height: 457px; position: absolute;"
+            >
+              <div
+                class="text-card-foreground gap-6 rounded-xl py-6 border-border/85 bg-card shadow-[var(--shadow-surface-panel)] h-full flex flex-col group"
+                data-slot="card"
+              >
+                <div
+                  class="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 shrink-0 px-3 pt-2 pb-1"
+                  data-slot="card-header"
+                >
+                  <div
+                    class="flex items-center gap-2 min-w-0"
+                  >
+                    <div
+                      class="font-semibold text-sm truncate"
+                      data-slot="card-title"
+                    >
+                      Atom Coordinates
+                    </div>
+                    <span
+                      class="inline-flex items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 font-mono tabular-nums"
+                      data-slot="badge"
+                      data-variant="secondary"
+                    >
+                      2
+                    </span>
+                    <div
+                      class="ml-auto flex items-center gap-2 shrink-0"
+                    >
+                      <button
+                        aria-label="Download XYZ coordinates"
+                        class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed size-8"
+                        data-size="icon"
+                        data-slot="button"
+                        data-variant="outline"
+                        title="Download XYZ coordinates"
+                        type="button"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          class="lucide lucide-download size-3.5"
+                          fill="none"
+                          height="24"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          viewBox="0 0 24 24"
+                          width="24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M12 15V3"
+                          />
+                          <path
+                            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                          />
+                          <path
+                            d="m7 10 5 5 5-5"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <button
+                      aria-label="Expand Atom Coordinates fullscreen"
+                      class=" p-1.5 rounded-md hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-expand size-3.5"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m15 15 6 6"
+                        />
+                        <path
+                          d="m15 9 6-6"
+                        />
+                        <path
+                          d="M21 16v5h-5"
+                        />
+                        <path
+                          d="M21 8V3h-5"
+                        />
+                        <path
+                          d="M3 16v5h5"
+                        />
+                        <path
+                          d="m3 21 6-6"
+                        />
+                        <path
+                          d="M3 8V3h5"
+                        />
+                        <path
+                          d="M9 9 3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="p-0 flex-1 min-h-0 overflow-hidden flex flex-col"
+                  data-slot="card-content"
+                >
+                  <div
+                    class="border-t h-full overflow-y-auto flex-1"
+                  >
+                    <table
+                      aria-label="Atom coordinates"
+                      class="w-full"
+                    >
+                      <thead>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-2 border-b bg-muted/40 sticky top-0 z-10"
+                        >
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            #
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Sym
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            X (Å)
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Y (Å)
+                          </th>
+                          <th
+                            class="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                          >
+                            Z (Å)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-1.5 border-b last:border-0 hover:bg-muted/40 transition-colors"
+                        >
+                          <td
+                            class="text-xs text-muted-foreground tabular-nums"
+                          >
+                            1
+                          </td>
+                          <td
+                            class="text-sm font-medium"
+                          >
+                            H
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                        </tr>
+                        <tr
+                          class="grid grid-cols-[1.5rem_3rem_1fr_1fr_1fr] gap-3 items-center px-3 py-1.5 border-b last:border-0 hover:bg-muted/40 transition-colors"
+                        >
+                          <td
+                            class="text-xs text-muted-foreground tabular-nums"
+                          >
+                            2
+                          </td>
+                          <td
+                            class="text-sm font-medium"
+                          >
+                            H
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.000
+                          </td>
+                          <td
+                            class="text-xs font-mono tabular-nums"
+                          >
+                            0.740
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;

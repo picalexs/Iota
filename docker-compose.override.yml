@@ -1,0 +1,37 @@
+services:
+  ui:
+    build:
+      context: ./frontend
+      target: dev
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/package-lock.json:/app/package-lock.json
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./shared:/shared:ro
+      - operatoraccess:/app/local-operator
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-}
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-}
+      API_TARGET_URL: ${API_TARGET_URL:-http://api:8000}
+      LOCAL_OPERATOR_TOKEN: ${LOCAL_OPERATOR_TOKEN:-}
+      LOCAL_OPERATOR_TOKEN_FILE: ${LOCAL_OPERATOR_TOKEN_FILE:-/app/local-operator/operator-access.token}
+
+  api:
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${API_PORT:-8000}:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - credentialkeys:/app/local-state
+      - operatoraccess:/app/local-operator
+
+  worker:
+    volumes:
+      - ./worker:/app/worker
+      - credentialkeys:/app/local-state
+
+  redis:
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${REDIS_PUBLISHED_PORT:-6379}:6379"

@@ -1,0 +1,244 @@
+services:
+  # -- Secret Volume Init ---------------------------------------
+  secret-init:
+    image: alpine:3.22
+    command:
+      - /bin/sh
+      - -eu
+      - -c
+      - |
+        mkdir -p /mnt/local-state /mnt/local-operator
+        chown -R 10001:10001 /mnt/local-state /mnt/local-operator
+        chmod 700 /mnt/local-state /mnt/local-operator
+        find /mnt/local-state /mnt/local-operator -mindepth 1 -type d -exec chmod 700 {} +
+        find /mnt/local-state /mnt/local-operator -mindepth 1 -type f -exec chmod 600 {} +
+    volumes:
+      - credentialkeys:/mnt/local-state
+      - operatoraccess:/mnt/local-operator
+    networks:
+      - vqe-network
+
+  # -- Frontend ---------------------------------------
+  ui:
+    build:
+      context: ./frontend
+      target: prod
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
+    volumes:
+      - operatoraccess:/app/local-operator
+    depends_on:
+      api:
+        condition: service_healthy
+      secret-init:
+        condition: service_completed_successfully
+    environment:
+      API_TARGET_URL: ${API_TARGET_URL:-http://api:8000}
+      LOCAL_OPERATOR_TOKEN: ${LOCAL_OPERATOR_TOKEN:-}
+      LOCAL_OPERATOR_TOKEN_FILE: ${LOCAL_OPERATOR_TOKEN_FILE:-/app/local-operator/operator-access.token}
+      NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-_}
+    networks:
+      - vqe-network
+    cpus: "1.00"
+    mem_limit: 1024M
+    mem_reservation: 512M
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+
+  # -- Backend API ---------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    volumes:
+      - credentialkeys:/app/local-state
+      - operatoraccess:/app/local-operator
+    environment:
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-vqe}
+      DB_USER: ${DB_USER:-vqe}
+      DB_PASSWORD: ${DB_PASSWORD:-dev-password-not-secret} # pragma: allowlist secret - dev placeholder, not a real secret
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD:-dev-redis-not-secret}@redis:6379/0} # pragma: allowlist secret - dev placeholder
+      QUEUE_NAME: ${QUEUE_NAME:-quantum}
+      QUANTUM_JOB_TIMEOUT_SECONDS: ${QUANTUM_JOB_TIMEOUT_SECONDS:-14400}
+      LOCAL_CREDENTIALS_KEYS: ${LOCAL_CREDENTIALS_KEYS:-}
+      LOCAL_CREDENTIALS_KEY_FILE: ${LOCAL_CREDENTIALS_KEY_FILE:-/app/local-state/credential-fernet.key}
+      LOCAL_OPERATOR_TOKEN: ${LOCAL_OPERATOR_TOKEN:-}
+      LOCAL_OPERATOR_TOKEN_FILE: ${LOCAL_OPERATOR_TOKEN_FILE:-/app/local-operator/operator-access.token}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_VERSION: ${APP_VERSION:-dev}
+      SKIP_PUBCHEM_SYNC: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      secret-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 120s
+    networks:
+      - vqe-network
+    restart: unless-stopped
+    cpus: "1.00"
+    mem_limit: 1024M
+    mem_reservation: 512M
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+
+  # -- RQ Worker ---------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    command: python -m worker.main
+    volumes:
+      - credentialkeys:/app/local-state
+    environment:
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-vqe}
+      DB_USER: ${DB_USER:-vqe}
+      DB_PASSWORD: ${DB_PASSWORD:-dev-password-not-secret} # pragma: allowlist secret - dev placeholder, not a real secret
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD:-dev-redis-not-secret}@redis:6379/0} # pragma: allowlist secret - dev placeholder
+      QUEUE_NAME: ${QUEUE_NAME:-quantum}
+      QUANTUM_JOB_TIMEOUT_SECONDS: ${QUANTUM_JOB_TIMEOUT_SECONDS:-14400}
+      LOCAL_CREDENTIALS_KEYS: ${LOCAL_CREDENTIALS_KEYS:-}
+      LOCAL_CREDENTIALS_KEY_FILE: ${LOCAL_CREDENTIALS_KEY_FILE:-/app/local-state/credential-fernet.key}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_VERSION: ${APP_VERSION:-dev}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      secret-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - rq info --url "$${REDIS_URL}" "$${QUEUE_NAME}" >/dev/null
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - vqe-network
+    restart: unless-stopped
+    cpus: "8.00"
+    mem_limit: 8192M
+    mem_reservation: 2048M
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "8.00"
+          memory: 8192M
+        reservations:
+          cpus: "4.00"
+          memory: 2048M
+
+  # -- Postgres ---------------------------------------
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-vqe}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev-password-not-secret} # pragma: allowlist secret - dev placeholder, not a real secret
+      POSTGRES_DB: ${DB_NAME:-vqe}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vqe}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - vqe-network
+    cpus: "1.50"
+    mem_limit: 1536M
+    mem_reservation: 1024M
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 1536M
+        reservations:
+          cpus: "0.75"
+          memory: 1024M
+
+  # -- Redis ---------------------------------------
+  redis:
+    image: redis:8-alpine
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "${REDIS_PASSWORD:-dev-redis-not-secret}", # pragma: allowlist secret - dev placeholder
+      ]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "${REDIS_PASSWORD:-dev-redis-not-secret}", # pragma: allowlist secret - dev placeholder
+          "--no-auth-warning",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - vqe-network
+    cpus: "0.50"
+    mem_limit: 512M
+    mem_reservation: 256M
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+volumes:
+  pgdata:
+    name: ${PGDATA_VOLUME_NAME:-quantum_simulation_studio_pgdata}
+  redisdata:
+    name: ${REDISDATA_VOLUME_NAME:-quantum_simulation_studio_redisdata}
+  credentialkeys:
+    name: ${CREDENTIALKEYS_VOLUME_NAME:-quantum_simulation_studio_credentialkeys}
+  operatoraccess:
+    name: ${OPERATORACCESS_VOLUME_NAME:-quantum_simulation_studio_operatoraccess}
+
+networks:
+  vqe-network:

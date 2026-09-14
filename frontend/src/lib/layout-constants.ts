@@ -1,0 +1,9 @@
+export const MOBILE_BREAKPOINT = 768;
+
+export const GRID_MOBILE_BREAKPOINT = 640;
+export const GRID_SMALL_TABLET_BREAKPOINT = 800;
+export const GRID_TABLET_BREAKPOINT = 1024;
+export const GRID_ROW_HEIGHT = 85;
+
+export const ELASTIC_MAX_OFFSET_PX = 26;
+export const ELASTIC_STIFFNESS_PX = 70;

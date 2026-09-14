@@ -1,0 +1,49 @@
+# Normalize text files to LF. This matches .editorconfig and keeps WSL/Docker
+# checkouts predictable across platforms.
+* text=auto eol=lf
+
+# Source and configuration
+*.py          text eol=lf diff=python
+*.pyi         text eol=lf diff=python
+*.js          text eol=lf
+*.jsx         text eol=lf
+*.ts          text eol=lf
+*.tsx         text eol=lf
+*.cjs         text eol=lf
+*.mjs         text eol=lf
+*.css         text eol=lf
+*.html        text eol=lf
+*.json        text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+*.toml        text eol=lf
+*.ini         text eol=lf
+*.properties  text eol=lf
+*.md          text eol=lf diff=markdown
+*.svg         text eol=lf
+
+# Scripts
+*.sh          text eol=lf
+Dockerfile    text eol=lf
+*/Dockerfile  text eol=lf
+*.bat         text eol=crlf
+*.cmd         text eol=crlf
+*.ps1         text eol=crlf
+
+# Lockfiles, snapshots, and notebooks
+package-lock.json           text eol=lf linguist-generated=true
+frontend/package-lock.json  text eol=lf linguist-generated=true
+*.lock                      text eol=lf
+*.snap                      text eol=lf linguist-generated=true
+*.ipynb                     text eol=lf -linguist-detectable
+
+# Binary assets
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pkl   binary
+*.zip   binary
+*.gz    binary
+*.xz    binary

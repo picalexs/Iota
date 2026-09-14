@@ -1,0 +1,43 @@
+# Version control and local configuration
+.git
+.git/**
+.gitignore
+.gitattributes
+.env
+.env.*
+
+# Local credentials and state
+**/*.pem
+**/*.p12
+**/*.key
+**/*-access.token
+local-state/
+local-operator/
+
+# Local dependencies, caches, and generated output
+node_modules/
+**/node_modules/
+.pytest_cache/
+**/.pytest_cache/
+.ruff_cache/
+**/.ruff_cache/
+.mypy_cache/
+**/.mypy_cache/
+.coverage
+coverage/
+**/coverage/
+htmlcov/
+dist/
+**/dist/
+build/
+**/build/
+*.pyc
+__pycache__/
+**/__pycache__/
+*.log
+*.tmp
+
+# Files and folders outside API and worker image inputs
+.github/
+.playwright-cli/
+frontend/
