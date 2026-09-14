@@ -16,7 +16,7 @@ qiskit-aer==0.17.2
 qiskit-addon-sqd==0.12.1
 qiskit-ibm-runtime==0.45.1
 qiskit-qasm3-import>=0.6,<1.0
-ffsim==0.0.68
+ffsim==0.0.84
 rustworkx>=0.14.0
 matplotlib>=3.10,<4.0
 pylatexenc>=2.10,<3.0
