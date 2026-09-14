@@ -15,7 +15,6 @@ public service.
 | [API endpoints](api-endpoints.md) | REST and Server-Sent Events endpoints. |
 | [Pydantic schemas](schemas.md) | API request and response models. |
 | [Worker and queue](worker-and-queue.md) | Worker execution and Redis/RQ behavior. |
-| [Public release plan](open-source-public-release-plan.md) | License, security, scope, and publication gates. |
 
 ## Scope rules
 
@@ -24,4 +23,3 @@ public service.
 - Do not add private paths, credentials, provider job identifiers, or local
   result exports.
 - Do not describe local simulation as hardware evidence.
-- Keep publication planning separate from benchmark and manuscript material.

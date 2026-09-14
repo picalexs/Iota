@@ -30,8 +30,7 @@ details, and benchmark comparison views.
 
 This tree is not ready for public publication. The software license is now
 selected, but third-party asset review, owner review of repository controls,
-and remote branch-protection settings are still pending. See the [public
-release plan](docs/open-source-public-release-plan.md).
+and remote branch-protection settings are still pending.
 
 ## Application layout
 
@@ -40,7 +39,7 @@ release plan](docs/open-source-public-release-plan.md).
 - `frontend/`: React and Vite web application.
 - `shared/`: Python modules shared by the API and worker.
 - `scripts/contracts/`: API schema export used by frontend type generation.
-- `docs/`: application documentation and the public release plan.
+- `docs/`: application documentation.
 
 ## Run locally
 
