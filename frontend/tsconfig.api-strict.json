@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.api-strict.tsbuildinfo"
+  },
+  "include": [
+    "src/api",
+    "src/types",
+    "src/lib/app-logger.ts",
+    "src/lib/benchmark-presets.ts",
+    "src/lib/ibm-profile-events.ts",
+    "src/vite-env.d.ts"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "catalog_version": "v1-statevector",
+  "molecules": {
+    "H2": {
+      "active_space": [2, 2],
+      "atoms": [
+        {
+          "symbol": "H",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        {
+          "symbol": "H",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.7414
+        }
+      ],
+      "basis": "sto-3g",
+      "expected": {
+        "primary_energy": -0.5858141814352165,
+        "primary_iterations": 30
+      }
+    },
+    "LiH": {
+      "active_space": [4, 4],
+      "atoms": [
+        {
+          "symbol": "Li",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        {
+          "symbol": "H",
+          "x": 0.0,
+          "y": 0.0,
+          "z": 1.6
+        }
+      ],
+      "basis": "sto-3g",
+      "expected": {
+        "primary_energy": -7.08423707199838,
+        "primary_iterations": 34
+      }
+    }
+  },
+  "solver": {
+    "algorithm": "vqe",
+    "ansatz_name": "EfficientSU2",
+    "backend_target": "statevector",
+    "max_iterations": 30,
+    "optimizer_name": "COBYLA",
+    "seed": 42
+  }
+}

@@ -1,0 +1,18 @@
+# Version control and local configuration
+.git
+.git/**
+.gitignore
+.gitattributes
+.env
+.env.*
+
+# Local dependencies, caches, and generated output
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.vite/
+*.log
+*.tmp
+.DS_Store

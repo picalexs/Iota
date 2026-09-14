@@ -1,0 +1,5 @@
+---
+warn-only: true
+vulnerability-check: true
+license-check: false
+comment-summary-in-pr: never

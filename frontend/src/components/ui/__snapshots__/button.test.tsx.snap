@@ -1,0 +1,54 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Button > matches snapshot 1`] = `
+<div>
+  <button
+    class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-primary/35 bg-primary text-primary-foreground shadow-[var(--shadow-button-primary)] hover:bg-primary/92 hover:shadow-[var(--shadow-elevation-raised)] active:bg-primary/95 active:shadow-[var(--shadow-button-primary-pressed)] h-9 px-4 py-2 has-[>svg]:px-3"
+    data-size="default"
+    data-slot="button"
+    data-variant="default"
+  >
+    Default
+  </button>
+  <button
+    class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-transparent bg-secondary text-secondary-foreground shadow-none hover:bg-interactive-hover active:bg-surface-pressed h-9 px-4 py-2 has-[>svg]:px-3"
+    data-size="default"
+    data-slot="button"
+    data-variant="secondary"
+  >
+    Secondary
+  </button>
+  <button
+    class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-destructive/35 bg-destructive text-white hover:bg-destructive/92 active:bg-destructive/95 active:shadow-[inset_0_1px_2px_rgb(0_0_0_/_0.16)] dark:bg-destructive/70 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-size="default"
+    data-slot="button"
+    data-variant="destructive"
+  >
+    Destructive
+  </button>
+  <button
+    class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-input bg-surface-raised text-foreground shadow-none hover:border-interactive-hover-border hover:bg-interactive-hover active:border-interactive-pressed-border active:bg-surface-pressed h-9 px-4 py-2 has-[>svg]:px-3"
+    data-size="default"
+    data-slot="button"
+    data-variant="outline"
+  >
+    Outline
+  </button>
+  <button
+    class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-transparent bg-transparent shadow-none hover:bg-accent hover:text-accent-foreground active:bg-accent/90 dark:hover:bg-accent/60 h-9 px-4 py-2 has-[>svg]:px-3"
+    data-size="default"
+    data-slot="button"
+    data-variant="ghost"
+  >
+    Ghost
+  </button>
+  <button
+    class="inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-accent-2/60 focus-visible:ring-focus-strong focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border-transparent bg-transparent text-primary shadow-none underline-offset-4 hover:underline h-9 px-4 py-2 has-[>svg]:px-3"
+    data-size="default"
+    data-slot="button"
+    data-variant="link"
+  >
+    Link
+  </button>
+</div>
+`;

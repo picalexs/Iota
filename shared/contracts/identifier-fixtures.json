@@ -1,0 +1,606 @@
+{
+  "algorithms": [
+    "vqe",
+    "qse",
+    "kqd",
+    "qfd",
+    "sqd",
+    "skqd"
+  ],
+  "ansatzes": [
+    {
+      "aliases": [
+        "efficient_su2",
+        "efficientsu2"
+      ],
+      "description": "Hardware-efficient SU(2) ansatz used as the balanced default.",
+      "id": "EfficientSU2",
+      "label": "EfficientSU2",
+      "metadata": {
+        "canonical_worker_id": "efficientsu2",
+        "default_reps": 2
+      },
+      "supported_algorithms": [
+        "vqe",
+        "qse"
+      ]
+    },
+    {
+      "aliases": [
+        "number_preserving",
+        "numberpreserving"
+      ],
+      "description": "Hartree-Fock-seeded same-spin excitation-preserving ansatz that stays in the declared electron sector.",
+      "id": "NumberPreserving",
+      "label": "NumberPreserving",
+      "metadata": {
+        "canonical_worker_id": "numberpreserving",
+        "default_reps": 2
+      },
+      "supported_algorithms": [
+        "vqe",
+        "qse"
+      ]
+    },
+    {
+      "aliases": [
+        "real_amplitudes",
+        "realamplitudes"
+      ],
+      "description": "Real-valued Ry/CX ansatz with fewer parameters than EfficientSU2.",
+      "id": "RealAmplitudes",
+      "label": "RealAmplitudes",
+      "metadata": {
+        "canonical_worker_id": "realamplitudes",
+        "default_reps": 2
+      },
+      "supported_algorithms": [
+        "vqe",
+        "qse"
+      ]
+    },
+    {
+      "aliases": [
+        "two_local",
+        "twolocal"
+      ],
+      "description": "Two-local Ry/Rz plus CX ansatz for higher-expressibility scans.",
+      "id": "TwoLocal",
+      "label": "TwoLocal",
+      "metadata": {
+        "canonical_worker_id": "twolocal",
+        "default_reps": 2
+      },
+      "supported_algorithms": [
+        "vqe",
+        "qse"
+      ]
+    }
+  ],
+  "backend_targets": [
+    "statevector",
+    "aer_simulator",
+    "ibm_runtime"
+  ],
+  "capabilities": {
+    "aer_simulator": {
+      "enabled": true,
+      "supports_noise_profile": true,
+      "supports_shots": true
+    },
+    "ibm_runtime": {
+      "enabled": true,
+      "supports_noise_profile": false,
+      "supports_shots": true
+    },
+    "statevector": {
+      "enabled": true,
+      "supports_noise_profile": false,
+      "supports_shots": false
+    }
+  },
+  "catalog_version": "2026-09-11-v21",
+  "defaults": {
+    "ansatz_name": "EfficientSU2",
+    "optimizer_name": "COBYLA",
+    "qse_reference_ansatz_name": "EfficientSU2",
+    "qse_reference_optimizer_name": "COBYLA"
+  },
+  "easy_goal_presets": [
+    {
+      "chemical_accuracy_target_ha": 0.005,
+      "goal": "fastest",
+      "label": "5.0 mHa"
+    },
+    {
+      "chemical_accuracy_target_ha": 0.0016,
+      "goal": "balanced",
+      "label": "1.6 mHa"
+    },
+    {
+      "chemical_accuracy_target_ha": 0.0005,
+      "goal": "best_accuracy",
+      "label": "0.5 mHa"
+    }
+  ],
+  "easy_goals": [
+    "fastest",
+    "balanced",
+    "best_accuracy"
+  ],
+  "limits": {
+    "advanced_config.initial_point_candidates": {
+      "maximum": 16,
+      "minimum": 1
+    },
+    "advanced_config.krylov_dim": {
+      "maximum": 64,
+      "minimum": 1
+    },
+    "advanced_config.krylov_extension_dim": {
+      "maximum": 32,
+      "minimum": 1
+    },
+    "advanced_config.max_function_evaluations": {
+      "maximum": 250000,
+      "minimum": 1
+    },
+    "advanced_config.max_iterations": {
+      "maximum": 5000,
+      "minimum": 1
+    },
+    "advanced_config.max_subspace_dim": {
+      "maximum": 96,
+      "minimum": 1
+    },
+    "advanced_config.num_batches": {
+      "maximum": 128,
+      "minimum": 1
+    },
+    "advanced_config.num_time_points": {
+      "maximum": 128,
+      "minimum": 1
+    },
+    "advanced_config.samples_per_batch": {
+      "maximum": 2000,
+      "minimum": 1
+    },
+    "advanced_config.samples_per_state": {
+      "maximum": 4096,
+      "minimum": 1
+    },
+    "advanced_config.trotter_steps": {
+      "maximum": 32,
+      "minimum": 1
+    },
+    "advanced_config.vqe_reference_max_iterations": {
+      "maximum": 1000,
+      "minimum": 1
+    },
+    "molecule.active_space.n_orbitals.dense": {
+      "maximum": 6,
+      "minimum": 1
+    },
+    "molecule.active_space.sector_dimension": {
+      "maximum": 500000,
+      "minimum": 1
+    }
+  },
+  "optimizers": [
+    {
+      "aliases": [],
+      "description": "Derivative-free constrained optimizer; the current default.",
+      "id": "COBYLA",
+      "label": "COBYLA",
+      "metadata": {
+        "allowed_options": [
+          "catol",
+          "f_target",
+          "rhobeg",
+          "rhoend",
+          "tol"
+        ],
+        "kind": "scipy",
+        "scipy_method": "COBYLA",
+        "supports_max_function_evaluations": false
+      },
+      "supported_algorithms": [
+        "vqe",
+        "qse"
+      ]
+    },
+    {
+      "aliases": [],
+      "description": "Stochastic optimizer suited for noisy primitive evaluations.",
+      "id": "SPSA",
+      "label": "SPSA",
+      "metadata": {
+        "allowed_options": [
+          "allowed_increase",
+          "blocking",
+          "learning_rate",
+          "perturbation"
+        ],
+        "kind": "spsa",
+        "scipy_method": null,
+        "supports_max_function_evaluations": false
+      },
+      "supported_algorithms": [
+        "vqe",
+        "qse"
+      ]
+    },
+    {
+      "aliases": [],
+      "description": "Gradient-based SciPy optimizer for smooth local scans.",
+      "id": "SLSQP",
+      "label": "SLSQP",
+      "metadata": {
+        "allowed_options": [
+          "eps",
+          "ftol",
+          "tol"
+        ],
+        "kind": "scipy",
+        "scipy_method": "SLSQP",
+        "supports_max_function_evaluations": false
+      },
+      "supported_algorithms": [
+        "vqe",
+        "qse"
+      ]
+    },
+    {
+      "aliases": [
+        "L-BFGS-B"
+      ],
+      "description": "Bound-aware quasi-Newton optimizer for larger parameter vectors.",
+      "id": "L_BFGS_B",
+      "label": "L-BFGS-B",
+      "metadata": {
+        "allowed_options": [
+          "eps",
+          "ftol",
+          "gtol",
+          "maxfun",
+          "maxls",
+          "tol"
+        ],
+        "kind": "scipy",
+        "scipy_method": "L-BFGS-B",
+        "supports_max_function_evaluations": true
+      },
+      "supported_algorithms": [
+        "vqe",
+        "qse"
+      ]
+    }
+  ],
+  "recommendations": {
+    "kqd": {
+      "balanced": {
+        "budget": {
+          "krylov_dim": 8
+        },
+        "evolution_method": "exact",
+        "krylov_dim": 8,
+        "residual_tolerance": 1e-08,
+        "time_step": 0.35,
+        "trotter_steps": 1
+      },
+      "best_accuracy": {
+        "budget": {
+          "krylov_dim": 12
+        },
+        "evolution_method": "exact",
+        "krylov_dim": 12,
+        "residual_tolerance": 1e-08,
+        "time_step": 0.5,
+        "trotter_steps": 1
+      },
+      "fastest": {
+        "budget": {
+          "krylov_dim": 4
+        },
+        "evolution_method": "exact",
+        "krylov_dim": 4,
+        "residual_tolerance": 1e-08,
+        "time_step": 0.35,
+        "trotter_steps": 1
+      }
+    },
+    "qfd": {
+      "balanced": {
+        "budget": {
+          "num_time_points": 8
+        },
+        "max_time": 2.5,
+        "num_time_points": 8,
+        "residual_tolerance": 1e-06,
+        "time_grid_type": "linear",
+        "trotter_steps": 1
+      },
+      "best_accuracy": {
+        "budget": {
+          "num_time_points": 12
+        },
+        "max_time": 4.0,
+        "num_time_points": 12,
+        "residual_tolerance": 1e-06,
+        "time_grid_type": "geometric",
+        "trotter_steps": 1
+      },
+      "fastest": {
+        "budget": {
+          "num_time_points": 4
+        },
+        "max_time": 0.5,
+        "num_time_points": 4,
+        "residual_tolerance": 1e-06,
+        "time_grid_type": "linear",
+        "trotter_steps": 1
+      }
+    },
+    "qse": {
+      "balanced": {
+        "budget": {
+          "max_subspace_dim": 8,
+          "reference_method": "hf"
+        },
+        "excitation_level": "singles_doubles",
+        "max_subspace_dim": 8,
+        "overlap_threshold": 1e-05,
+        "reference_method": "hf",
+        "regularization": 1e-07,
+        "residual_tolerance": 1e-08,
+        "vqe_reference_ansatz_name": "EfficientSU2",
+        "vqe_reference_max_iterations": 256,
+        "vqe_reference_optimizer_name": "COBYLA",
+        "vqe_reference_reps": 1
+      },
+      "best_accuracy": {
+        "budget": {
+          "max_subspace_dim": 12,
+          "reference_method": "hf"
+        },
+        "excitation_level": "singles_doubles",
+        "max_subspace_dim": 12,
+        "overlap_threshold": 5e-06,
+        "reference_method": "hf",
+        "regularization": 1e-07,
+        "residual_tolerance": 1e-08,
+        "vqe_reference_ansatz_name": "EfficientSU2",
+        "vqe_reference_max_iterations": 512,
+        "vqe_reference_optimizer_name": "COBYLA",
+        "vqe_reference_reps": 1
+      },
+      "fastest": {
+        "budget": {
+          "max_subspace_dim": 4,
+          "reference_method": "hf"
+        },
+        "excitation_level": "singles",
+        "max_subspace_dim": 4,
+        "overlap_threshold": 0.0001,
+        "reference_method": "hf",
+        "regularization": 1e-06,
+        "residual_tolerance": 1e-08,
+        "vqe_reference_ansatz_name": "EfficientSU2",
+        "vqe_reference_max_iterations": 128,
+        "vqe_reference_optimizer_name": "COBYLA",
+        "vqe_reference_reps": 1
+      }
+    },
+    "skqd": {
+      "balanced": {
+        "budget": {
+          "krylov_states": 4,
+          "samples_per_state": 1024,
+          "selected_ci_max_dim": 32,
+          "total_samples": 4096
+        },
+        "krylov_extension_dim": 4,
+        "max_dim": 32,
+        "min_selected_configurations": 2,
+        "residual_tolerance": 1e-06,
+        "samples_per_state": 1024,
+        "seed": null,
+        "spin_sq_target": null,
+        "symmetrize_spin": false,
+        "time_step": 0.22
+      },
+      "best_accuracy": {
+        "budget": {
+          "krylov_states": 6,
+          "samples_per_state": 2048,
+          "selected_ci_max_dim": 64,
+          "total_samples": 12288
+        },
+        "krylov_extension_dim": 6,
+        "max_dim": 64,
+        "min_selected_configurations": 2,
+        "residual_tolerance": 1e-06,
+        "samples_per_state": 2048,
+        "seed": null,
+        "spin_sq_target": null,
+        "symmetrize_spin": false,
+        "time_step": 0.26
+      },
+      "fastest": {
+        "budget": {
+          "krylov_states": 1,
+          "samples_per_state": 512,
+          "selected_ci_max_dim": 16,
+          "total_samples": 512
+        },
+        "krylov_extension_dim": 1,
+        "max_dim": 16,
+        "min_selected_configurations": 2,
+        "residual_tolerance": 1e-06,
+        "samples_per_state": 512,
+        "seed": null,
+        "spin_sq_target": null,
+        "symmetrize_spin": false,
+        "time_step": 0.2
+      }
+    },
+    "sqd": {
+      "balanced": {
+        "budget": {
+          "recovery_rounds": 8,
+          "samples": 4096,
+          "selected_ci_max_dim": 32,
+          "sampling_vqe_iterations": 448
+        },
+        "carryover_threshold": null,
+        "energy_tol": 7.5e-05,
+        "max_dim": 32,
+        "max_dim_a": null,
+        "max_dim_b": null,
+        "max_dim_mode": "shared",
+        "max_iterations": 8,
+        "min_selected_configurations": 2,
+        "num_batches": 8,
+        "occupancies_tol": 7.5e-05,
+        "sampling_state_source": "vqe",
+        "sampling_vqe_ansatz_name": "NumberPreserving",
+        "sampling_vqe_max_iterations": 448,
+        "sampling_vqe_optimizer_name": "COBYLA",
+        "sampling_vqe_reps": 2,
+        "sampling_vqe_seed": null,
+        "samples_per_batch": 512,
+        "seed": null,
+        "spin_sq_target": null,
+        "symmetrize_spin": false
+      },
+      "best_accuracy": {
+        "budget": {
+          "recovery_rounds": 12,
+          "samples": 16384,
+          "selected_ci_max_dim": 64,
+          "sampling_vqe_iterations": 512
+        },
+        "carryover_threshold": null,
+        "energy_tol": 5e-05,
+        "max_dim": 64,
+        "max_dim_a": null,
+        "max_dim_b": null,
+        "max_dim_mode": "shared",
+        "max_iterations": 12,
+        "min_selected_configurations": 2,
+        "num_batches": 16,
+        "occupancies_tol": 5e-05,
+        "sampling_state_source": "vqe",
+        "sampling_vqe_ansatz_name": "NumberPreserving",
+        "sampling_vqe_max_iterations": 512,
+        "sampling_vqe_optimizer_name": "COBYLA",
+        "sampling_vqe_reps": 2,
+        "sampling_vqe_seed": null,
+        "samples_per_batch": 1024,
+        "seed": null,
+        "spin_sq_target": null,
+        "symmetrize_spin": false
+      },
+      "fastest": {
+        "budget": {
+          "recovery_rounds": 4,
+          "samples": 1024,
+          "selected_ci_max_dim": 16,
+          "sampling_vqe_iterations": 128
+        },
+        "carryover_threshold": null,
+        "energy_tol": 0.0001,
+        "max_dim": 16,
+        "max_dim_a": null,
+        "max_dim_b": null,
+        "max_dim_mode": "shared",
+        "max_iterations": 4,
+        "min_selected_configurations": 2,
+        "num_batches": 4,
+        "occupancies_tol": 0.0001,
+        "sampling_state_source": "vqe",
+        "sampling_vqe_ansatz_name": "NumberPreserving",
+        "sampling_vqe_max_iterations": 128,
+        "sampling_vqe_optimizer_name": "COBYLA",
+        "sampling_vqe_reps": 1,
+        "sampling_vqe_seed": null,
+        "samples_per_batch": 256,
+        "seed": null,
+        "spin_sq_target": null,
+        "symmetrize_spin": false
+      }
+    },
+    "vqe": {
+      "balanced": {
+        "ansatz_name": "NumberPreserving",
+        "budget": {
+          "initial_point_candidates": 2,
+          "objective_evaluations": 448
+        },
+        "convergence_threshold": null,
+        "initial_point_candidates": 2,
+        "initial_point_strategy": "zero_plus_seeded_random",
+        "max_function_evaluations": 448,
+        "max_iterations": 448,
+        "optimizer_name": "COBYLA",
+        "reps": 2,
+        "seed": null
+      },
+      "best_accuracy": {
+        "ansatz_name": "NumberPreserving",
+        "budget": {
+          "initial_point_candidates": 4,
+          "objective_evaluations": 512
+        },
+        "convergence_threshold": null,
+        "initial_point_candidates": 4,
+        "initial_point_strategy": "zero_plus_seeded_random",
+        "max_function_evaluations": 512,
+        "max_iterations": 512,
+        "optimizer_name": "COBYLA",
+        "reps": 2,
+        "seed": null
+      },
+      "fastest": {
+        "ansatz_name": "NumberPreserving",
+        "budget": {
+          "initial_point_candidates": 1,
+          "objective_evaluations": 128
+        },
+        "convergence_threshold": null,
+        "initial_point_candidates": 1,
+        "initial_point_strategy": "zero_plus_seeded_random",
+        "max_function_evaluations": 128,
+        "max_iterations": 128,
+        "optimizer_name": "COBYLA",
+        "reps": 2,
+        "seed": null
+      }
+    }
+  },
+  "run_event_types": [
+    "status_changed",
+    "iteration_update",
+    "error",
+    "result",
+    "estimate_updated",
+    "ibm_job_submitted",
+    "ibm_status_poll",
+    "control_requested",
+    "checkpoint_saved",
+    "resume_enqueued",
+    "restart_created"
+  ],
+  "run_statuses": [
+    "CREATED",
+    "QUEUED",
+    "RUNNING",
+    "PAUSING",
+    "PAUSED",
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED",
+    "EXCLUDED",
+    "SUBMITTED_TO_IBM"
+  ]
+}

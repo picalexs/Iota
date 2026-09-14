@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+  "__pycache__",
+  ".venv",
+  "venv",
+  "build",
+  "dist",
+  "frontend/**/node_modules/**",
+  "**/node_modules/**",
+  "backend/migrations/**",
+]
+
+[tool.ruff.lint]
+extend-ignore = ["E203"]
+extend-select = ["I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Allow relaxed docstring rules and security checks in tests
+"backend/tests/*" = ["D", "S101"]

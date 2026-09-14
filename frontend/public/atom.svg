@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Quantum Simulation Studio atom mark">
+  <rect width="120" height="120" rx="24" fill="#020817"/>
+  <g fill="none" stroke="#7dd3fc" stroke-width="7" stroke-linecap="round">
+    <ellipse cx="60" cy="60" rx="38" ry="17" opacity="0.9"/>
+    <ellipse cx="60" cy="60" rx="38" ry="17" transform="rotate(60 60 60)" opacity="0.72"/>
+    <ellipse cx="60" cy="60" rx="38" ry="17" transform="rotate(-60 60 60)" opacity="0.72"/>
+  </g>
+  <circle cx="60" cy="60" r="15" fill="#0ea5e9" opacity="0.32"/>
+  <circle cx="60" cy="60" r="8" fill="#38bdf8"/>
+  <circle cx="98" cy="60" r="5" fill="#bae6fd"/>
+  <circle cx="41" cy="92" r="5" fill="#bae6fd"/>
+  <circle cx="41" cy="28" r="5" fill="#bae6fd"/>
+</svg>

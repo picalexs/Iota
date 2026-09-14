@@ -1,0 +1,507 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@source "./**/*.{ts,tsx}";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-accent-2: var(--accent-2);
+  --color-accent-2-foreground: var(--accent-2-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-surface-default: var(--surface-default);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-raised-hover: var(--surface-raised-hover);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-overlay-strong: var(--surface-overlay-strong);
+  --color-surface-pressed: var(--surface-pressed);
+  --color-interactive-hover: var(--interactive-hover);
+  --color-interactive-hover-border: var(--interactive-hover-border);
+  --color-interactive-selected: var(--interactive-selected);
+  --color-interactive-selected-border: var(--interactive-selected-border);
+  --color-interactive-selected-foreground: var(--interactive-selected-foreground);
+  --color-interactive-pressed: var(--interactive-pressed);
+  --color-interactive-pressed-border: var(--interactive-pressed-border);
+  --color-focus-strong: var(--focus-strong);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-hover-border: var(--sidebar-hover-border);
+  --color-sidebar-selected: var(--sidebar-selected);
+  --color-sidebar-selected-border: var(--sidebar-selected-border);
+  --color-sidebar-selected-foreground: var(--sidebar-selected-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: #f2f6fb;
+  --foreground: #101828;
+  --card: #ffffff;
+  --card-foreground: #101828;
+  --popover: #ffffff;
+  --popover-foreground: #101828;
+  --primary: #3f62cf;
+  --primary-foreground: #f8fbff;
+  --secondary: #eaf0f8;
+  --secondary-foreground: #1f2937;
+  --muted: #e9eff7;
+  --muted-foreground: #43566f;
+  --accent: #e2eaf6;
+  --accent-foreground: #1f2937;
+  --accent-2: #5478d8;
+  --accent-2-foreground: #0f172a;
+  --destructive: #dc4c43;
+  --destructive-foreground: #ffffff;
+  --success: #2f9e68;
+  --warning: #b7791f;
+  --info: #3b82f6;
+  --surface-default: #ffffff;
+  --surface-raised: #e7eef8;
+  --surface-raised-hover: #dfe9f7;
+  --surface-overlay: #ffffff;
+  --surface-overlay-strong: #fbfdff;
+  --surface-pressed: #d4e0f0;
+  --interactive-hover: #d7e4fb;
+  --interactive-hover-border: #88a7df;
+  --interactive-selected: #d2e0fc;
+  --interactive-selected-border: #5478d8;
+  --interactive-selected-foreground: #0d1d39;
+  --interactive-pressed: #c7d6ef;
+  --interactive-pressed-border: #8fa9dc;
+  --border: #cfd9e6;
+  --input: #c6d3e2;
+  --ring: rgb(63 98 207 / 0.35);
+  --focus-strong: rgb(63 98 207 / 0.22);
+  --chart-1: #3f62cf;
+  --chart-2: #2f9e68;
+  --chart-3: #0f766e;
+  --chart-4: #d4a017;
+  --chart-5: #d97706;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #101828;
+  --sidebar-primary: #1f2937;
+  --sidebar-primary-foreground: #f8fbff;
+  --sidebar-accent: #e3ebf6;
+  --sidebar-accent-foreground: #1f2937;
+  --sidebar-hover: #e6eefc;
+  --sidebar-hover-border: #bfd0ea;
+  --sidebar-selected: #dae5fc;
+  --sidebar-selected-border: #5478d8;
+  --sidebar-selected-foreground: #101828;
+  --sidebar-border: #c8d4e4;
+  --sidebar-ring: rgb(63 98 207 / 0.3);
+  --shadow-elevation-raised: 0 1px 2px rgb(16 24 40 / 0.04), 0 10px 24px -20px rgb(16 24 40 / 0.18);
+  --shadow-elevation-overlay-sm:
+    0 12px 32px -20px rgb(16 24 40 / 0.24), 0 2px 6px rgb(16 24 40 / 0.08);
+  --shadow-elevation-overlay-md:
+    0 24px 60px -28px rgb(16 24 40 / 0.34), 0 6px 18px rgb(16 24 40 / 0.1);
+  --shadow-surface-panel:
+    0 0 0 1px rgb(255 255 255 / 0.5) inset, 0 1px 2px rgb(16 24 40 / 0.05),
+    0 18px 36px -32px rgb(16 24 40 / 0.24);
+  --shadow-button-primary:
+    0 1px 0 rgb(255 255 255 / 0.18) inset, 0 10px 20px -18px rgb(16 24 40 / 0.4);
+  --shadow-button-primary-pressed: inset 0 1px 2px rgb(16 24 40 / 0.18);
+  --shadow-interactive-hover: inset 0 0 0 1px rgb(63 98 207 / 0.14);
+  --shadow-interactive-selected:
+    0 0 0 2px rgb(63 98 207 / 0.24), inset 0 0 0 1px rgb(63 98 207 / 0.18);
+  --shadow-sidebar-selected: 0 0 0 2px rgb(63 98 207 / 0.2), inset 0 0 0 1px rgb(63 98 207 / 0.16);
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #0c1218;
+  --foreground: #f0f6fc;
+  --card: #1a222d;
+  --card-foreground: #f0f6fc;
+  --popover: #26323f;
+  --popover-foreground: #f0f6fc;
+  --primary: #8baeff;
+  --primary-foreground: #0b1220;
+  --secondary: #202935;
+  --secondary-foreground: #ebf2fa;
+  --muted: #202935;
+  --muted-foreground: #c2d0df;
+  --accent: #26303c;
+  --accent-foreground: #f0f6fc;
+  --accent-2: #a8c0ff;
+  --accent-2-foreground: #0b1220;
+  --destructive: #d98a84;
+  --destructive-foreground: #ffffff;
+  --success: #86b58f;
+  --warning: #c8ab71;
+  --info: #8baed9;
+  --surface-default: #1a222d;
+  --surface-raised: #24303d;
+  --surface-raised-hover: #2a3846;
+  --surface-overlay: #26323f;
+  --surface-overlay-strong: #2b3745;
+  --surface-pressed: #32404f;
+  --interactive-hover: #2b3a4c;
+  --interactive-hover-border: rgb(139 174 255 / 0.32);
+  --interactive-selected: #314764;
+  --interactive-selected-border: rgb(139 174 255 / 0.6);
+  --interactive-selected-foreground: #f7fbff;
+  --interactive-pressed: #39516d;
+  --interactive-pressed-border: rgb(139 174 255 / 0.4);
+  --border: rgb(240 246 252 / 0.14);
+  --input: rgb(240 246 252 / 0.18);
+  --ring: rgb(139 174 255 / 0.45);
+  --focus-strong: rgb(139 174 255 / 0.3);
+  --chart-1: #8baeff;
+  --chart-2: #8ab58f;
+  --chart-3: #d3bc84;
+  --chart-4: #b7add8;
+  --chart-5: #c99084;
+  --sidebar: #121923;
+  --sidebar-foreground: #f0f6fc;
+  --sidebar-primary: #8baeff;
+  --sidebar-primary-foreground: #0b1220;
+  --sidebar-accent: #242d39;
+  --sidebar-accent-foreground: #f0f6fc;
+  --sidebar-hover: #1f2a37;
+  --sidebar-hover-border: rgb(139 174 255 / 0.22);
+  --sidebar-selected: #22364f;
+  --sidebar-selected-border: rgb(139 174 255 / 0.58);
+  --sidebar-selected-foreground: #f7fbff;
+  --sidebar-border: rgb(240 246 252 / 0.12);
+  --sidebar-ring: rgb(139 174 255 / 0.35);
+  --shadow-elevation-raised:
+    0 0 0 1px rgb(255 255 255 / 0.04) inset, 0 14px 30px -24px rgb(0 0 0 / 0.9);
+  --shadow-elevation-overlay-sm:
+    0 0 0 1px rgb(255 255 255 / 0.05) inset, 0 20px 42px -24px rgb(0 0 0 / 0.94);
+  --shadow-elevation-overlay-md:
+    0 0 0 1px rgb(255 255 255 / 0.06) inset, 0 32px 72px -32px rgb(0 0 0 / 0.96);
+  --shadow-surface-panel:
+    0 0 0 1px rgb(255 255 255 / 0.05) inset, 0 1px 2px rgb(0 0 0 / 0.24),
+    0 22px 42px -32px rgb(0 0 0 / 0.9);
+  --shadow-button-primary:
+    0 1px 0 rgb(255 255 255 / 0.06) inset, 0 10px 24px -20px rgb(0 0 0 / 0.82);
+  --shadow-button-primary-pressed: inset 0 1px 2px rgb(0 0 0 / 0.28);
+  --shadow-interactive-hover: inset 0 0 0 1px rgb(139 174 255 / 0.18);
+  --shadow-interactive-selected:
+    0 0 0 2px rgb(139 174 255 / 0.3), inset 0 0 0 1px rgb(139 174 255 / 0.22);
+  --shadow-sidebar-selected:
+    0 0 0 2px rgb(139 174 255 / 0.26), inset 0 0 0 1px rgb(139 174 255 / 0.2);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  html {
+    /* Reserve scrollbar space to avoid width shift when modal scroll-lock toggles. */
+    scrollbar-gutter: stable;
+  }
+
+  @supports not (scrollbar-gutter: stable) {
+    html {
+      overflow-y: scroll;
+    }
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+
+  code,
+  pre {
+    font-family: var(--font-mono);
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  /*
+   * Radix UI overlay components (Select, Dialog, etc.) inject
+   * `padding-right: <scrollbar-width>` on the body to compensate for the
+   * scrollbar disappearing when scroll is locked.  Because we already
+   * reserve that space with `scrollbar-gutter: stable` on <html>, the
+   * extra padding would cause a double-shift.  Override it to zero.
+   */
+  body[data-scroll-locked] {
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* ── Custom scrollbar ─────────────────────────────────────────────────
+   * Thin, minimal scrollbar that fades in when the user hovers the page
+   * or a scrollable element.  Falls back gracefully on Firefox via
+   * `scrollbar-color` / `scrollbar-width`.
+   */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+  }
+
+  /* Reveal the thumb on hover so it doesn't clutter the UI at rest */
+  html:hover ::-webkit-scrollbar-thumb,
+  *:hover::-webkit-scrollbar-thumb {
+    background: rgb(95 107 122 / 0.25);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(95 107 122 / 0.45);
+  }
+
+  html:hover,
+  *:hover {
+    scrollbar-color: rgb(95 107 122 / 0.25) transparent;
+  }
+
+  /* Smooth sidebar expansion with better easing */
+  [data-sidebar] {
+    transition-property: width;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+
+  /* Prevent scrollbars and layout shift */
+  [data-sidebar-side] {
+    overflow: hidden;
+  }
+
+  /* Smooth text fade transitions */
+  [data-sidebar] span {
+    transition-property: opacity;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+}
+
+.info-equation .katex-display {
+  margin: 0;
+}
+
+.info-equation .katex {
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+/* ── Smooth transitions for list pagination and search ──────────────────────
+ * Table rows and content fade smoothly when pagination changes.
+ * Preserves reduced-motion accessibility preference.
+ */
+@supports (transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)) {
+  [role="table"] [role="rowgroup"] {
+    transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [role="table"] [role="rowgroup"] {
+    transition: none !important;
+  }
+}
+
+/* ── Sidebar overlay (no content reflow) ─────────────────────────────────────
+ * The sidebar gap is locked to icon-width so the content area never shifts
+ * when the sidebar expands on hover. The panel itself is position:fixed so
+ * it floats above the content. Sidebar container is kept above draggable cards.
+ */
+[data-slot="sidebar-gap"] {
+  width: var(--sidebar-width-icon) !important;
+  transition: none !important;
+}
+
+[data-slot="sidebar-container"] {
+  z-index: 80 !important;
+}
+
+/* ── react-grid-layout overrides ──────────────────────────────────────────── */
+.react-grid-item.react-grid-placeholder {
+  background: var(--primary) !important;
+  opacity: 0.08 !important;
+  border-radius: var(--radius);
+  border: 2px dashed rgb(95 107 122 / 0.4);
+}
+
+.react-grid-item.react-draggable-dragging {
+  /* Keep dragged cards above sidebar rails and add elastic overshoot offset. */
+  z-index: 60 !important;
+  will-change: transform, translate;
+  translate: var(--drag-elastic-x, 0px) var(--drag-elastic-y, 0px);
+}
+
+.react-resizable-handle {
+  background-image: none !important;
+  z-index: 20;
+  width: 30px !important;
+  height: 30px !important;
+  right: 0;
+  bottom: 0;
+}
+
+.react-resizable-handle-se {
+  width: 30px !important;
+  height: 30px !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  cursor: se-resize !important;
+}
+
+.react-resizable-handle-se::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-bottom-right-radius: var(--radius-sm);
+  background: linear-gradient(135deg, transparent 46%, rgb(95 107 122 / 0.15) 100%);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 16px;
+  height: 16px;
+  border-right: 3px solid rgb(95 107 122 / 0.62);
+  border-bottom: 3px solid rgb(95 107 122 / 0.62);
+  border-bottom-right-radius: var(--radius-sm);
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.react-grid-item:hover .react-resizable-handle::after {
+  opacity: 0.95;
+}
+
+.dark .react-resizable-handle::after {
+  border-right-color: rgb(208 215 222 / 0.38);
+  border-bottom-color: rgb(208 215 222 / 0.38);
+}
+
+/* ── Animation utilities with fill-mode: forwards ────────────────────────── */
+/* Prevents blinking on page reload by ensuring animations stay in place */
+@layer utilities {
+  .animate-in-fixed {
+    @apply animate-in;
+    animation-fill-mode: both;
+  }
+
+  .fade-in-fixed {
+    @apply fade-in-0;
+    animation-fill-mode: both;
+  }
+
+  .slide-in-top-fixed {
+    @apply slide-in-from-top-6;
+    animation-fill-mode: both;
+  }
+
+  .slide-in-top-card {
+    @apply slide-in-from-top-4;
+    animation-fill-mode: both;
+  }
+
+  @keyframes skeleton-shimmer-slide {
+    0% {
+      transform: translateX(-130%);
+    }
+
+    100% {
+      transform: translateX(130%);
+    }
+  }
+
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 42%;
+    transform: translateX(-130%);
+    background: linear-gradient(100deg, transparent 0%, oklch(1 0 0 / 0.2) 45%, transparent 100%);
+    animation: skeleton-shimmer-slide 1.7s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  /* Spinning atom animation */
+  @keyframes spin-atom {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .spin-atom {
+    animation: spin-atom 5s linear infinite;
+  }
+}
+
+@layer utilities {
+  .bg-hero-gradient {
+    background:
+      radial-gradient(ellipse at top left, rgb(79 111 214 / 0.12), transparent 60%),
+      linear-gradient(135deg, rgb(148 163 184 / 0.08), transparent 70%);
+  }
+
+  .dark .bg-hero-gradient {
+    background:
+      radial-gradient(ellipse at top left, rgb(122 162 247 / 0.12), transparent 58%),
+      linear-gradient(135deg, rgb(240 246 252 / 0.03), transparent 72%);
+  }
+
+  .glass {
+    background: color-mix(in oklch, var(--card) 85%, transparent);
+    backdrop-filter: blur(12px);
+  }
+}

@@ -1,0 +1,22 @@
+services:
+  ui:
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${FRONTEND_PORT:-80}:8080"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+  api:
+    restart: always
+
+  worker:
+    restart: always
+
+  db:
+    restart: always
+
+  redis:
+    restart: always

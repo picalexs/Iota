@@ -1,0 +1,41 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.1
+    hooks:
+      - id: ruff-format
+        files: '^(backend|worker|shared|scripts)/.*\.py$'
+      - id: ruff
+        args: [--select, E4,E7,E9,F,I]
+        files: '^(backend|worker|shared|scripts)/.*\.py$'
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: frontend lint
+        entry: npm --prefix frontend run lint
+        language: system
+        pass_filenames: false
+        files: '^frontend/.*\.(js|jsx|ts|tsx)$'
+
+      - id: frontend-generated-types
+        name: frontend generated API types
+        entry: npm --prefix frontend run check:generated-types
+        language: system
+        pass_filenames: false
+        files: '^(backend/|frontend/src/types/generated-api\.ts$|scripts/contracts/)'
