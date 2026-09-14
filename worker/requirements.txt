@@ -11,7 +11,7 @@ python-dotenv==1.2.2
 numpy>=1.24,<2.0
 scipy>=1.13,<2.0
 pyscf>=2.6.0,<3.0
-qiskit==2.3.0
+qiskit==2.5.2
 qiskit-aer==0.17.2
 qiskit-addon-sqd==0.12.1
 qiskit-ibm-runtime==0.45.1
