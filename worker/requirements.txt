@@ -8,7 +8,7 @@ cryptography==50.0.0
 python-dotenv==1.2.2
 
 # Quantum / chemistry stack (R2P)
-numpy>=1.24,<2.0
+numpy>=2.5.3,<3.0
 scipy>=1.13,<2.0
 pyscf>=2.6.0,<3.0
 qiskit==2.3.0
