@@ -113,7 +113,7 @@ def _build_vqe_reference_state(
     resolved_config: dict[str, Any],
     progress_callback: ProgressCallback | None,
 ) -> tuple[np.ndarray, list[dict[str, Any]]]:
-    """Keep the legacy QSE VQE reference helper import-compatible."""
+    """Adapt VQE reference inputs to the reference-policy module."""
     return build_vqe_reference_state(
         hamiltonian=hamiltonian,
         backend=backend,
@@ -133,7 +133,7 @@ def _resolve_reference_state(
     resolved_config: dict[str, Any],
     progress_callback: ProgressCallback | None,
 ) -> tuple[str, np.ndarray, list[dict[str, Any]]]:
-    """Keep the legacy dense-reference helper import-compatible."""
+    """Adapt dense-reference inputs to the reference-policy module."""
     return resolve_reference_state(
         hamiltonian=hamiltonian,
         backend=backend,
@@ -153,7 +153,7 @@ def _resolve_sector_reference_state(
     action: HamiltonianAction,
     resolved_config: dict[str, Any],
 ) -> tuple[str, np.ndarray, list[dict[str, Any]]]:
-    """Keep the legacy sector-reference helper import-compatible."""
+    """Adapt sector-reference inputs to the reference-policy module."""
     return resolve_sector_reference_state(
         hamiltonian=hamiltonian,
         action=action,
@@ -175,7 +175,7 @@ def _build_sector_excitation_basis(
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy sector-basis helper import-compatible."""
+    """Adapt sector-basis inputs to the basis module."""
     return build_sector_excitation_basis(
         reference_state,
         action,
@@ -202,7 +202,7 @@ def _build_excitation_basis(
     regularization: float,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy dense-basis helper import-compatible."""
+    """Adapt dense-basis inputs to the basis module."""
     return build_excitation_basis(
         reference_state,
         operator_matrix,

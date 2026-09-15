@@ -138,7 +138,7 @@ def _build_krylov_extension(
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
 ) -> tuple[np.ndarray, int, dict[str, float], np.ndarray | None]:
-    """Keep the legacy dense SKQD extension helper import-compatible."""
+    """Adapt dense SKQD inputs to the extension module."""
     return _build_krylov_extension_kernel(
         operator,
         reference_state=_resolve_dense_krylov_seed(
@@ -169,7 +169,7 @@ def _build_sector_krylov_extension(
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
 ) -> tuple[np.ndarray, int, dict[str, float], np.ndarray | None]:
-    """Keep the legacy sector SKQD extension helper import-compatible."""
+    """Adapt sector SKQD inputs to the extension module."""
     return _build_sector_krylov_extension_kernel(
         action,
         reference_state=_resolve_sector_krylov_seed(action, seed_state),

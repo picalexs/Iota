@@ -23,6 +23,7 @@ its definition, primitive decision, and workflow entry point.
 | `worker/chemistry/algorithm_contracts.py` | Shared definition and primitive contracts. |
 | `worker/chemistry/algorithms/registry.py` | Static list of package-owned definitions. |
 | `worker/jobs/dispatcher.py` | Generic lookup, configuration resolution, and runner call. |
+| `worker/adapters/aer_noise.py` | Aer noise validation, model construction, topology, and provenance. |
 | `worker/chemistry/projected_execution.py` | KQD/QFD path selection and QSE measurement policy. |
 | `worker/chemistry/types.py` | Shared execution-plan and result records. |
 | `worker/chemistry/algorithms/<name>/config.py` | Resolved options and validation for one algorithm. |
@@ -30,8 +31,21 @@ its definition, primitive decision, and workflow entry point.
 | `worker/adapters/result_adapter.py` | Conversion from worker results to persisted API payloads. |
 | `worker/chemistry/algorithms/<name>/workflow.py` | Public workflow entry point for one algorithm. |
 
-The package root uses lazy exports. Prefer explicit imports from the owning
-module in new code.
+Algorithm package roots keep no shared workflow exports. Prefer explicit
+imports from the owning module in new code.
+
+## Aer noise contract
+
+An absent `noise_profile` uses ideal Aer simulation. A `custom_preset` builds
+only the selected synthetic error model. A `backend_derived` profile loads the
+named IBM backend through the active credential profile and builds a local Aer
+model from its calibration data.
+
+The worker rejects simulator names, missing credentials, unavailable backend
+references, unknown fields, and incomplete preset parameters. It records the
+requested and resolved backend names, temperature, topology, basis gates, and
+model fingerprint in non-secret metadata. It does not substitute another
+backend.
 
 ## Add an algorithm
 

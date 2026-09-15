@@ -107,7 +107,7 @@ def _build_kqd_circuit_artifacts(
     evolution_method: str,
     use_branch_matrix_elements: bool,
 ) -> list[dict[str, Any]]:
-    """Keep the legacy KQD artifact helper import-compatible."""
+    """Adapt KQD artifact inputs to the artifact builder."""
     return build_kqd_circuit_artifacts(
         hamiltonian=hamiltonian,
         time_step=time_step,
@@ -128,7 +128,7 @@ def _build_representative_kqd_circuit(
     evolution_method: str,
     use_branch_matrix_elements: bool,
 ) -> Any | None:
-    """Keep the legacy KQD circuit helper import-compatible."""
+    """Adapt KQD circuit inputs to the circuit builder."""
     return build_representative_kqd_circuit(
         hamiltonian=hamiltonian,
         time_step=time_step,
@@ -163,7 +163,7 @@ def _build_krylov_basis(
     progress_callback: ProgressCallback | None,
     backend_context: Any | None = None,
 ) -> list[np.ndarray]:
-    """Keep the legacy dense KQD basis helper import-compatible."""
+    """Adapt dense KQD basis inputs to the basis builder."""
     return build_krylov_basis(
         hamiltonian,
         operator_matrix,
@@ -192,7 +192,7 @@ def _build_sector_krylov_basis(
     trotter_steps: int,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy sector KQD basis helper import-compatible."""
+    """Adapt sector KQD basis inputs to the basis builder."""
     return build_sector_krylov_basis(
         action,
         reference_state,
@@ -214,7 +214,7 @@ def _prepare_dense_krylov_spectrum(
     evolution_method: str,
     use_aer: bool,
 ) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
-    """Keep the legacy dense-spectrum helper import-compatible."""
+    """Adapt dense-spectrum inputs to the basis builder."""
     return prepare_dense_krylov_spectrum(
         operator_matrix=operator_matrix,
         reference=reference,
@@ -238,7 +238,7 @@ def _evolve_dense_krylov_state(
     reference_projection: np.ndarray | None,
     backend_context: Any | None,
 ) -> np.ndarray:
-    """Keep the legacy dense evolution helper import-compatible."""
+    """Adapt dense-evolution inputs to the basis builder."""
     return evolve_dense_krylov_state(
         hamiltonian=hamiltonian,
         operator_matrix=operator_matrix,
@@ -261,7 +261,7 @@ def _dense_krylov_partial_energy(
     operator_matrix: np.ndarray,
     basis: list[np.ndarray],
 ) -> float | None:
-    """Keep the legacy dense partial-energy helper import-compatible."""
+    """Adapt dense partial-energy inputs to the basis builder."""
     return dense_krylov_partial_energy(
         operator_matrix,
         basis,
@@ -275,7 +275,7 @@ def _sector_krylov_partial_energy(
     action: HamiltonianAction,
     basis: list[np.ndarray],
 ) -> float | None:
-    """Keep the legacy sector partial-energy helper import-compatible."""
+    """Adapt sector partial-energy inputs to the basis builder."""
     return sector_krylov_partial_energy(
         action,
         basis,
@@ -298,7 +298,7 @@ def _emit_dense_krylov_progress(
     trotter_steps: int,
     use_aer: bool,
 ) -> None:
-    """Keep the legacy dense progress helper import-compatible."""
+    """Adapt dense progress inputs to the basis builder."""
     emit_dense_krylov_progress(
         progress_callback=progress_callback,
         iteration=iteration,
@@ -329,7 +329,7 @@ def _emit_sector_krylov_progress(
     sector_dimension: int,
     implemented_evolution_method: str = "sector_expm_multiply",
 ) -> None:
-    """Keep the legacy sector progress helper import-compatible."""
+    """Adapt sector progress inputs to the basis builder."""
     emit_sector_krylov_progress(
         progress_callback=progress_callback,
         iteration=iteration,

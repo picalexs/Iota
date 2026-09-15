@@ -80,7 +80,7 @@ def _build_hf_reference_state_with_source(
     *,
     fallback_dim: int | None = None,
 ) -> tuple[np.ndarray, str]:
-    """Keep the legacy patchable HF helper while persisting its source."""
+    """Build the HF reference and preserve its source metadata."""
     return build_hf_reference_state(
         hamiltonian,
         fallback_dim=fallback_dim,
@@ -121,7 +121,7 @@ def _build_sector_qfd_states(
     time_grid_type: str,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy sector-state helper import-compatible."""
+    """Adapt sector-state inputs to the state builder."""
     return build_sector_qfd_states(
         action,
         reference_state,
@@ -439,7 +439,7 @@ def _build_dense_qfd_states(
     time_grid_type: str,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy dense-state helper import-compatible."""
+    """Adapt dense-state inputs to the state builder."""
     return build_dense_qfd_states(
         evolution_context=evolution_context,
         time_grid=time_grid,
@@ -458,7 +458,7 @@ def _evolve_dense_qfd_state(
     evolution_context: _QFDDenseEvolutionContext,
     time_point: float,
 ) -> np.ndarray:
-    """Keep the legacy dense-state evolution helper import-compatible."""
+    """Adapt dense evolution inputs to the state builder."""
     return evolve_dense_qfd_state(
         evolution_context=evolution_context,
         time_point=time_point,
@@ -471,7 +471,7 @@ def _dense_qfd_partial_energy(
     operator: np.ndarray,
     dense_states: list[np.ndarray],
 ) -> float | None:
-    """Keep the legacy dense partial-energy helper import-compatible."""
+    """Adapt dense partial-energy inputs to the state builder."""
     return dense_qfd_partial_energy(
         operator,
         dense_states,
@@ -493,7 +493,7 @@ def _emit_dense_qfd_progress(
     use_aer: bool,
     trotter_steps: int,
 ) -> None:
-    """Keep the legacy dense progress helper import-compatible."""
+    """Adapt dense progress inputs to the state builder."""
     emit_dense_qfd_progress(
         progress_callback=progress_callback,
         index=index,

@@ -112,7 +112,7 @@ def _run_parameterless_vqe(
     optimizer_name: str,
     reps: int,
 ) -> VQEResult:
-    """Keep the legacy parameterless VQE result helper import-compatible."""
+    """Adapt parameterless execution inputs to the result builder."""
     return build_parameterless_vqe_result(
         objective=objective,
         initial_point=initial_point,
@@ -144,7 +144,7 @@ def _build_vqe_initial_point_limit_result(
     exc: Exception,
     objective_state: VQEObjectiveState | None = None,
 ) -> VQEResult:
-    """Keep the legacy VQE limit-result helper import-compatible."""
+    """Adapt evaluation-limit inputs to the result builder."""
     return build_vqe_initial_point_limit_result(
         ansatz=ansatz,
         ansatz_name=ansatz_name,
@@ -196,7 +196,7 @@ def _should_retry_stationary_warm_start(
     converged: bool,
     optimizer_diagnostics: dict[str, Any],
 ) -> bool:
-    """Keep the legacy VQE retry-policy import compatible."""
+    """Adapt retry-policy inputs to the retry module."""
     return should_retry_stationary_warm_start(
         optimizer=optimizer,
         initial_point=initial_point,
@@ -211,7 +211,7 @@ def _warm_start_retry_indices(
     candidate_points: list[np.ndarray],
     selected_initial_diagnostics: dict[str, Any],
 ) -> list[int]:
-    """Keep the legacy warm-start ordering import compatible."""
+    """Adapt warm-start ordering inputs to the retry module."""
     return warm_start_retry_indices(
         candidate_points=candidate_points,
         selected_initial_diagnostics=selected_initial_diagnostics,
@@ -230,7 +230,7 @@ def _retry_stationary_warm_start(
     current_result: tuple[np.ndarray, float, int, bool, dict[str, Any]],
     run_optimizer_fn: Any | None = None,
 ) -> tuple[np.ndarray, float, int, bool, dict[str, Any]]:
-    """Keep the legacy VQE retry helper import compatible."""
+    """Adapt retry execution inputs to the retry module."""
     return _retry_stationary_warm_start_impl(
         objective=objective,
         optimizer=optimizer,
@@ -429,7 +429,7 @@ def _build_vqe_result(
     objective_state: VQEObjectiveState,
     optimizer_diagnostics: dict[str, Any],
 ) -> VQEResult:
-    """Keep the legacy canonical VQE result helper import-compatible."""
+    """Adapt canonical VQE inputs to the result builder."""
     return build_vqe_result(
         ansatz=ansatz,
         ansatz_name=ansatz_name,
@@ -455,7 +455,7 @@ def _reported_vqe_energy_source(
     final_point: np.ndarray,
     reported_point: np.ndarray,
 ) -> str:
-    """Keep the legacy VQE energy-source helper import-compatible."""
+    """Adapt VQE energy-source inputs to the result builder."""
     return reported_vqe_energy_source(
         final_energy=final_energy,
         best_observed_energy=best_observed_energy,
@@ -675,9 +675,8 @@ def run_vqe(
     }
 
     def evaluate_energy(parameter_values: np.ndarray) -> tuple[float, float | None] | float:
-        # Keep the legacy solver seam usable for local integrations that
-        # replace ``_evaluate_energy``. The production path obtains the
-        # uncertainty from this same primitive submission.
+        # Keep the evaluator injection seam explicit. The production path
+        # obtains uncertainty from this same primitive submission.
         if _evaluate_energy is not _vqe_objective.evaluate_energy:
             return _evaluate_energy(
                 backend=backend,
