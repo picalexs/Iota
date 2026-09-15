@@ -239,7 +239,7 @@ def _prepare_skqd_execution(hamiltonian: object) -> _SKQDExecutionPlan:
 
 def _resolve_legacy_sampling_time_step(
     *,
-    skqd_config: "_SKQDConfig",
+    skqd_config: SKQDConfig,
     plan: _SKQDExecutionPlan,
 ) -> float:
     """Resolve the legacy Krylov extension time step, applying paper auto-scaling.
@@ -342,15 +342,11 @@ def _emit_skqd_completion(
     )
 
 
-_SKQDConfig = SKQDConfig
-_resolve_skqd_config = resolve_skqd_config
-
-
 def _run_skqd_sample_union(
     *,
     hamiltonian: object,
     backend: object | None,
-    skqd_config: _SKQDConfig,
+    skqd_config: SKQDConfig,
     plan: Any,
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
@@ -487,7 +483,7 @@ def run_skqd(
 ) -> SKQDResult:
     """Run direct SKQD sample-union mode or the explicit legacy extension."""
     resolved = resolve_algorithm_config(config, "skqd")
-    skqd_config = _resolve_skqd_config(resolved)
+    skqd_config = resolve_skqd_config(resolved)
 
     t_start = time.monotonic()
     plan = _prepare_skqd_execution(hamiltonian)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from worker.chemistry.algorithms.skqd import workflow as skqd_solver
 from worker.chemistry.algorithms.skqd.config import SKQDConfig, resolve_skqd_config
 
 
@@ -56,8 +55,3 @@ def test_resolve_skqd_config_normalizes_explicit_sample_union_mode() -> None:
     result = resolve_skqd_config({"sampling_mode": " SAMPLE_UNION_EXACT "})
 
     assert result.sampling_mode == "sample_union_exact"
-
-
-def test_skqd_solver_keeps_legacy_configuration_aliases() -> None:
-    assert skqd_solver._SKQDConfig is SKQDConfig
-    assert skqd_solver._resolve_skqd_config is resolve_skqd_config
