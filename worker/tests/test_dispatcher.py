@@ -453,7 +453,7 @@ def test_dispatch_kqd_uses_estimator_for_large_aer_matrix_elements(monkeypatch) 
             matrix_element_summary={"matrix_element_strategy": "branch_estimator"},
         )
 
-    monkeypatch.setattr("worker.jobs.dispatcher.run_kqd", _fake_run_kqd)
+    monkeypatch.setattr("worker.chemistry.algorithms.kqd.definition.run_kqd", _fake_run_kqd)
 
     result = dispatch_algorithm(
         algorithm="kqd",
@@ -487,7 +487,7 @@ def test_dispatch_kqd_uses_estimator_for_noisy_small_aer_matrix_elements(monkeyp
             matrix_element_summary={"matrix_element_strategy": "branch_estimator"},
         )
 
-    monkeypatch.setattr("worker.jobs.dispatcher.run_kqd", _fake_run_kqd)
+    monkeypatch.setattr("worker.chemistry.algorithms.kqd.definition.run_kqd", _fake_run_kqd)
 
     result = dispatch_algorithm(
         algorithm="kqd",
@@ -524,7 +524,7 @@ def test_dispatch_qfd_uses_estimator_for_large_aer_matrix_elements(monkeypatch) 
             matrix_element_summary={"matrix_element_strategy": "branch_estimator"},
         )
 
-    monkeypatch.setattr("worker.jobs.dispatcher.run_qfd", _fake_run_qfd)
+    monkeypatch.setattr("worker.chemistry.algorithms.qfd.definition.run_qfd", _fake_run_qfd)
 
     result = dispatch_algorithm(
         algorithm="qfd",
@@ -557,7 +557,7 @@ def test_dispatch_qfd_uses_estimator_for_noisy_small_aer_matrix_elements(monkeyp
             matrix_element_summary={"matrix_element_strategy": "branch_estimator"},
         )
 
-    monkeypatch.setattr("worker.jobs.dispatcher.run_qfd", _fake_run_qfd)
+    monkeypatch.setattr("worker.chemistry.algorithms.qfd.definition.run_qfd", _fake_run_qfd)
 
     result = dispatch_algorithm(
         algorithm="qfd",
