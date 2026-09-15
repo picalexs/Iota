@@ -7,4 +7,3 @@ from worker.exceptions.backend_error import BackendError
 
 class NoiseConfigurationError(BackendError):
     """The worker cannot construct the requested Aer noise configuration."""
-
