@@ -85,16 +85,13 @@ from worker.chemistry.types import KQDResult
 logger = logging.getLogger(__name__)
 
 
-# Re-export private names for existing solver tests and importers.
+# Keep these callables local to make execution-path seams explicit.
 _num_qubits = num_qubits
 _num_spatial_orbitals = num_spatial_orbitals
 _can_use_sector_action = can_use_sector_action
 _should_use_branch_matrix_elements = should_use_branch_matrix_elements
 _backend_label = backend_label
 _normalize_krylov_reference_state = normalize_state_vector
-
-
-_KQDExecutionPlan = KQDExecutionPlan
 
 
 @dataclass(frozen=True)
@@ -364,7 +361,7 @@ def _prepare_kqd_execution(
     backend: object | None,
     backend_context: Any | None,
     execution_policy: ProjectedExecutionPolicy | None = None,
-) -> _KQDExecutionPlan:
+) -> KQDExecutionPlan:
     """Resolve the KQD execution path and base operator resources."""
     return prepare_kqd_execution(
         hamiltonian=hamiltonian,
@@ -380,16 +377,14 @@ def _prepare_kqd_execution(
     )
 
 
-_KQDConfig = KQDConfig
 _KRYLOV_BASIS_INDEX_CONVENTION = "k=0..krylov_dim-1"
-_resolve_kqd_config = resolve_kqd_config
 
 
 def _solve_kqd_branch_path(
     *,
     hamiltonian: object,
     backend: object | None,
-    kqd_config: _KQDConfig,
+    kqd_config: KQDConfig,
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
 ) -> _KQDSolveData:
@@ -481,7 +476,7 @@ def _solve_kqd_branch_path(
 def _solve_kqd_sector_path(
     *,
     sector_action: HamiltonianAction,
-    kqd_config: _KQDConfig,
+    kqd_config: KQDConfig,
     progress_callback: ProgressCallback | None,
 ) -> _KQDSolveData:
     """Solve KQD in the fixed-particle sector."""
@@ -554,7 +549,7 @@ def _solve_kqd_dense_path(
     *,
     hamiltonian: object,
     operator: np.ndarray,
-    kqd_config: _KQDConfig,
+    kqd_config: KQDConfig,
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
 ) -> _KQDSolveData:
@@ -633,10 +628,10 @@ def _solve_kqd_dense_path(
 
 def _run_kqd_solve_path(
     *,
-    plan: _KQDExecutionPlan,
+    plan: KQDExecutionPlan,
     hamiltonian: object,
     backend: object | None,
-    kqd_config: _KQDConfig,
+    kqd_config: KQDConfig,
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
 ) -> _KQDSolveData:
@@ -673,7 +668,7 @@ def _emit_kqd_completion(
     ritz_values: np.ndarray,
     diagnostics: dict[str, Any],
     matrix_element_summary: dict[str, Any],
-    kqd_config: _KQDConfig,
+    kqd_config: KQDConfig,
     primary_energy: float,
     time_evolution_backend: str,
     kqd_elapsed: float,
@@ -705,7 +700,7 @@ def run_kqd(
 ) -> KQDResult:
     """Run a deterministic Krylov subspace diagonalization workflow."""
     resolved = resolve_algorithm_config(config, "kqd")
-    kqd_config = _resolve_kqd_config(resolved)
+    kqd_config = resolve_kqd_config(resolved)
 
     t_start = time.monotonic()
     plan = _prepare_kqd_execution(
