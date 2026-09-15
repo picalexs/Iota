@@ -34,6 +34,6 @@ def test_normalize_state_vector_rejects_zero_and_wrong_size() -> None:
 
 
 def test_kqd_keeps_legacy_reference_normalization_alias() -> None:
-    from worker.chemistry import kqd_solver
+    from worker.chemistry.algorithms.kqd import workflow as kqd_solver
 
     assert kqd_solver._normalize_krylov_reference_state is normalize_state_vector

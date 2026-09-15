@@ -11,22 +11,22 @@ from qiskit.quantum_info import SparsePauliOp
 from worker.adapters.aer_adapter import AerAdapter
 from worker.adapters.base import BackendExecutionContext
 from worker.adapters.result_adapter import normalize_result
-from worker.chemistry.eigensolver import (
-    StabilizedGeneralizedEigenproblemResult,
-    solve_generalized_eigenproblem,
-)
-from worker.chemistry.hamiltonian_action import build_hamiltonian_action
-from worker.chemistry.kqd_solver import (
+from worker.chemistry.algorithms.kqd.workflow import (
     _build_krylov_basis,
     _build_sector_krylov_basis,
     _projected_matrix_converged,
     run_kqd,
 )
+from worker.chemistry.eigensolver import (
+    StabilizedGeneralizedEigenproblemResult,
+    solve_generalized_eigenproblem,
+)
+from worker.chemistry.hamiltonian_action import build_hamiltonian_action
 from worker.chemistry.overlap import build_overlap_matrix
 from worker.chemistry.sector_basis import hartree_fock_sector_state
 from worker.jobs.dispatcher import dispatch_algorithm
 
-RESOLVE_OPERATOR_MATRIX_PATH = "worker.chemistry.kqd_solver.resolve_operator_matrix"
+RESOLVE_OPERATOR_MATRIX_PATH = "worker.chemistry.algorithms.kqd.workflow.resolve_operator_matrix"
 
 
 def _single_qubit_x_hamiltonian() -> SimpleNamespace:
@@ -236,7 +236,7 @@ def test_run_kqd_passes_residual_tolerance_into_projected_ritz_diagnostics(
 ) -> None:
     captured: dict[str, float] = {}
 
-    from worker.chemistry import kqd_solver
+    from worker.chemistry.algorithms.kqd import workflow as kqd_solver
 
     original = kqd_solver.projected_ritz_diagnostics
 
@@ -277,7 +277,7 @@ def test_run_kqd_does_not_mark_singular_dense_projection_converged(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "worker.chemistry.kqd_solver._build_krylov_basis",
+        "worker.chemistry.algorithms.kqd.workflow._build_krylov_basis",
         lambda *args, **kwargs: [
             np.array([1.0, 0.0], dtype=complex),
             np.array([1.0, 0.0], dtype=complex),
@@ -377,7 +377,7 @@ def test_run_kqd_returns_stabilized_noisy_projected_solve_as_diagnostic(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "worker.chemistry.kqd_solver.solve_stabilized_generalized_eigenproblem",
+        "worker.chemistry.algorithms.kqd.workflow.solve_stabilized_generalized_eigenproblem",
         lambda *_args, **_kwargs: StabilizedGeneralizedEigenproblemResult(
             eigenvalues=np.array([-93.0]),
             raw_eigenvalues=np.array([-1.0]),

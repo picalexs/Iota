@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from worker.chemistry import qfd_solver
+from worker.chemistry.algorithms.qfd import workflow as qfd_solver
 from worker.chemistry.algorithms.qfd.config import QFDConfig, resolve_qfd_config
 
 

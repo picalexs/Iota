@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 
+from worker.chemistry.algorithms.kqd.workflow import run_kqd
+from worker.chemistry.algorithms.qfd.workflow import run_qfd
 from worker.chemistry.algorithms.qse.workflow import run_qse
 from worker.chemistry.algorithms.sqd.workflow import run_sqd
 from worker.chemistry.backend_selector import select_backend
@@ -11,9 +13,7 @@ from worker.chemistry.hamiltonian_builder import (
     _hamiltonian_sha256,
     build_qubit_hamiltonian,
 )
-from worker.chemistry.kqd_solver import run_kqd
 from worker.chemistry.molecule_builder import build_molecule
-from worker.chemistry.qfd_solver import run_qfd
 from worker.chemistry.skqd_solver import run_skqd
 from worker.chemistry.types import ChemistryInput
 from worker.chemistry.vqe_solver import run_vqe

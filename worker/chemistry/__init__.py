@@ -37,8 +37,8 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     ),
     "run_vqe": ("worker.chemistry.vqe_solver", "run_vqe"),
     "run_sqd": ("worker.chemistry.algorithms.sqd.workflow", "run_sqd"),
-    "run_kqd": ("worker.chemistry.kqd_solver", "run_kqd"),
-    "run_qfd": ("worker.chemistry.qfd_solver", "run_qfd"),
+    "run_kqd": ("worker.chemistry.algorithms.kqd.workflow", "run_kqd"),
+    "run_qfd": ("worker.chemistry.algorithms.qfd.workflow", "run_qfd"),
     "run_qse": ("worker.chemistry.algorithms.qse.workflow", "run_qse"),
     "run_skqd": ("worker.chemistry.skqd_solver", "run_skqd"),
 }

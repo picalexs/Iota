@@ -6,7 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from worker.chemistry import kqd_solver, qfd_solver
+from worker.chemistry.algorithms.kqd import workflow as kqd_solver
+from worker.chemistry.algorithms.qfd import workflow as qfd_solver
 from worker.chemistry.projected_execution import (
     ProjectedExecutionPolicy,
     QSEExecutionPolicy,
