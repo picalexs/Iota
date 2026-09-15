@@ -17,12 +17,7 @@ from worker.chemistry.algorithms.qse.basis import (
 from worker.chemistry.algorithms.qse.config import resolve_qse_config
 from worker.chemistry.algorithms.qse.excitations import (
     apply_fermionic_excitation,
-    apply_fermionic_ladder,
-    build_sector_excitation_candidates,
-    double_excitation_specs,
     fermionic_excitation_specs,
-    same_spin_count,
-    single_excitation_specs,
 )
 from worker.chemistry.algorithms.qse.execution import (
     execute_dense_qse,
@@ -35,8 +30,6 @@ from worker.chemistry.algorithms.qse.measured import (
 )
 from worker.chemistry.algorithms.qse.reference import (
     normalize_reference_state_vector,
-    parse_reference_scalar,
-    string_option,
     vector_size_to_qubits,
 )
 from worker.chemistry.algorithms.qse.reference_policy import (
@@ -49,11 +42,7 @@ from worker.chemistry.algorithms.qse.results import (
     build_qse_result,
     emit_qse_completion,
 )
-from worker.chemistry.algorithms.qse.sector import (
-    dominant_sector_occupations,
-    sector_excitation_coupling_score,
-    sector_excitation_specs,
-)
+from worker.chemistry.algorithms.qse.sector import sector_excitation_specs
 from worker.chemistry.algorithms.vqe.workflow import run_vqe
 from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.circuit_artifacts import (
@@ -116,24 +105,6 @@ def _hf_reference_artifacts(hamiltonian: object) -> list[dict[str, Any]]:
     ]
 
 
-_string_option = string_option
-_parse_reference_scalar = parse_reference_scalar
-_normalize_reference_state_vector = normalize_reference_state_vector
-_vector_size_to_qubits = vector_size_to_qubits
-_apply_fermionic_ladder = apply_fermionic_ladder
-_apply_fermionic_excitation = apply_fermionic_excitation
-_fermionic_excitation_specs = fermionic_excitation_specs
-_single_excitation_specs = single_excitation_specs
-_double_excitation_specs = double_excitation_specs
-_same_spin_count = same_spin_count
-_accept_basis_candidate = accept_basis_candidate
-_build_sector_excitation_candidates = build_sector_excitation_candidates
-_dominant_sector_occupations = dominant_sector_occupations
-_sector_excitation_coupling_score = sector_excitation_coupling_score
-_sector_excitation_specs = sector_excitation_specs
-_real_scalar = real_scalar
-
-
 def _build_vqe_reference_state(
     *,
     hamiltonian: object,
@@ -172,7 +143,7 @@ def _resolve_reference_state(
         build_vqe_reference_state_fn=_build_vqe_reference_state,
         build_hf_reference_state_fn=build_hf_reference_state,
         hf_reference_artifacts_fn=_hf_reference_artifacts,
-        normalize_reference_state_vector_fn=_normalize_reference_state_vector,
+        normalize_reference_state_vector_fn=normalize_reference_state_vector,
     )
 
 
@@ -214,9 +185,9 @@ def _build_sector_excitation_basis(
         regularization=regularization,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
-        sector_excitation_specs_fn=_sector_excitation_specs,
+        sector_excitation_specs_fn=sector_excitation_specs,
         apply_fermionic_excitation_sector_fn=apply_fermionic_excitation_sector,
-        accept_basis_candidate_fn=_accept_basis_candidate,
+        accept_basis_candidate_fn=accept_basis_candidate,
         solve_action_subspace_fn=solve_action_subspace,
     )
 
@@ -240,13 +211,13 @@ def _build_excitation_basis(
         overlap_threshold=overlap_threshold,
         regularization=regularization,
         progress_callback=progress_callback,
-        vector_size_to_qubits_fn=_vector_size_to_qubits,
-        fermionic_excitation_specs_fn=_fermionic_excitation_specs,
-        apply_fermionic_excitation_fn=_apply_fermionic_excitation,
-        accept_basis_candidate_fn=_accept_basis_candidate,
+        vector_size_to_qubits_fn=vector_size_to_qubits,
+        fermionic_excitation_specs_fn=fermionic_excitation_specs,
+        apply_fermionic_excitation_fn=apply_fermionic_excitation,
+        accept_basis_candidate_fn=accept_basis_candidate,
         overlap_builder_fn=build_overlap_matrix,
         eigensolver_fn=solve_generalized_eigenproblem,
-        real_scalar_fn=_real_scalar,
+        real_scalar_fn=real_scalar,
     )
 
 
@@ -338,7 +309,7 @@ def run_qse(
             resolve_reference_state_fn=_resolve_sector_reference_state,
             build_excitation_basis_fn=_build_sector_excitation_basis,
             solve_action_subspace_fn=solve_action_subspace,
-            real_scalar_fn=_real_scalar,
+            real_scalar_fn=real_scalar,
         )
     else:
         operator = resolve_operator_matrix(hamiltonian)
@@ -367,7 +338,7 @@ def run_qse(
             build_overlap_matrix_fn=build_overlap_matrix,
             solve_generalized_eigenproblem_fn=solve_generalized_eigenproblem,
             projected_ritz_diagnostics_fn=projected_ritz_diagnostics,
-            real_scalar_fn=_real_scalar,
+            real_scalar_fn=real_scalar,
             solve_generalized_eigensystem_fn=solve_exact_generalized_eigensystem,
             execution_mode="dense_exact_emulation",
         )
@@ -375,7 +346,7 @@ def run_qse(
     eigenvalues = outcome.eigenvalues
     if eigenvalues.size == 0:
         raise ValueError("QSE projected solve produced no eigenvalues")
-    primary_energy = _real_scalar(eigenvalues[0], label="QSE primary energy")
+    primary_energy = real_scalar(eigenvalues[0], label="QSE primary energy")
     relative_residual = outcome.residual_diagnostics["relative_ritz_residual"]
     qse_elapsed = time.monotonic() - t_start
     if outcome.execution_mode is None:

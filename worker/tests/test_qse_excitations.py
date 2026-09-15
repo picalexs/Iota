@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from worker.chemistry.algorithms.qse import workflow as qse_solver
 from worker.chemistry.algorithms.qse.excitations import (
     apply_fermionic_excitation,
     apply_fermionic_ladder,
@@ -59,10 +58,3 @@ def test_build_sector_excitation_candidates_filters_spin_changes() -> None:
         ("single", (1,), (0,)),
         ("single", (3,), (2,)),
     ]
-
-
-def test_qse_solver_keeps_legacy_excitation_aliases() -> None:
-    assert qse_solver._apply_fermionic_ladder is apply_fermionic_ladder
-    assert qse_solver._apply_fermionic_excitation is apply_fermionic_excitation
-    assert qse_solver._fermionic_excitation_specs is fermionic_excitation_specs
-    assert qse_solver._build_sector_excitation_candidates is build_sector_excitation_candidates
