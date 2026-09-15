@@ -253,10 +253,11 @@ class AerAdapter(BackendAdapter):
         *,
         include_estimator_precision: bool = False,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        backend_options, noise_configuration, method = self._resolve_execution_details(
-            context
+        _, noise_configuration, method = self._resolve_execution_details(context)
+        backend_options = aer_simulator_options(
+            context,
+            extra_options=noise_configuration.simulator_options(),
         )
-        backend_options.update(noise_configuration.simulator_options())
 
         primitive_options = {
             "backend_options": backend_options,

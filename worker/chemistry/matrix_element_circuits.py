@@ -133,7 +133,7 @@ def aer_simulator_options(
     backend fields stay out of the Aer constructor.
     """
     method = str(getattr(context, "simulator_method", None) or "automatic")
-    options: dict[str, Any] = {} if method == "automatic" else {"method": method}
+    options: dict[str, Any] = {"method": method}
     backend_options = getattr(context, "backend_options", None)
     if isinstance(backend_options, dict):
         device = backend_options.get("device")

@@ -328,6 +328,8 @@ def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_b
     assert second_metadata["noise_summary"] == {"enabled": True, "source": "custom_preset"}
     assert estimator_options[0]["backend_options"]["noise_model"] is noise_model
     assert sampler_options[0]["backend_options"]["noise_model"] is noise_model
+    assert estimator_options[0]["backend_options"]["method"] == "automatic"
+    assert sampler_options[0]["backend_options"]["method"] == "automatic"
 
 
 def test_ibm_adapter_raises_without_credentials(monkeypatch) -> None:
