@@ -123,7 +123,6 @@ _seed_state_from_sqd_result_with_source = seed_state_from_sqd_result_with_source
 _sector_seed_state_from_sqd_result_with_source = sector_seed_state_from_sqd_result_with_source
 _statevector_bitstring_distribution = statevector_bitstring_distribution
 _time_evolved_bitstring_distribution = time_evolved_bitstring_distribution
-_orthonormalize_krylov_candidate = orthonormalize_candidate
 _dense_skqd_partial_energy = orthonormal_projected_ground_energy
 _sector_skqd_partial_energy = matrix_free_projected_ground_energy
 _emit_skqd_krylov_progress = emit_skqd_krylov_progress
@@ -151,7 +150,7 @@ def _build_krylov_extension(
         time_step=time_step,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
-        orthonormalize_fn=_orthonormalize_krylov_candidate,
+        orthonormalize_fn=orthonormalize_candidate,
         partial_energy_fn=_dense_skqd_partial_energy,
         prepare_spectrum_fn=prepare_exact_time_evolution,
         evolve_state_fn=exact_time_evolution_state_from_spectrum,
@@ -179,7 +178,7 @@ def _build_sector_krylov_extension(
         time_step=time_step,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
-        orthonormalize_fn=_orthonormalize_krylov_candidate,
+        orthonormalize_fn=orthonormalize_candidate,
         partial_energy_fn=_sector_skqd_partial_energy,
         solve_action_subspace_fn=solve_action_subspace,
         emit_progress_fn=_emit_skqd_krylov_progress,

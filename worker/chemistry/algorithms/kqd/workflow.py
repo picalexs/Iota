@@ -85,15 +85,6 @@ from worker.chemistry.types import KQDResult
 logger = logging.getLogger(__name__)
 
 
-# Keep these callables local to make execution-path seams explicit.
-_num_qubits = num_qubits
-_num_spatial_orbitals = num_spatial_orbitals
-_can_use_sector_action = can_use_sector_action
-_should_use_branch_matrix_elements = should_use_branch_matrix_elements
-_backend_label = backend_label
-_normalize_krylov_reference_state = normalize_state_vector
-
-
 @dataclass(frozen=True)
 class _KQDSolveData:
     """Projected solve outputs shared across KQD execution paths."""
@@ -146,7 +137,7 @@ def _build_representative_kqd_circuit(
         use_branch_matrix_elements=use_branch_matrix_elements,
         build_hf_reference_circuit_fn=build_hf_reference_circuit,
         prepare_hf_reference_bits_fn=prepare_hf_reference_bits,
-        num_qubits_fn=_num_qubits,
+        num_qubits_fn=num_qubits,
     )
 
 
@@ -183,7 +174,7 @@ def _build_krylov_basis(
         trotter_steps=trotter_steps,
         progress_callback=progress_callback,
         backend_context=backend_context,
-        normalize_reference_fn=_normalize_krylov_reference_state,
+        normalize_reference_fn=normalize_state_vector,
         prepare_spectrum_fn=_prepare_dense_krylov_spectrum,
         evolve_state_fn=_evolve_dense_krylov_state,
         partial_energy_fn=_dense_krylov_partial_energy,
@@ -210,7 +201,7 @@ def _build_sector_krylov_basis(
         time_step=time_step,
         trotter_steps=trotter_steps,
         progress_callback=progress_callback,
-        normalize_reference_fn=_normalize_krylov_reference_state,
+        normalize_reference_fn=normalize_state_vector,
         partial_energy_fn=_sector_krylov_partial_energy,
         emit_progress_fn=_emit_sector_krylov_progress,
     )
@@ -367,12 +358,12 @@ def _prepare_kqd_execution(
         hamiltonian=hamiltonian,
         backend=backend,
         backend_context=backend_context,
-        should_use_branch_matrix_elements_fn=_should_use_branch_matrix_elements,
-        can_use_sector_action_fn=_can_use_sector_action,
+        should_use_branch_matrix_elements_fn=should_use_branch_matrix_elements,
+        can_use_sector_action_fn=can_use_sector_action,
         build_hamiltonian_action_fn=build_hamiltonian_action,
         resolve_operator_matrix_fn=resolve_operator_matrix,
-        num_qubits_fn=_num_qubits,
-        backend_label_fn=_backend_label,
+        num_qubits_fn=num_qubits,
+        backend_label_fn=backend_label,
         execution_policy=execution_policy,
     )
 
@@ -428,7 +419,7 @@ def _solve_kqd_branch_path(
     basis_rank = projected_hamiltonian.shape[0]
     reference_state, reference_source = build_hf_reference_state_with_source(
         hamiltonian,
-        fallback_dim=2 ** max(0, _num_qubits(hamiltonian)),
+        fallback_dim=2 ** max(0, num_qubits(hamiltonian)),
     )
     reference_descriptor = build_reference_descriptor(
         state=reference_state,
@@ -688,7 +679,6 @@ def _emit_kqd_completion(
         ),
     )
 
-
 def run_kqd(
     *,
     hamiltonian: object,
@@ -754,14 +744,14 @@ def run_kqd(
     }
     if plan.use_branch_matrix_elements:
         projected_residual = solve_data.residual_diagnostics["relative_ritz_residual"]
-        converged = _projected_matrix_converged(diagnostics) and (
+        converged = projected_matrix_converged(diagnostics) and (
             projected_residual <= kqd_config.residual_tolerance
         )
         matrix_element_summary["convergence_basis"] = (
             "projected_overlap_condition_and_generalized_residual"
         )
     else:
-        converged = _projected_matrix_converged(diagnostics) and (
+        converged = projected_matrix_converged(diagnostics) and (
             solve_data.residual_diagnostics["relative_ritz_residual"]
             <= kqd_config.residual_tolerance
         )
@@ -812,6 +802,3 @@ def run_kqd(
             use_branch_matrix_elements=plan.use_branch_matrix_elements,
         ),
     )
-
-
-_projected_matrix_converged = projected_matrix_converged

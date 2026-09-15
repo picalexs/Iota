@@ -10,8 +10,8 @@ from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.base import BackendExecutionContext
 from worker.chemistry.algorithms.qfd import workflow as qfd_solver
-from worker.chemistry.algorithms.qfd.workflow import _projected_matrix_converged
 from worker.chemistry.eigensolver import StabilizedGeneralizedEigenproblemResult
+from worker.chemistry.projected_subspace import projected_matrix_converged
 from worker.jobs.dispatcher import dispatch_algorithm
 
 
@@ -486,21 +486,21 @@ def test_run_qfd_returns_stabilized_noisy_projected_solve_as_diagnostic(
 
 
 def test_projected_matrix_converged_requires_stable_overlap_gate() -> None:
-    assert _projected_matrix_converged(
+    assert projected_matrix_converged(
         {
             "stability_state": "stable",
             "overlap_condition": 128.0,
             "overlap_min_eigenvalue": 1e-3,
         }
     )
-    assert not _projected_matrix_converged(
+    assert not projected_matrix_converged(
         {
             "stability_state": "stabilized",
             "overlap_condition": 128.0,
             "overlap_min_eigenvalue": 1e-3,
         }
     )
-    assert not _projected_matrix_converged(
+    assert not projected_matrix_converged(
         {
             "stability_state": "stable",
             "overlap_condition": 128.0,

@@ -75,17 +75,6 @@ logger = logging.getLogger(__name__)
 _NO_QFD_FILTER_EIGENVALUES = "QFD projected solve produced no filter eigenvalues"
 
 
-# Re-export private names for existing solver tests and importers.
-_num_qubits = num_qubits
-_num_spatial_orbitals = num_spatial_orbitals
-_can_use_sector_action = can_use_sector_action
-_should_use_branch_matrix_elements = should_use_branch_matrix_elements
-_backend_label = backend_label
-
-
-_QFDExecutionPlan = QFDExecutionPlan
-
-
 def _build_hf_reference_state_with_source(
     hamiltonian: object,
     *,
@@ -152,18 +141,18 @@ def _prepare_qfd_execution(
     backend: object | None,
     backend_context: Any | None,
     execution_policy: ProjectedExecutionPolicy | None = None,
-) -> _QFDExecutionPlan:
+) -> QFDExecutionPlan:
     """Resolve the QFD execution path and any reusable dense evolution data."""
     return prepare_qfd_execution(
         hamiltonian=hamiltonian,
         backend=backend,
         backend_context=backend_context,
-        should_use_branch_matrix_elements_fn=_should_use_branch_matrix_elements,
-        can_use_sector_action_fn=_can_use_sector_action,
+        should_use_branch_matrix_elements_fn=should_use_branch_matrix_elements,
+        can_use_sector_action_fn=can_use_sector_action,
         build_hamiltonian_action_fn=build_hamiltonian_action,
         resolve_operator_matrix_fn=resolve_operator_matrix,
-        num_qubits_fn=_num_qubits,
-        backend_label_fn=_backend_label,
+        num_qubits_fn=num_qubits,
+        backend_label_fn=backend_label,
         prepare_dense_spectrum_fn=_prepare_dense_qfd_spectrum,
         execution_policy=execution_policy,
     )
@@ -194,7 +183,7 @@ def _solve_qfd_branch_path(
     *,
     hamiltonian: object,
     backend: object | None,
-    plan: _QFDExecutionPlan,
+    plan: QFDExecutionPlan,
     time_grid: np.ndarray,
     num_time_points: int,
     max_time: float,
@@ -223,7 +212,7 @@ def _solve_qfd_branch_path(
     overlap = estimate.overlap
     reference_state, reference_source = _build_hf_reference_state_with_source(
         hamiltonian,
-        fallback_dim=2 ** max(0, _num_qubits(hamiltonian)),
+        fallback_dim=2 ** max(0, num_qubits(hamiltonian)),
     )
     reference_descriptor = build_reference_descriptor(
         state=reference_state,
@@ -283,7 +272,7 @@ def _solve_qfd_branch_path(
         "time_points": float(num_time_points),
         "max_time": float(max_time),
     }
-    converged = _projected_matrix_converged(diagnostics) and (
+    converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
     matrix_element_summary["convergence_basis"] = (
@@ -380,7 +369,7 @@ def _solve_qfd_sector_path(
         states_matrix,
         residual_tolerance=residual_tolerance,
     )
-    converged = _projected_matrix_converged(diagnostics) and (
+    converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
     matrix_element_summary = {
@@ -522,7 +511,7 @@ def _solve_qfd_dense_path(
     *,
     hamiltonian: object,
     operator: np.ndarray,
-    plan: _QFDExecutionPlan,
+    plan: QFDExecutionPlan,
     time_grid: np.ndarray,
     num_time_points: int,
     max_time: float,
@@ -577,7 +566,7 @@ def _solve_qfd_dense_path(
         states_matrix,
         residual_tolerance=residual_tolerance,
     )
-    converged = _projected_matrix_converged(diagnostics) and (
+    converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
     matrix_element_summary = {
@@ -794,6 +783,3 @@ def _emit_qfd_completion(
             qfd_variant=qfd_variant,
         ),
     )
-
-
-_projected_matrix_converged = projected_matrix_converged
