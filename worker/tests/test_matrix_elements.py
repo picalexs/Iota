@@ -268,7 +268,11 @@ def test_branch_estimator_accepts_bounded_aer_pub_chunk_override() -> None:
     context = BackendExecutionContext(
         backend_target="aer_simulator",
         backend_options={"aer_pub_chunk_size": 99},
-        noise_profile={"source": "custom_preset", "preset": "depolarizing_cx"},
+        noise_profile={
+            "source": "custom_preset",
+            "preset": "depolarizing_cx",
+            "strength": 0.01,
+        },
     )
 
     assert _estimator_pub_chunk_size(context) == 32

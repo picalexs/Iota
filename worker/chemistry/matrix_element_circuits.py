@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
@@ -94,15 +95,14 @@ def transpile_aer_circuit(
     *,
     context: Any,
     noise_model: Any | None = None,
+    noise_options: Mapping[str, Any] | None = None,
 ) -> Any:
     """Transpile a circuit to the local Aer simulator instruction set."""
     from qiskit import transpile
-    from qiskit_aer import AerSimulator
-
-    simulator_options = aer_simulator_options(context)
+    simulator_options = dict(noise_options or {})
     if noise_model is not None:
         simulator_options["noise_model"] = noise_model
-    simulator = AerSimulator(**simulator_options)
+    simulator = build_aer_simulator(context, extra_options=simulator_options)
     transpile_options: dict[str, Any] = {"optimization_level": optimization_level(context)}
     seed_transpiler = backend_option_int(context, "seed_transpiler")
     if seed_transpiler is not None:
@@ -110,7 +110,22 @@ def transpile_aer_circuit(
     return transpile(circuit, simulator, **transpile_options)
 
 
-def aer_simulator_options(context: Any | None) -> dict[str, Any]:
+def build_aer_simulator(
+    context: Any | None,
+    *,
+    extra_options: Mapping[str, Any] | None = None,
+) -> Any:
+    """Create the shared Aer simulator used by worker execution paths."""
+    from qiskit_aer import AerSimulator
+
+    return AerSimulator(**aer_simulator_options(context, extra_options=extra_options))
+
+
+def aer_simulator_options(
+    context: Any | None,
+    *,
+    extra_options: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Return validated Aer simulator options from a backend context.
 
     The options are explicit so a benchmark can opt into GPU execution or
@@ -120,24 +135,24 @@ def aer_simulator_options(context: Any | None) -> dict[str, Any]:
     method = str(getattr(context, "simulator_method", None) or "automatic")
     options: dict[str, Any] = {} if method == "automatic" else {"method": method}
     backend_options = getattr(context, "backend_options", None)
-    if not isinstance(backend_options, dict):
-        return options
+    if isinstance(backend_options, dict):
+        device = backend_options.get("device")
+        if isinstance(device, str) and device.upper() in {"CPU", "GPU"}:
+            options["device"] = device.upper()
 
-    device = backend_options.get("device")
-    if isinstance(device, str) and device.upper() in {"CPU", "GPU"}:
-        options["device"] = device.upper()
+        for key in _AER_BOOLEAN_OPTIONS:
+            value = backend_options.get(key)
+            if isinstance(value, bool):
+                options[key] = value
 
-    for key in _AER_BOOLEAN_OPTIONS:
-        value = backend_options.get(key)
-        if isinstance(value, bool):
-            options[key] = value
+        for key in _AER_INTEGER_OPTIONS:
+            value = backend_options.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            options[key] = max(1, min(int(value), 1024))
 
-    for key in _AER_INTEGER_OPTIONS:
-        value = backend_options.get(key)
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            continue
-        options[key] = max(1, min(int(value), 1024))
-
+    if extra_options:
+        options.update(extra_options)
     return options
 
 
