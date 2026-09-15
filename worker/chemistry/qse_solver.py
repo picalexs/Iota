@@ -14,6 +14,7 @@ from worker.chemistry.algorithms.qse.basis import (
     build_sector_excitation_basis,
     real_scalar,
 )
+from worker.chemistry.algorithms.qse.config import resolve_qse_config
 from worker.chemistry.algorithms.qse.excitations import (
     apply_fermionic_excitation,
     apply_fermionic_ladder,
@@ -88,7 +89,7 @@ from worker.chemistry.sector_basis import (
     hartree_fock_sector_state,
     state_from_sector_amplitudes,
 )
-from worker.chemistry.solver_utils import bounded_int, resolve_algorithm_config
+from worker.chemistry.solver_utils import resolve_algorithm_config
 from worker.chemistry.types import QSEResult
 from worker.chemistry.vqe_solver import run_vqe
 
@@ -269,24 +270,15 @@ def run_qse(
     """Run a deterministic projected-subspace solve workflow."""
     resolved = resolve_algorithm_config(config, "qse")
 
-    max_subspace_dim = bounded_int(
-        resolved.get("max_subspace_dim"),
-        default=8,
-        low=1,
-        high=96,
-    )
-    regularization = float(resolved.get("regularization") or 1e-8)
-    overlap_threshold = max(float(resolved.get("overlap_threshold") or 1e-8), 0.0)
-    residual_tolerance = float(resolved.get("residual_tolerance") or 1e-8)
-    excitation_level = str(resolved.get("excitation_level", "singles")).lower()
-    if excitation_level not in {"singles", "singles_doubles"}:
-        raise ValueError(
-            f"Unsupported QSE excitation_level '{excitation_level}'. "
-            "Supported: singles, singles_doubles"
-        )
+    qse_config = resolve_qse_config(resolved)
+    max_subspace_dim = qse_config.max_subspace_dim
+    regularization = qse_config.regularization
+    overlap_threshold = qse_config.overlap_threshold
+    residual_tolerance = qse_config.residual_tolerance
+    excitation_level = qse_config.excitation_level
 
     t_start = time.monotonic()
-    reference_method_requested = str(resolved.get("reference_method", "vqe")).lower()
+    reference_method_requested = qse_config.reference_method
     qse_policy = execution_policy or resolve_qse_execution_policy(
         backend_context=backend_context,
         reference_method=reference_method_requested,

@@ -7,6 +7,7 @@ import pytest
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.result_adapter import normalize_result
+from worker.chemistry.algorithms.qse.config import QSEConfig, resolve_qse_config
 from worker.chemistry.backend_selector import select_backend
 from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.qse_solver import (
@@ -28,6 +29,38 @@ class _DenseHamiltonian:
 
     def __init__(self, matrix: np.ndarray) -> None:
         self.dense_operator_matrix = matrix
+
+
+def test_qse_configuration_resolves_into_algorithm_owned_record() -> None:
+    config = resolve_qse_config(
+        {
+            "max_subspace_dim": 4,
+            "regularization": 1e-6,
+            "overlap_threshold": 0.01,
+            "residual_tolerance": 1e-5,
+            "excitation_level": "singles_doubles",
+            "reference_method": "hf",
+        }
+    )
+
+    assert config == QSEConfig(
+        max_subspace_dim=4,
+        regularization=1e-6,
+        overlap_threshold=0.01,
+        residual_tolerance=1e-5,
+        excitation_level="singles_doubles",
+        reference_method="hf",
+    )
+
+
+@pytest.mark.parametrize("field", ["regularization", "residual_tolerance"])
+def test_qse_configuration_rejects_explicit_non_positive_values(field: str) -> None:
+    with pytest.raises(ValueError, match="finite and positive"):
+        resolve_qse_config({field: 0})
+
+
+def test_qse_configuration_allows_zero_overlap_threshold() -> None:
+    assert resolve_qse_config({"overlap_threshold": 0}).overlap_threshold == 0.0
 
 
 class _SectorHamiltonian:
