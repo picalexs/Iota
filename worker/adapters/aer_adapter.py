@@ -7,6 +7,7 @@ import weakref
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from worker.adapters.aer_noise import AerNoiseConfiguration, resolve_aer_noise_profile
 from worker.adapters.base import (
     AdapterCapabilities,
     BackendAdapter,
@@ -14,12 +15,12 @@ from worker.adapters.base import (
     PrimitiveJobObserver,
     TrackingPrimitive,
 )
-from worker.adapters.aer_noise import AerNoiseConfiguration, resolve_aer_noise_profile
 from worker.chemistry.matrix_element_circuits import (
     aer_simulator_options,
     apply_layout_to_observable,
     transpile_aer_circuit,
 )
+
 _DEFAULT_CONTEXT = BackendExecutionContext(backend_target="aer_simulator")
 logger = logging.getLogger(__name__)
 

@@ -60,7 +60,6 @@ from worker.chemistry.projected_execution import (
     backend_label,
     can_use_sector_action,
     num_qubits,
-    num_spatial_orbitals,
     should_use_branch_matrix_elements,
     validate_branch_estimator_feasibility,
 )

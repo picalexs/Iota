@@ -129,6 +129,7 @@ def aer_pauli_time_evolution_state(
     from qiskit.circuit.library import PauliEvolutionGate
     from qiskit.quantum_info import SparsePauliOp
     from qiskit.synthesis import LieTrotter
+
     from worker.chemistry.matrix_element_circuits import build_aer_simulator
 
     pauli_hamiltonian = getattr(hamiltonian, "pauli_hamiltonian", None)
