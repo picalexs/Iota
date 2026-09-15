@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from worker.chemistry import qse_solver
+from worker.chemistry.algorithms.qse import workflow as qse_solver
 from worker.chemistry.algorithms.qse.excitations import (
     apply_fermionic_excitation,
     apply_fermionic_ladder,

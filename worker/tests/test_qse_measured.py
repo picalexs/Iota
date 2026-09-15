@@ -15,8 +15,8 @@ from worker.chemistry.algorithms.qse.measured import (
     build_measured_excitation_operators,
     estimate_measured_qse_matrices,
 )
+from worker.chemistry.algorithms.qse.workflow import run_qse
 from worker.chemistry.eigensolver import solve_stabilized_generalized_eigenproblem
-from worker.chemistry.qse_solver import run_qse
 from worker.chemistry.reference_states import build_hf_reference_state
 
 

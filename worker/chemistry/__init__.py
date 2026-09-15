@@ -39,7 +39,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "run_sqd": ("worker.chemistry.algorithms.sqd.workflow", "run_sqd"),
     "run_kqd": ("worker.chemistry.kqd_solver", "run_kqd"),
     "run_qfd": ("worker.chemistry.qfd_solver", "run_qfd"),
-    "run_qse": ("worker.chemistry.qse_solver", "run_qse"),
+    "run_qse": ("worker.chemistry.algorithms.qse.workflow", "run_qse"),
     "run_skqd": ("worker.chemistry.skqd_solver", "run_skqd"),
 }
 

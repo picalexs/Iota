@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from worker.chemistry import qse_solver
+from worker.chemistry.algorithms.qse import workflow as qse_solver
 from worker.chemistry.algorithms.qse.reference import (
     normalize_reference_state_vector,
     parse_reference_scalar,
