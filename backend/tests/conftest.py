@@ -26,6 +26,7 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("DEBUG", "false")
 os.environ.setdefault("LOG_LEVEL", "INFO")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
+os.environ.setdefault("TRUSTED_HOSTS", "testserver,localhost,127.0.0.1")
 os.environ.setdefault("LOCAL_OPERATOR_TOKEN", "test-local-operator-token")
 
 from app.database.base import Base
