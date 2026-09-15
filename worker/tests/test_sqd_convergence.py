@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from worker.chemistry import sqd_solver
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 from worker.chemistry.algorithms.sqd.convergence import (
     build_iteration_signature,
     compute_iteration_deltas,

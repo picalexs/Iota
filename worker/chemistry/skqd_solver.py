@@ -9,7 +9,9 @@ from typing import Any
 import numpy as np
 
 from worker.chemistry.algorithms.skqd.config import SKQDConfig, resolve_skqd_config
-from worker.chemistry.algorithms.skqd.convergence import evaluate_sample_union_convergence
+from worker.chemistry.algorithms.skqd.convergence import (
+    evaluate_sample_union_convergence,
+)
 from worker.chemistry.algorithms.skqd.diagnostics import build_skqd_prefix_summaries
 from worker.chemistry.algorithms.skqd.distributions import (
     statevector_bitstring_distribution,
@@ -77,6 +79,7 @@ from worker.chemistry.algorithms.skqd.workflow import (
 )
 from worker.chemistry.algorithms.sqd.config import resolve_sqd_options
 from worker.chemistry.algorithms.sqd.state import import_sqd_dependencies
+from worker.chemistry.algorithms.sqd.workflow import run_sqd
 from worker.chemistry.eigensolver import (
     build_hf_reference_state,
     build_reference_state,
@@ -101,7 +104,6 @@ from worker.chemistry.sector_basis import (
     hartree_fock_sector_state,
 )
 from worker.chemistry.solver_utils import resolve_algorithm_config
-from worker.chemistry.sqd_solver import run_sqd
 from worker.chemistry.state_vectors import normalize_state_vector
 from worker.chemistry.time_evolution import (
     exact_time_evolution_state_from_spectrum,

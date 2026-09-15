@@ -1,7 +1,7 @@
 """Tests for the SQD sampling-execution boundary."""
 
-from worker.chemistry import sqd_solver
 from worker.chemistry.algorithms.sqd import sampling_execution as sqd_sampling_execution
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 
 
 def test_solver_keeps_sampling_helpers_as_compatibility_aliases() -> None:

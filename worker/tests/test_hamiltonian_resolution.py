@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
+from worker.chemistry.algorithms.sqd.workflow import run_sqd
 from worker.chemistry.eigensolver import resolve_operator_matrix
 from worker.chemistry.kqd_solver import run_kqd
 from worker.chemistry.qfd_solver import run_qfd
 from worker.chemistry.qse_solver import run_qse
 from worker.chemistry.skqd_solver import run_skqd
-from worker.chemistry.sqd_solver import run_sqd
 from worker.chemistry.vqe_solver import run_vqe
 
 
