@@ -22,9 +22,9 @@ mathematics.
 | --- | --- |
 | `worker/jobs/dispatcher.py` | Algorithm definitions, supported keys, and primitive creation. |
 | `worker/chemistry/projected_execution.py` | KQD/QFD path selection and QSE measurement policy. |
+| `worker/chemistry/types.py` | Shared execution-plan and result records. |
 | `worker/chemistry/algorithms/<name>/config.py` | Resolved options and validation for one algorithm. |
 | `worker/chemistry/algorithms/<name>/` | Algorithm-specific kernels, execution helpers, and result builders. |
-| `worker/chemistry/types.py` | Worker-internal result records and chemistry input records. |
 | `worker/adapters/result_adapter.py` | Conversion from worker results to persisted API payloads. |
 | `worker/chemistry/algorithms/<name>/workflow.py` | Public workflow entry point for one algorithm. |
 

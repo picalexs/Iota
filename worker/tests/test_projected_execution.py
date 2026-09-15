@@ -20,6 +20,7 @@ from worker.chemistry.projected_execution import (
     should_use_branch_matrix_elements,
     validate_branch_estimator_feasibility,
 )
+from worker.chemistry.types import ExecutionPlan
 
 
 def _context(target: str | None = None, *, noise: object | None = None) -> SimpleNamespace:
@@ -104,6 +105,7 @@ def test_projected_policy_contains_one_path_and_primitive_decision(
     )
 
     assert isinstance(policy, ProjectedExecutionPolicy)
+    assert isinstance(policy, ExecutionPlan)
     assert policy.requested_backend_target == target
     assert policy.actual_path == expected_path
     assert policy.primitive == expected_primitive

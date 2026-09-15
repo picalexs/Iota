@@ -12,6 +12,7 @@ from worker.chemistry.hamiltonian_action import (
     HamiltonianAction,
     can_build_hamiltonian_action,
 )
+from worker.chemistry.types import ExecutionPlan
 from worker.exceptions import RunExcludedError
 
 _DENSE_QUBIT_LIMIT = 12
@@ -20,38 +21,19 @@ _MAX_IBM_PROJECTED_MATRIX_ORBITALS = _MAX_NOISY_AER_PROJECTED_MATRIX_ORBITALS
 
 
 @dataclass(frozen=True, slots=True)
-class ProjectedExecutionPolicy:
+class ProjectedExecutionPolicy(ExecutionPlan):
     """Backend-path decision shared by KQD and QFD."""
-
-    requested_backend_target: str | None
-    actual_path: str
-    primitive: str | None
-    selection_reason: str
-
-    @property
-    def requires_estimator(self) -> bool:
-        """Return whether the selected path needs an estimator primitive."""
-        return self.primitive == "EstimatorV2"
 
 
 @dataclass(frozen=True, slots=True)
-class QSEExecutionPolicy:
+class QSEExecutionPolicy(ExecutionPlan):
     """Backend-path decision shared by QSE dispatch and execution."""
-
-    requested_backend_target: str | None
-    actual_path: str
-    primitive: str | None
-    selection_reason: str
 
     @property
     def uses_measured_matrix_elements(self) -> bool:
         """Return whether QSE must measure projected matrices."""
         return self.actual_path == "measured_matrix_elements"
 
-    @property
-    def requires_estimator(self) -> bool:
-        """Return whether QSE needs an estimator primitive."""
-        return self.primitive == "EstimatorV2"
 
 
 @dataclass(frozen=True)

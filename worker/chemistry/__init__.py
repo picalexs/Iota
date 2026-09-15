@@ -12,6 +12,7 @@ from typing import Any
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "AlgorithmResult": ("worker.chemistry.types", "AlgorithmResult"),
+    "ExecutionPlan": ("worker.chemistry.types", "ExecutionPlan"),
     "ChemistryInput": ("worker.chemistry.types", "ChemistryInput"),
     "PreparedMolecule": ("worker.chemistry.types", "PreparedMolecule"),
     "HamiltonianBundle": ("worker.chemistry.types", "HamiltonianBundle"),
