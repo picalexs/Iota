@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from worker.chemistry import sqd_solver
 from worker.chemistry.algorithms.sqd import progress as sqd_progress
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 
 
 def test_solver_keeps_progress_helpers_as_compatibility_aliases() -> None:

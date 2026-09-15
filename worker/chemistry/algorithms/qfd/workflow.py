@@ -39,11 +39,14 @@ from worker.chemistry.hamiltonian_action import (
     HamiltonianAction,
     build_hamiltonian_action,
 )
-from worker.chemistry.matrix_elements import estimate_projected_matrices_with_branch_estimator
+from worker.chemistry.matrix_elements import (
+    estimate_projected_matrices_with_branch_estimator,
+)
 from worker.chemistry.overlap import build_overlap_matrix, overlap_metrics
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_energy import generalized_projected_ground_energy
 from worker.chemistry.projected_execution import (
+    ProjectedExecutionPolicy,
     backend_label,
     can_use_sector_action,
     num_qubits,
@@ -148,6 +151,7 @@ def _prepare_qfd_execution(
     hamiltonian: object,
     backend: object | None,
     backend_context: Any | None,
+    execution_policy: ProjectedExecutionPolicy | None = None,
 ) -> _QFDExecutionPlan:
     """Resolve the QFD execution path and any reusable dense evolution data."""
     return prepare_qfd_execution(
@@ -161,6 +165,7 @@ def _prepare_qfd_execution(
         num_qubits_fn=_num_qubits,
         backend_label_fn=_backend_label,
         prepare_dense_spectrum_fn=_prepare_dense_qfd_spectrum,
+        execution_policy=execution_policy,
     )
 
 
@@ -659,6 +664,7 @@ def run_qfd(
     config: dict[str, Any],
     progress_callback: ProgressCallback | None = None,
     backend_context: Any | None = None,
+    execution_policy: ProjectedExecutionPolicy | None = None,
 ) -> QFDResult:
     """Run a deterministic filter-diagonalization workflow."""
     resolved = resolve_algorithm_config(config, "qfd")
@@ -669,6 +675,7 @@ def run_qfd(
         hamiltonian=hamiltonian,
         backend=backend,
         backend_context=backend_context,
+        execution_policy=execution_policy,
     )
     logger.info(
         "QFD setup: hilbert_dim=%d num_time_points=%d max_time=%.4f grid=%s "

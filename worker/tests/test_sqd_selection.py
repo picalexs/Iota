@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from worker.chemistry import sqd_solver
 from worker.chemistry.algorithms.sqd import selection as sqd_selection
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 
 
 def test_sqd_solver_keeps_legacy_selection_imports_as_compatibility_aliases() -> None:

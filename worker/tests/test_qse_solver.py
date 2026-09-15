@@ -7,14 +7,15 @@ import pytest
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.result_adapter import normalize_result
-from worker.chemistry.backend_selector import select_backend
-from worker.chemistry.hamiltonian_action import HamiltonianAction
-from worker.chemistry.qse_solver import (
+from worker.chemistry.algorithms.qse.config import QSEConfig, resolve_qse_config
+from worker.chemistry.algorithms.qse.workflow import (
     _build_excitation_basis,
     _real_scalar,
     _sector_excitation_specs,
     run_qse,
 )
+from worker.chemistry.backend_selector import select_backend
+from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.sector_basis import (
     address_to_bitstring,
     apply_fermionic_excitation_sector,
@@ -28,6 +29,38 @@ class _DenseHamiltonian:
 
     def __init__(self, matrix: np.ndarray) -> None:
         self.dense_operator_matrix = matrix
+
+
+def test_qse_configuration_resolves_into_algorithm_owned_record() -> None:
+    config = resolve_qse_config(
+        {
+            "max_subspace_dim": 4,
+            "regularization": 1e-6,
+            "overlap_threshold": 0.01,
+            "residual_tolerance": 1e-5,
+            "excitation_level": "singles_doubles",
+            "reference_method": "hf",
+        }
+    )
+
+    assert config == QSEConfig(
+        max_subspace_dim=4,
+        regularization=1e-6,
+        overlap_threshold=0.01,
+        residual_tolerance=1e-5,
+        excitation_level="singles_doubles",
+        reference_method="hf",
+    )
+
+
+@pytest.mark.parametrize("field", ["regularization", "residual_tolerance"])
+def test_qse_configuration_rejects_explicit_non_positive_values(field: str) -> None:
+    with pytest.raises(ValueError, match="finite and positive"):
+        resolve_qse_config({field: 0})
+
+
+def test_qse_configuration_allows_zero_overlap_threshold() -> None:
+    assert resolve_qse_config({"overlap_threshold": 0}).overlap_threshold == 0.0
 
 
 class _SectorHamiltonian:
@@ -497,7 +530,7 @@ def test_qse_hf_sector_path_does_not_materialize_dense_matrix(monkeypatch: pytes
         raise AssertionError("QSE sector path should not resolve a dense matrix")
 
     monkeypatch.setattr(
-        "worker.chemistry.qse_solver.resolve_operator_matrix",
+        "worker.chemistry.algorithms.qse.workflow.resolve_operator_matrix",
         _fail_dense_resolution,
     )
 
@@ -530,7 +563,7 @@ def test_qse_provided_sector_reference_uses_sparse_amplitudes(
         raise AssertionError("QSE provided_sector path should not resolve a dense matrix")
 
     monkeypatch.setattr(
-        "worker.chemistry.qse_solver.resolve_operator_matrix",
+        "worker.chemistry.algorithms.qse.workflow.resolve_operator_matrix",
         _fail_dense_resolution,
     )
     bitstring = address_to_bitstring(0, norb=7, nelec=(1, 1))

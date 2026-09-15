@@ -9,9 +9,9 @@ from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.base import BackendExecutionContext
-from worker.chemistry import qfd_solver
+from worker.chemistry.algorithms.qfd import workflow as qfd_solver
+from worker.chemistry.algorithms.qfd.workflow import _projected_matrix_converged
 from worker.chemistry.eigensolver import StabilizedGeneralizedEigenproblemResult
-from worker.chemistry.qfd_solver import _projected_matrix_converged
 from worker.jobs.dispatcher import dispatch_algorithm
 
 

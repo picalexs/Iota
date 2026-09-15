@@ -138,7 +138,7 @@ class IBMAdapter(BackendAdapter):
 
     def run_vqe(self, *, hamiltonian: object, config: dict) -> object:
         """Run VQE using IBM Runtime backend."""
-        from worker.chemistry.vqe_solver import run_vqe
+        from worker.chemistry.algorithms.vqe.workflow import run_vqe
 
         return run_vqe(
             hamiltonian=hamiltonian,
@@ -820,7 +820,9 @@ class _RuntimeTranspiler:
             return self._pass_manager
 
         try:
-            from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+            from qiskit.transpiler.preset_passmanagers import (
+                generate_preset_pass_manager,
+            )
         except Exception as exc:
             raise BackendError(
                 "Qiskit transpiler preset pass managers are unavailable; "

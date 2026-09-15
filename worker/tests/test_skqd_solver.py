@@ -9,18 +9,18 @@ from qiskit.quantum_info import SparsePauliOp
 from worker.adapters.aer_adapter import AerAdapter
 from worker.adapters.base import BackendExecutionContext
 from worker.adapters.result_adapter import normalize_result
-from worker.chemistry.hamiltonian_action import build_hamiltonian_action
-from worker.chemistry.skqd_solver import (
+from worker.chemistry.algorithms.skqd.workflow import (
     _build_krylov_extension,
     _build_sector_krylov_extension,
     _seed_state_from_sqd_result,
     run_skqd,
 )
+from worker.chemistry.hamiltonian_action import build_hamiltonian_action
 from worker.chemistry.types import SQDResult
 
 SQD_SEED_ARTIFACT_ID = "sqd.iteration.1.sampler"
-RUN_SQD_PATCH_TARGET = "worker.chemistry.skqd_solver.run_sqd"
-BUILD_KRYLOV_EXTENSION_PATCH_TARGET = "worker.chemistry.skqd_solver._build_krylov_extension"
+RUN_SQD_PATCH_TARGET = "worker.chemistry.algorithms.skqd.workflow.run_sqd"
+BUILD_KRYLOV_EXTENSION_PATCH_TARGET = "worker.chemistry.algorithms.skqd.workflow._build_krylov_extension"
 
 
 def _sector_hamiltonian(*, norb: int = 7, n_alpha: int = 1, n_beta: int = 1) -> Any:
@@ -476,7 +476,7 @@ def test_run_skqd_sector_path_does_not_materialize_dense_matrix(monkeypatch: Any
 
     monkeypatch.setattr(RUN_SQD_PATCH_TARGET, _fake_run_sqd)
     monkeypatch.setattr(
-        "worker.chemistry.skqd_solver.resolve_operator_matrix",
+        "worker.chemistry.algorithms.skqd.workflow.resolve_operator_matrix",
         _fail_dense_resolution,
     )
 

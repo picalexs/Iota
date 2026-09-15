@@ -11,11 +11,26 @@ from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 
 from shared.contracts.identifiers import RunAlgorithm
-from worker.adapters.base import AdapterCapabilities, BackendAdapter, BackendExecutionContext
+from worker.adapters.base import (
+    AdapterCapabilities,
+    BackendAdapter,
+    BackendExecutionContext,
+)
 from worker.chemistry.backend_selector import select_backend
-from worker.chemistry.types import KQDResult, QFDResult, QSEResult, SKQDResult, SQDResult
+from worker.chemistry.types import (
+    KQDResult,
+    QFDResult,
+    QSEResult,
+    SKQDResult,
+    SQDResult,
+)
 from worker.exceptions import BackendError
-from worker.jobs.dispatcher import dispatch_algorithm, supported_algorithms
+from worker.jobs.dispatcher import (
+    PrimitiveRequirement,
+    algorithm_definitions,
+    dispatch_algorithm,
+    supported_algorithms,
+)
 
 
 def _dummy_hamiltonian() -> object:
@@ -77,6 +92,22 @@ class _MatrixElementBackend(BackendAdapter):
 
 def test_supported_algorithms_matches_shared_contract() -> None:
     assert supported_algorithms() == {algorithm.value for algorithm in RunAlgorithm}
+
+
+def test_algorithm_registry_exposes_runtime_metadata_for_each_algorithm() -> None:
+    definitions = algorithm_definitions()
+
+    assert set(definitions) == {algorithm.value for algorithm in RunAlgorithm}
+    assert all(definition.algorithm == algorithm for algorithm, definition in definitions.items())
+    assert definitions["vqe"].config_namespace == "vqe"
+    assert definitions["vqe"].config_resolver(
+        {"advanced_config": {"algorithm": "vqe", "max_iterations": 3}}
+    ) == {"algorithm": "vqe", "max_iterations": 3}
+    assert definitions["vqe"].primitive_requirement is PrimitiveRequirement.ESTIMATOR
+    assert (
+        definitions["sqd"].primitive_requirement
+        is PrimitiveRequirement.SAMPLER_AND_OPTIONAL_ESTIMATOR
+    )
 
 
 def test_dispatch_vqe_with_statevector_backend() -> None:

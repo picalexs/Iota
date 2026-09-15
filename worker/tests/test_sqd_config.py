@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from worker.chemistry import sqd_solver
 from worker.chemistry.algorithms.sqd import config as sqd_config
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 
 
 def _hamiltonian(*, norb: int = 2, num_elec_a: int = 1, num_elec_b: int = 1) -> SimpleNamespace:

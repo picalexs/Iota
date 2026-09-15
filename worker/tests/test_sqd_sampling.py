@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from worker.chemistry import sqd_solver
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 from worker.chemistry.algorithms.sqd.sampling import (
     aggregate_bitstring_frequencies,
     bitstring_from_row,

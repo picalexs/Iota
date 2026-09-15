@@ -14,6 +14,7 @@ from worker.chemistry.algorithms.qse.basis import (
     build_sector_excitation_basis,
     real_scalar,
 )
+from worker.chemistry.algorithms.qse.config import resolve_qse_config
 from worker.chemistry.algorithms.qse.excitations import (
     apply_fermionic_excitation,
     apply_fermionic_ladder,
@@ -27,6 +28,10 @@ from worker.chemistry.algorithms.qse.execution import (
     execute_dense_qse,
     execute_measured_qse,
     execute_sector_qse,
+)
+from worker.chemistry.algorithms.qse.measured import (
+    estimate_measured_qse_matrices,
+    measured_qse_dimension_limit,
 )
 from worker.chemistry.algorithms.qse.reference import (
     normalize_reference_state_vector,
@@ -49,6 +54,7 @@ from worker.chemistry.algorithms.qse.sector import (
     sector_excitation_coupling_score,
     sector_excitation_specs,
 )
+from worker.chemistry.algorithms.vqe.workflow import run_vqe
 from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.circuit_artifacts import (
     build_hf_reference_circuit,
@@ -69,13 +75,13 @@ from worker.chemistry.hamiltonian_action import (
 )
 from worker.chemistry.overlap import build_overlap_matrix
 from worker.chemistry.progress import ProgressCallback
+from worker.chemistry.projected_execution import (
+    QSEExecutionPolicy,
+    resolve_qse_execution_policy,
+)
 from worker.chemistry.projected_subspace import (
     projected_diagnostic_energy_is_reportable,
     solve_action_subspace,
-)
-from worker.chemistry.qse_measured import (
-    estimate_measured_qse_matrices,
-    measured_qse_dimension_limit,
 )
 from worker.chemistry.reference_descriptor import build_reference_descriptor
 from worker.chemistry.reference_states import build_hf_reference_state_with_source
@@ -84,9 +90,8 @@ from worker.chemistry.sector_basis import (
     hartree_fock_sector_state,
     state_from_sector_amplitudes,
 )
-from worker.chemistry.solver_utils import bounded_int, resolve_algorithm_config
+from worker.chemistry.solver_utils import resolve_algorithm_config
 from worker.chemistry.types import QSEResult
-from worker.chemistry.vqe_solver import run_vqe
 
 logger = logging.getLogger(__name__)
 
@@ -247,12 +252,10 @@ def _build_excitation_basis(
 
 def _use_measured_qse(backend_context: object | None) -> bool:
     """Return whether QSE should measure H/S through the backend estimator."""
-    backend_target = getattr(backend_context, "backend_target", None)
-    if backend_target == "ibm_runtime":
-        return True
-    return backend_target == "aer_simulator" and (
-        getattr(backend_context, "noise_profile", None) is not None
-    )
+    return resolve_qse_execution_policy(
+        backend_context=backend_context,
+        reference_method="hf",
+    ).uses_measured_matrix_elements
 
 
 def run_qse(
@@ -262,29 +265,25 @@ def run_qse(
     config: dict[str, Any],
     progress_callback: ProgressCallback | None = None,
     backend_context: object | None = None,
+    execution_policy: QSEExecutionPolicy | None = None,
 ) -> QSEResult:
     """Run a deterministic projected-subspace solve workflow."""
     resolved = resolve_algorithm_config(config, "qse")
 
-    max_subspace_dim = bounded_int(
-        resolved.get("max_subspace_dim"),
-        default=8,
-        low=1,
-        high=96,
-    )
-    regularization = float(resolved.get("regularization") or 1e-8)
-    overlap_threshold = max(float(resolved.get("overlap_threshold") or 1e-8), 0.0)
-    residual_tolerance = float(resolved.get("residual_tolerance") or 1e-8)
-    excitation_level = str(resolved.get("excitation_level", "singles")).lower()
-    if excitation_level not in {"singles", "singles_doubles"}:
-        raise ValueError(
-            f"Unsupported QSE excitation_level '{excitation_level}'. "
-            "Supported: singles, singles_doubles"
-        )
+    qse_config = resolve_qse_config(resolved)
+    max_subspace_dim = qse_config.max_subspace_dim
+    regularization = qse_config.regularization
+    overlap_threshold = qse_config.overlap_threshold
+    residual_tolerance = qse_config.residual_tolerance
+    excitation_level = qse_config.excitation_level
 
     t_start = time.monotonic()
-    reference_method_requested = str(resolved.get("reference_method", "vqe")).lower()
-    if _use_measured_qse(backend_context):
+    reference_method_requested = qse_config.reference_method
+    qse_policy = execution_policy or resolve_qse_execution_policy(
+        backend_context=backend_context,
+        reference_method=reference_method_requested,
+    )
+    if qse_policy.uses_measured_matrix_elements:
         measured_rank = min(max_subspace_dim, measured_qse_dimension_limit())
         logger.info(
             "QSE setup: max_subspace_dim=%d excitation=%s reference_method=%s "

@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from worker.chemistry import qse_solver
-from worker.chemistry.algorithms.qse.basis import accept_basis_candidate, build_excitation_basis
+from worker.chemistry.algorithms.qse import workflow as qse_solver
+from worker.chemistry.algorithms.qse.basis import (
+    accept_basis_candidate,
+    build_excitation_basis,
+)
 
 
 def test_accept_basis_candidate_normalizes_and_reports_independence() -> None:

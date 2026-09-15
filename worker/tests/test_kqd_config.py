@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from worker.chemistry import kqd_solver
+from worker.chemistry.algorithms.kqd import workflow as kqd_solver
 from worker.chemistry.algorithms.kqd.config import KQDConfig, resolve_kqd_config
 
 

@@ -7,6 +7,21 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class ExecutionPlan:
+    """Resolved backend path consumed by an algorithm workflow."""
+
+    requested_backend_target: str | None
+    actual_path: str
+    primitive: str | None
+    selection_reason: str
+
+    @property
+    def requires_estimator(self) -> bool:
+        """Return whether the selected path needs an EstimatorV2 primitive."""
+        return self.primitive == "EstimatorV2"
+
+
+@dataclass(frozen=True)
 class AlgorithmResult:
     """Base worker-internal solver result before API normalization."""
 

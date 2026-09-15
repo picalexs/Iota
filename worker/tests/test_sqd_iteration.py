@@ -1,7 +1,7 @@
 """Tests for the SQD iteration-execution boundary."""
 
-from worker.chemistry import sqd_solver
 from worker.chemistry.algorithms.sqd import iteration as sqd_iteration
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 
 
 def test_solver_keeps_iteration_helpers_as_compatibility_aliases() -> None:

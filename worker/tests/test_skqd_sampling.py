@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from qiskit.quantum_info import SparsePauliOp
 
-from worker.chemistry.algorithms.skqd import workflow
+from worker.chemistry.algorithms.skqd import sample_union as workflow
 from worker.chemistry.algorithms.skqd.sampling import (
     sample_exact_krylov_states,
     sample_krylov_state_sources,

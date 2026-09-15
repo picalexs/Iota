@@ -3,22 +3,31 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
+from functools import partial
 from typing import Any
 
 import numpy as np
 
 from shared.contracts.identifiers import RunAlgorithm
 from worker.adapters.base import BackendAdapter, BackendExecutionContext
+from worker.chemistry.algorithms.kqd.workflow import run_kqd
+from worker.chemistry.algorithms.qfd.workflow import run_qfd
+from worker.chemistry.algorithms.qse.workflow import run_qse
+from worker.chemistry.algorithms.skqd.workflow import run_skqd
+from worker.chemistry.algorithms.sqd.workflow import run_sqd
+from worker.chemistry.algorithms.vqe.workflow import run_vqe
 from worker.chemistry.ansatz_registry import build_ansatz
-from worker.chemistry.kqd_solver import run_kqd
 from worker.chemistry.progress import ProgressCallback
-from worker.chemistry.qfd_solver import run_qfd
-from worker.chemistry.qse_solver import run_qse
-from worker.chemistry.skqd_solver import run_skqd
+from worker.chemistry.projected_execution import (
+    ProjectedExecutionPolicy,
+    QSEExecutionPolicy,
+    resolve_projected_execution_policy,
+    resolve_qse_execution_policy,
+)
 from worker.chemistry.solver_utils import resolve_algorithm_config
-from worker.chemistry.sqd_solver import run_sqd
 from worker.chemistry.types import AlgorithmResult
-from worker.chemistry.vqe_solver import run_vqe
 from worker.exceptions import BackendError
 
 AlgorithmRunner = Callable[
@@ -31,31 +40,27 @@ AlgorithmRunner = Callable[
     ],
     AlgorithmResult,
 ]
-
-_DENSE_QUBIT_LIMIT = 12
-
-
-def _hamiltonian_num_qubits(hamiltonian_bundle: object) -> int:
-    if hasattr(hamiltonian_bundle, "num_qubits"):
-        return int(getattr(hamiltonian_bundle, "num_qubits") or 0)
-    pauli = getattr(hamiltonian_bundle, "pauli_hamiltonian", None)
-    if pauli is not None and hasattr(pauli, "num_qubits"):
-        return int(getattr(pauli, "num_qubits") or 0)
-    return 0
+ConfigResolver = Callable[[dict[str, Any]], dict[str, Any]]
 
 
-def _projected_matrix_estimator_required(
-    *,
-    hamiltonian_bundle: object,
-    backend_context: BackendExecutionContext | None,
-) -> bool:
-    backend_target = getattr(backend_context, "backend_target", None)
-    if backend_target == "ibm_runtime":
-        return True
-    return backend_target == "aer_simulator" and (
-        getattr(backend_context, "noise_profile", None) is not None
-        or _hamiltonian_num_qubits(hamiltonian_bundle) > _DENSE_QUBIT_LIMIT
-    )
+class PrimitiveRequirement(StrEnum):
+    """Primitive contract declared by a registered algorithm."""
+
+    ESTIMATOR = "estimator"
+    SAMPLER = "sampler"
+    OPTIONAL_ESTIMATOR = "optional_estimator"
+    SAMPLER_AND_OPTIONAL_ESTIMATOR = "sampler_and_optional_estimator"
+
+
+@dataclass(frozen=True, slots=True)
+class AlgorithmDefinition:
+    """Runtime metadata and entry point for one worker algorithm."""
+
+    algorithm: str
+    runner: AlgorithmRunner
+    config_namespace: str
+    config_resolver: ConfigResolver
+    primitive_requirement: PrimitiveRequirement
 
 
 def _run_vqe(
@@ -188,12 +193,13 @@ def _run_kqd(
     # projected matrix elements through EstimatorV2. Small Aer targets use
     # AerSimulator for state propagation; large Aer targets use Aer Estimator
     # branch matrix elements to avoid dense full-Hilbert operators.
+    execution_policy: ProjectedExecutionPolicy = resolve_projected_execution_policy(
+        hamiltonian=hamiltonian_bundle,
+        backend_context=backend_context,
+    )
     primitive = (
         backend.create_estimator(backend_context)
-        if _projected_matrix_estimator_required(
-            hamiltonian_bundle=hamiltonian_bundle,
-            backend_context=backend_context,
-        )
+        if execution_policy.requires_estimator
         else None
     )
     return run_kqd(
@@ -202,6 +208,7 @@ def _run_kqd(
         config=config,
         progress_callback=progress_callback,
         backend_context=backend_context,
+        execution_policy=execution_policy,
     )
 
 
@@ -216,12 +223,13 @@ def _run_qfd(
     # projected matrix elements through EstimatorV2. Small Aer targets use
     # AerSimulator for state propagation; large Aer targets use Aer Estimator
     # branch matrix elements to avoid dense full-Hilbert operators.
+    execution_policy: ProjectedExecutionPolicy = resolve_projected_execution_policy(
+        hamiltonian=hamiltonian_bundle,
+        backend_context=backend_context,
+    )
     primitive = (
         backend.create_estimator(backend_context)
-        if _projected_matrix_estimator_required(
-            hamiltonian_bundle=hamiltonian_bundle,
-            backend_context=backend_context,
-        )
+        if execution_policy.requires_estimator
         else None
     )
     return run_qfd(
@@ -230,6 +238,7 @@ def _run_qfd(
         config=config,
         progress_callback=progress_callback,
         backend_context=backend_context,
+        execution_policy=execution_policy,
     )
 
 
@@ -246,14 +255,13 @@ def _run_qse(
     # measure projected H/S matrix elements. A VQE reference also needs an
     # estimator for its optimization. The IBM estimator is created through the
     # existing adapter, which fails closed without credentials.
-    backend_target = getattr(backend_context, "backend_target", None)
-    measured_path = backend_target == "ibm_runtime" or (
-        backend_target == "aer_simulator"
-        and getattr(backend_context, "noise_profile", None) is not None
+    execution_policy: QSEExecutionPolicy = resolve_qse_execution_policy(
+        backend_context=backend_context,
+        reference_method=reference_method,
     )
     estimator = (
         backend.create_estimator(backend_context)
-        if measured_path or reference_method == "vqe"
+        if execution_policy.requires_estimator
         else None
     )
     return run_qse(
@@ -262,6 +270,7 @@ def _run_qse(
         config=config,
         progress_callback=progress_callback,
         backend_context=backend_context,
+        execution_policy=execution_policy,
     )
 
 
@@ -282,13 +291,49 @@ def _run_skqd(
     )
 
 
-_ALGORITHM_REGISTRY: dict[str, AlgorithmRunner] = {
-    RunAlgorithm.VQE.value: _run_vqe,
-    RunAlgorithm.SQD.value: _run_sqd,
-    RunAlgorithm.KQD.value: _run_kqd,
-    RunAlgorithm.QFD.value: _run_qfd,
-    RunAlgorithm.QSE.value: _run_qse,
-    RunAlgorithm.SKQD.value: _run_skqd,
+_ALGORITHM_REGISTRY: dict[str, AlgorithmDefinition] = {
+    RunAlgorithm.VQE.value: AlgorithmDefinition(
+        algorithm=RunAlgorithm.VQE.value,
+        runner=_run_vqe,
+        config_namespace=RunAlgorithm.VQE.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.VQE.value),
+        primitive_requirement=PrimitiveRequirement.ESTIMATOR,
+    ),
+    RunAlgorithm.SQD.value: AlgorithmDefinition(
+        algorithm=RunAlgorithm.SQD.value,
+        runner=_run_sqd,
+        config_namespace=RunAlgorithm.SQD.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.SQD.value),
+        primitive_requirement=PrimitiveRequirement.SAMPLER_AND_OPTIONAL_ESTIMATOR,
+    ),
+    RunAlgorithm.KQD.value: AlgorithmDefinition(
+        algorithm=RunAlgorithm.KQD.value,
+        runner=_run_kqd,
+        config_namespace=RunAlgorithm.KQD.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.KQD.value),
+        primitive_requirement=PrimitiveRequirement.OPTIONAL_ESTIMATOR,
+    ),
+    RunAlgorithm.QFD.value: AlgorithmDefinition(
+        algorithm=RunAlgorithm.QFD.value,
+        runner=_run_qfd,
+        config_namespace=RunAlgorithm.QFD.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.QFD.value),
+        primitive_requirement=PrimitiveRequirement.OPTIONAL_ESTIMATOR,
+    ),
+    RunAlgorithm.QSE.value: AlgorithmDefinition(
+        algorithm=RunAlgorithm.QSE.value,
+        runner=_run_qse,
+        config_namespace=RunAlgorithm.QSE.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.QSE.value),
+        primitive_requirement=PrimitiveRequirement.OPTIONAL_ESTIMATOR,
+    ),
+    RunAlgorithm.SKQD.value: AlgorithmDefinition(
+        algorithm=RunAlgorithm.SKQD.value,
+        runner=_run_skqd,
+        config_namespace=RunAlgorithm.SKQD.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.SKQD.value),
+        primitive_requirement=PrimitiveRequirement.SAMPLER,
+    ),
 }
 
 
@@ -302,15 +347,27 @@ def dispatch_algorithm(
     backend_context: BackendExecutionContext | None = None,
 ) -> AlgorithmResult:
     """Dispatch to the selected algorithm runner."""
-    runner = _ALGORITHM_REGISTRY.get(algorithm)
-    if runner is None:
+    definition = _ALGORITHM_REGISTRY.get(algorithm)
+    if definition is None:
         supported = ", ".join(sorted(_ALGORITHM_REGISTRY))
         raise BackendError(
             f"algorithm '{algorithm}' is not enabled in worker rollout (supported: {supported})"
         )
-    return runner(backend, config_snapshot, hamiltonian_bundle, progress_callback, backend_context)
+    resolved_config = definition.config_resolver(config_snapshot)
+    return definition.runner(
+        backend,
+        resolved_config,
+        hamiltonian_bundle,
+        progress_callback,
+        backend_context,
+    )
 
 
 def supported_algorithms() -> set[str]:
     """Return currently enabled algorithm identifiers."""
     return set(_ALGORITHM_REGISTRY)
+
+
+def algorithm_definitions() -> dict[str, AlgorithmDefinition]:
+    """Return a copy of the worker algorithm registry metadata."""
+    return dict(_ALGORITHM_REGISTRY)

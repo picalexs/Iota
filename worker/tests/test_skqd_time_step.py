@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from qiskit.quantum_info import SparsePauliOp
 
-from worker.chemistry.algorithms.skqd import workflow
+from worker.chemistry.algorithms.skqd import sample_union as workflow
 from worker.chemistry.algorithms.skqd.config import resolve_skqd_config
 from worker.chemistry.algorithms.skqd.spectral_width import (
     estimate_action_spectral_width,
