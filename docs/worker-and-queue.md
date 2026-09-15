@@ -118,8 +118,14 @@ behavior when Redis or the worker is absent.
   around the ordered run story.
 - `worker/jobs/dispatcher.py`: registry-based algorithm dispatcher with the
   enabled algorithm set (`vqe`, `sqd`, `kqd`, `qfd`, `qse`, `skqd`) that
-  derives its public keys from `shared.contracts.identifiers.RunAlgorithm` and
-  receives a prebuilt chemistry Hamiltonian bundle from `execute_run`.
+  derives its public keys from `shared.contracts.identifiers.RunAlgorithm`,
+  exposes typed `AlgorithmDefinition` metadata, and receives a prebuilt
+  chemistry Hamiltonian bundle from `execute_run`.
+- `worker/chemistry/projected_execution.py`: canonical KQD/QFD projected-path
+  policy and QSE measurement policy. It records the requested target, actual
+  path, primitive requirement, and selection reason before execution.
+- `docs/worker-chemistry.md`: algorithm ownership, registration, provenance,
+  and test guidance for worker chemistry changes.
 - `worker/jobs/callbacks.py`: RQ callback implementations and bounded
   database-write retry policy.
   - `on_job_success` sets `COMPLETED`, persists normalized result payloads, and
