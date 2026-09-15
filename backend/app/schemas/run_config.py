@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import EasyGoal, RunAlgorithm
 from shared.contracts.catalog import PUBLIC_LIMITS
@@ -134,7 +134,19 @@ class BackendDerivedNoiseProfile(BaseModel):
 
     source: Literal[NoiseModelSource.BACKEND_DERIVED]
     reference_backend: str = Field(..., min_length=1)
-    temperature_mk: float | None = Field(None, ge=0.0)
+    temperature_mk: float | None = Field(None, ge=0.0, allow_inf_nan=False)
+
+    @field_validator("reference_backend")
+    @classmethod
+    def validate_reference_backend(cls, value: str) -> str:
+        normalized = value.strip()
+        if normalized.lower() in {
+            "aer_simulator",
+            "aer_simulator_statevector",
+            "statevector",
+        }:
+            raise ValueError("backend-derived noise requires an IBM backend reference")
+        return normalized
 
 
 class CustomPresetNoiseProfile(BaseModel):
@@ -142,7 +154,35 @@ class CustomPresetNoiseProfile(BaseModel):
 
     source: Literal[NoiseModelSource.CUSTOM_PRESET]
     preset: CustomNoisePreset
-    strength: float = Field(..., ge=0.0, le=1.0)
+    strength: float | None = Field(None, ge=0.0, le=1.0, allow_inf_nan=False)
+    p01: float | None = Field(None, ge=0.0, le=1.0, allow_inf_nan=False)
+    p10: float | None = Field(None, ge=0.0, le=1.0, allow_inf_nan=False)
+    t1_us: float | None = Field(None, gt=0.0, allow_inf_nan=False)
+    t2_us: float | None = Field(None, gt=0.0, allow_inf_nan=False)
+    gate_time_us: float | None = Field(None, gt=0.0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def validate_preset_parameters(self) -> "CustomPresetNoiseProfile":
+        populated = {
+            key
+            for key in ("strength", "p01", "p10", "t1_us", "t2_us", "gate_time_us")
+            if getattr(self, key) is not None
+        }
+        if self.preset == CustomNoisePreset.DEPOLARIZING_CX:
+            required = {"strength"}
+        elif self.preset == CustomNoisePreset.READOUT_BIAS:
+            required = {"p01", "p10"}
+        else:
+            required = {"t1_us", "t2_us", "gate_time_us"}
+        if populated != required:
+            expected = ", ".join(sorted(required))
+            raise ValueError(f"preset '{self.preset.value}' requires exactly: {expected}")
+        if self.preset == CustomNoisePreset.THERMAL_RELAXATION:
+            assert self.t1_us is not None
+            assert self.t2_us is not None
+            if self.t2_us > 2 * self.t1_us:
+                raise ValueError("t2_us must not exceed 2 * t1_us")
+        return self
 
 
 NoiseProfile = Annotated[

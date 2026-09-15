@@ -58,6 +58,21 @@ const optionalNullableInteger = (fieldLabel: string) =>
     .int(`${fieldLabel} must be an integer`)
     .nullable();
 
+const thermalNoiseProfileSchema = z
+  .object({
+    source: z.literal("custom_preset"),
+    preset: z.literal("thermal_relaxation"),
+    t1_us: z.number({ error: "T1 is required" }).positive("T1 must be greater than 0"),
+    t2_us: z.number({ error: "T2 is required" }).positive("T2 must be greater than 0"),
+    gate_time_us: z
+      .number({ error: "Gate time is required" })
+      .positive("Gate time must be greater than 0"),
+  })
+  .refine((profile) => profile.t2_us <= 2 * profile.t1_us, {
+    path: ["t2_us"],
+    message: "T2 must not exceed 2 × T1",
+  });
+
 function addNullableIntegerRangeIssue(
   ctx: z.RefinementCtx,
   path: (string | number)[],
@@ -781,24 +796,43 @@ export const runFormSchema = z
         .nullable(),
     }),
     noise_profile: z
-      .discriminatedUnion("source", [
+      .union([
         z.object({
           source: z.literal("backend_derived"),
-          reference_backend: requiredString("Reference backend is required"),
+          reference_backend: requiredString("Reference backend is required").refine(
+            (value) =>
+              !["aer_simulator", "aer_simulator_statevector", "statevector"].includes(
+                value.toLowerCase(),
+              ),
+            "Reference backend must be an IBM backend",
+          ),
           temperature_mk: z
             .number()
-            .positive("Temperature must be greater than 0")
+            .nonnegative("Temperature must be non-negative")
             .nullable()
             .optional(),
         }),
         z.object({
           source: z.literal("custom_preset"),
-          preset: z.enum(["depolarizing_cx", "thermal_relaxation", "readout_bias"]),
+          preset: z.literal("depolarizing_cx"),
           strength: z
-            .number({ error: "Noise strength is required" })
-            .min(0, "Noise strength must be at least 0")
-            .max(1, "Noise strength cannot exceed 1"),
+            .number({ error: "Depolarizing probability is required" })
+            .min(0, "Depolarizing probability must be at least 0")
+            .max(1, "Depolarizing probability cannot exceed 1"),
         }),
+        z.object({
+          source: z.literal("custom_preset"),
+          preset: z.literal("readout_bias"),
+          p01: z
+            .number({ error: "P(1|0) is required" })
+            .min(0, "P(1|0) must be at least 0")
+            .max(1, "P(1|0) cannot exceed 1"),
+          p10: z
+            .number({ error: "P(0|1) is required" })
+            .min(0, "P(0|1) must be at least 0")
+            .max(1, "P(0|1) cannot exceed 1"),
+        }),
+        thermalNoiseProfileSchema,
       ])
       .nullable(),
     basis_set_override: z.string(),

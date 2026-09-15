@@ -1393,14 +1393,24 @@ export interface components {
         CustomNoisePreset: "depolarizing_cx" | "thermal_relaxation" | "readout_bias";
         /** CustomPresetNoiseProfile */
         CustomPresetNoiseProfile: {
+            /** Gate time in microseconds for thermal relaxation */
+            gate_time_us?: number | null;
+            /** Probability of reading 1 when the true value is 0 */
+            p01?: number | null;
+            /** Probability of reading 0 when the true value is 1 */
+            p10?: number | null;
             preset: components["schemas"]["CustomNoisePreset"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
             source: "custom_preset";
-            /** Strength */
-            strength: number;
+            /** Gate strength for depolarizing CX noise */
+            strength?: number | null;
+            /** T1 relaxation time in microseconds */
+            t1_us?: number | null;
+            /** T2 relaxation time in microseconds */
+            t2_us?: number | null;
         };
         /**
          * EasyGoal

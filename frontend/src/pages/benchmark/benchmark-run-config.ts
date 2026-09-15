@@ -9,8 +9,6 @@ import type { BenchmarkExecutionSettings } from "@/types/benchmark";
 
 type BenchmarkRunConfigBase = Omit<AlgorithmAwareRunCreate, "easy_options" | "advanced_config">;
 
-const DEFAULT_NOISE_REFERENCE_BACKEND = "ibm_brisbane";
-
 function resolveBackendTarget(
   execution: BenchmarkExecutionSettings,
 ): AlgorithmAwareRunCreate["backend_target"] {
@@ -25,7 +23,7 @@ function resolveBackendName(
     return null;
   }
 
-  return execution.mode === "ibm_runtime" ? execution.backendName : "aer_simulator";
+  return execution.backendName;
 }
 
 function buildBackendOptions(backendName: string | null): BackendOptions {
@@ -49,7 +47,7 @@ function buildNoiseProfile(
 
   return {
     source: "backend_derived",
-    reference_backend: execution.backendName ?? DEFAULT_NOISE_REFERENCE_BACKEND,
+    reference_backend: execution.backendName ?? "",
   };
 }
 
