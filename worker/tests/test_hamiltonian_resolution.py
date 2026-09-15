@@ -7,10 +7,10 @@ import pytest
 from worker.chemistry.algorithms.kqd.workflow import run_kqd
 from worker.chemistry.algorithms.qfd.workflow import run_qfd
 from worker.chemistry.algorithms.qse.workflow import run_qse
+from worker.chemistry.algorithms.skqd.workflow import run_skqd
 from worker.chemistry.algorithms.sqd.workflow import run_sqd
 from worker.chemistry.algorithms.vqe.workflow import run_vqe
 from worker.chemistry.eigensolver import resolve_operator_matrix
-from worker.chemistry.skqd_solver import run_skqd
 
 
 def test_resolve_operator_matrix_raises_for_unsupported_input() -> None:

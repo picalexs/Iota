@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from worker.chemistry import skqd_solver
+from worker.chemistry.algorithms.skqd import workflow as skqd_solver
 from worker.chemistry.algorithms.skqd.config import SKQDConfig, resolve_skqd_config
 
 

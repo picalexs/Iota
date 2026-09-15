@@ -14,6 +14,7 @@ from worker.adapters.base import BackendAdapter, BackendExecutionContext
 from worker.chemistry.algorithms.kqd.workflow import run_kqd
 from worker.chemistry.algorithms.qfd.workflow import run_qfd
 from worker.chemistry.algorithms.qse.workflow import run_qse
+from worker.chemistry.algorithms.skqd.workflow import run_skqd
 from worker.chemistry.algorithms.sqd.workflow import run_sqd
 from worker.chemistry.algorithms.vqe.workflow import run_vqe
 from worker.chemistry.ansatz_registry import build_ansatz
@@ -24,7 +25,6 @@ from worker.chemistry.projected_execution import (
     resolve_projected_execution_policy,
     resolve_qse_execution_policy,
 )
-from worker.chemistry.skqd_solver import run_skqd
 from worker.chemistry.solver_utils import resolve_algorithm_config
 from worker.chemistry.types import AlgorithmResult
 from worker.exceptions import BackendError

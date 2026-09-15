@@ -82,6 +82,6 @@ def test_orthonormalize_candidate_rejects_dependent_vector() -> None:
 
 
 def test_skqd_keeps_legacy_orthonormalization_alias() -> None:
-    from worker.chemistry import skqd_solver
+    from worker.chemistry.algorithms.skqd import workflow as skqd_solver
 
     assert skqd_solver._orthonormalize_krylov_candidate is orthonormalize_candidate

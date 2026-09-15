@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from worker.chemistry import skqd_solver
+from worker.chemistry.algorithms.skqd import workflow as skqd_solver
 from worker.chemistry.algorithms.skqd.seed import (
     matches_spin_sector,
     parse_bitstring_index,
