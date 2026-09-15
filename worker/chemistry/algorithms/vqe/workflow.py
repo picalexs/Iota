@@ -27,7 +27,9 @@ from worker.chemistry.algorithms.vqe.initial_point import (
     _build_initial_point_candidates,
     _select_initial_point,
 )
-from worker.chemistry.algorithms.vqe.objective import evaluate_energy as _evaluate_energy
+from worker.chemistry.algorithms.vqe.objective import (
+    evaluate_energy as _evaluate_energy,
+)
 from worker.chemistry.algorithms.vqe.objective import (
     evaluate_energy_with_uncertainty as _evaluate_energy_with_uncertainty,
 )

@@ -158,7 +158,7 @@ class AerAdapter(BackendAdapter):
 
     def run_vqe(self, *, hamiltonian: object, config: dict) -> object:
         """Run VQE using Aer backend."""
-        from worker.chemistry.vqe_solver import run_vqe
+        from worker.chemistry.algorithms.vqe.workflow import run_vqe
 
         return run_vqe(
             hamiltonian=hamiltonian,

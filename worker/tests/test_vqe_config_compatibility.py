@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from worker.chemistry import vqe_solver
+from worker.chemistry.algorithms.vqe import workflow as vqe_solver
 from worker.chemistry.algorithms.vqe.config import (
     VQEConfig,
     bounded_optional_positive_int,

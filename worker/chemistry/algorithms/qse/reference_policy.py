@@ -13,6 +13,7 @@ from worker.chemistry.algorithms.qse.reference import (
     string_option,
     vector_size_to_qubits,
 )
+from worker.chemistry.algorithms.vqe.workflow import run_vqe
 from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.circuit_artifacts import retag_circuit_artifact
 from worker.chemistry.hamiltonian_action import HamiltonianAction
@@ -22,7 +23,6 @@ from worker.chemistry.sector_basis import (
     state_from_sector_amplitudes,
 )
 from worker.chemistry.solver_utils import bounded_int
-from worker.chemistry.vqe_solver import run_vqe
 
 
 def _reference_vqe_cost(

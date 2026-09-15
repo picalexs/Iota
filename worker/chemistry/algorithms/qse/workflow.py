@@ -54,6 +54,7 @@ from worker.chemistry.algorithms.qse.sector import (
     sector_excitation_coupling_score,
     sector_excitation_specs,
 )
+from worker.chemistry.algorithms.vqe.workflow import run_vqe
 from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.circuit_artifacts import (
     build_hf_reference_circuit,
@@ -91,7 +92,6 @@ from worker.chemistry.sector_basis import (
 )
 from worker.chemistry.solver_utils import resolve_algorithm_config
 from worker.chemistry.types import QSEResult
-from worker.chemistry.vqe_solver import run_vqe
 
 logger = logging.getLogger(__name__)
 

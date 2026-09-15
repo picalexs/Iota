@@ -35,7 +35,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
         "worker.chemistry.hamiltonian_builder",
         "build_qubit_hamiltonian",
     ),
-    "run_vqe": ("worker.chemistry.vqe_solver", "run_vqe"),
+    "run_vqe": ("worker.chemistry.algorithms.vqe.workflow", "run_vqe"),
     "run_sqd": ("worker.chemistry.algorithms.sqd.workflow", "run_sqd"),
     "run_kqd": ("worker.chemistry.algorithms.kqd.workflow", "run_kqd"),
     "run_qfd": ("worker.chemistry.algorithms.qfd.workflow", "run_qfd"),
