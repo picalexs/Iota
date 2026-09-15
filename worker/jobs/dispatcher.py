@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import partial
 from typing import Any
 
 import numpy as np
@@ -39,6 +40,7 @@ AlgorithmRunner = Callable[
     ],
     AlgorithmResult,
 ]
+ConfigResolver = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 class PrimitiveRequirement(StrEnum):
@@ -57,6 +59,7 @@ class AlgorithmDefinition:
     algorithm: str
     runner: AlgorithmRunner
     config_namespace: str
+    config_resolver: ConfigResolver
     primitive_requirement: PrimitiveRequirement
 
 
@@ -293,36 +296,42 @@ _ALGORITHM_REGISTRY: dict[str, AlgorithmDefinition] = {
         algorithm=RunAlgorithm.VQE.value,
         runner=_run_vqe,
         config_namespace=RunAlgorithm.VQE.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.VQE.value),
         primitive_requirement=PrimitiveRequirement.ESTIMATOR,
     ),
     RunAlgorithm.SQD.value: AlgorithmDefinition(
         algorithm=RunAlgorithm.SQD.value,
         runner=_run_sqd,
         config_namespace=RunAlgorithm.SQD.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.SQD.value),
         primitive_requirement=PrimitiveRequirement.SAMPLER_AND_OPTIONAL_ESTIMATOR,
     ),
     RunAlgorithm.KQD.value: AlgorithmDefinition(
         algorithm=RunAlgorithm.KQD.value,
         runner=_run_kqd,
         config_namespace=RunAlgorithm.KQD.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.KQD.value),
         primitive_requirement=PrimitiveRequirement.OPTIONAL_ESTIMATOR,
     ),
     RunAlgorithm.QFD.value: AlgorithmDefinition(
         algorithm=RunAlgorithm.QFD.value,
         runner=_run_qfd,
         config_namespace=RunAlgorithm.QFD.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.QFD.value),
         primitive_requirement=PrimitiveRequirement.OPTIONAL_ESTIMATOR,
     ),
     RunAlgorithm.QSE.value: AlgorithmDefinition(
         algorithm=RunAlgorithm.QSE.value,
         runner=_run_qse,
         config_namespace=RunAlgorithm.QSE.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.QSE.value),
         primitive_requirement=PrimitiveRequirement.OPTIONAL_ESTIMATOR,
     ),
     RunAlgorithm.SKQD.value: AlgorithmDefinition(
         algorithm=RunAlgorithm.SKQD.value,
         runner=_run_skqd,
         config_namespace=RunAlgorithm.SKQD.value,
+        config_resolver=partial(resolve_algorithm_config, algorithm=RunAlgorithm.SKQD.value),
         primitive_requirement=PrimitiveRequirement.SAMPLER,
     ),
 }
@@ -344,9 +353,10 @@ def dispatch_algorithm(
         raise BackendError(
             f"algorithm '{algorithm}' is not enabled in worker rollout (supported: {supported})"
         )
+    resolved_config = definition.config_resolver(config_snapshot)
     return definition.runner(
         backend,
-        config_snapshot,
+        resolved_config,
         hamiltonian_bundle,
         progress_callback,
         backend_context,

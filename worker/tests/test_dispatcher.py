@@ -100,6 +100,9 @@ def test_algorithm_registry_exposes_runtime_metadata_for_each_algorithm() -> Non
     assert set(definitions) == {algorithm.value for algorithm in RunAlgorithm}
     assert all(definition.algorithm == algorithm for algorithm, definition in definitions.items())
     assert definitions["vqe"].config_namespace == "vqe"
+    assert definitions["vqe"].config_resolver(
+        {"advanced_config": {"algorithm": "vqe", "max_iterations": 3}}
+    ) == {"algorithm": "vqe", "max_iterations": 3}
     assert definitions["vqe"].primitive_requirement is PrimitiveRequirement.ESTIMATOR
     assert (
         definitions["sqd"].primitive_requirement
