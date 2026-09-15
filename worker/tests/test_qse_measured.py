@@ -10,12 +10,12 @@ from qiskit.quantum_info import Operator, SparsePauliOp, Statevector
 
 from worker.adapters.result_adapter import normalize_result
 from worker.chemistry.algorithms.qse.excitations import apply_fermionic_excitation
-from worker.chemistry.eigensolver import solve_stabilized_generalized_eigenproblem
-from worker.chemistry.qse_measured import (
+from worker.chemistry.algorithms.qse.measured import (
     _estimator_pub_chunk_size,
     build_measured_excitation_operators,
     estimate_measured_qse_matrices,
 )
+from worker.chemistry.eigensolver import solve_stabilized_generalized_eigenproblem
 from worker.chemistry.qse_solver import run_qse
 from worker.chemistry.reference_states import build_hf_reference_state
 
@@ -147,7 +147,7 @@ def test_measured_excitation_operators_match_statevector_excitations() -> None:
 
     # Direct comparison: build the operator for create (1,) annihilate (0,) and
     # compare against apply_fermionic_excitation on all basis vectors.
-    from worker.chemistry.qse_measured import _excitation_operator
+    from worker.chemistry.algorithms.qse.measured import _excitation_operator
 
     operator = _excitation_operator(
         num_qubits,

@@ -29,6 +29,10 @@ from worker.chemistry.algorithms.qse.execution import (
     execute_measured_qse,
     execute_sector_qse,
 )
+from worker.chemistry.algorithms.qse.measured import (
+    estimate_measured_qse_matrices,
+    measured_qse_dimension_limit,
+)
 from worker.chemistry.algorithms.qse.reference import (
     normalize_reference_state_vector,
     parse_reference_scalar,
@@ -77,10 +81,6 @@ from worker.chemistry.projected_execution import (
 from worker.chemistry.projected_subspace import (
     projected_diagnostic_energy_is_reportable,
     solve_action_subspace,
-)
-from worker.chemistry.qse_measured import (
-    estimate_measured_qse_matrices,
-    measured_qse_dimension_limit,
 )
 from worker.chemistry.reference_descriptor import build_reference_descriptor
 from worker.chemistry.reference_states import build_hf_reference_state_with_source
