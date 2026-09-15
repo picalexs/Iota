@@ -26,7 +26,7 @@ mathematics.
 | `worker/chemistry/algorithms/<name>/` | Algorithm-specific kernels, execution helpers, and result builders. |
 | `worker/chemistry/types.py` | Worker-internal result records and chemistry input records. |
 | `worker/adapters/result_adapter.py` | Conversion from worker results to persisted API payloads. |
-| `worker/chemistry/*_solver.py` | Current top-level workflow entry points during the extraction transition. |
+| `worker/chemistry/algorithms/<name>/workflow.py` | Public workflow entry point for one algorithm. |
 
 The package root uses lazy exports. Prefer explicit imports from the owning
 module in new code.
@@ -88,8 +88,7 @@ tests.
 
 ## Current transition
 
-The algorithm packages already own many kernels, configuration records, and
-result builders. The top-level solver modules still contain workflow
-orchestration for several algorithms. Move one workflow at a time. Keep the
-old module only as a thin approved facade after all internal imports use the
-package workflow.
+The algorithm packages own the workflow entry points, kernels, configuration
+records, and result builders. Keep shared chemistry modules focused on
+cross-algorithm behavior. Remove a compatibility alias only after all internal
+imports and tests use the package workflow.
