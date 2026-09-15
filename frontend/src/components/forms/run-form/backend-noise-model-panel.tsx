@@ -407,7 +407,6 @@ export function NoiseModelPanel({
                     <SelectItem value="readout_bias">Readout bias</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
               {noiseProfile.preset === "depolarizing_cx" && (
                 <NoiseNumberField
                   label="CX probability"
