@@ -326,10 +326,7 @@ def _noise_model_has_errors(noise_model: Any) -> bool:
     to_dict = getattr(noise_model, "to_dict", None)
     if not callable(to_dict):
         return bool(_basis_gates(noise_model))
-    try:
-        model_dict = to_dict()
-    except Exception:
-        return bool(_basis_gates(noise_model))
+    model_dict = to_dict()
     return bool(model_dict.get("errors")) if isinstance(model_dict, dict) else False
 
 
@@ -349,7 +346,7 @@ def _coupling_map(backend: Any) -> tuple[tuple[int, int], ...]:
         if callable(configuration):
             try:
                 value = getattr(configuration(), "coupling_map", None)
-            except Exception:
+            except (AttributeError, TypeError, ValueError):
                 value = None
     if hasattr(value, "get_edges") and callable(value.get_edges):
         value = value.get_edges()
@@ -357,9 +354,12 @@ def _coupling_map(backend: Any) -> tuple[tuple[int, int], ...]:
         return ()
     edges: list[tuple[int, int]] = []
     for edge in value:
-        if isinstance(edge, (list, tuple)) and len(edge) == 2:
-            if all(isinstance(item, int) and not isinstance(item, bool) for item in edge):
-                edges.append((int(edge[0]), int(edge[1])))
+        if (
+            isinstance(edge, (list, tuple))
+            and len(edge) == 2
+            and all(isinstance(item, int) and not isinstance(item, bool) for item in edge)
+        ):
+            edges.append((int(edge[0]), int(edge[1])))
     return tuple(edges)
 
 

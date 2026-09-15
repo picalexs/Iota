@@ -46,8 +46,8 @@ class AlgorithmDefinition:
 
 __all__ = [
     "AlgorithmDefinition",
+    "AlgorithmResult",
     "AlgorithmRunner",
     "ConfigResolver",
     "PrimitiveRequirement",
-    "AlgorithmResult",
 ]

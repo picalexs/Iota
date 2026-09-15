@@ -82,7 +82,7 @@ def run_sqd_algorithm(
         progress_callback=vqe_sampling_progress,
         backend_context=backend_context,
     )
-    num_qubits = int(getattr(hamiltonian_bundle, "num_qubits"))
+    num_qubits = int(hamiltonian_bundle.num_qubits)
     ansatz = build_ansatz(
         ansatz_name=ansatz_name,
         num_qubits=num_qubits,
