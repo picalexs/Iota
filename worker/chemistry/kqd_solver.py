@@ -49,11 +49,14 @@ from worker.chemistry.hamiltonian_action import (
     HamiltonianAction,
     build_hamiltonian_action,
 )
-from worker.chemistry.matrix_elements import estimate_projected_matrices_with_branch_estimator
+from worker.chemistry.matrix_elements import (
+    estimate_projected_matrices_with_branch_estimator,
+)
 from worker.chemistry.overlap import build_overlap_matrix
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_energy import generalized_projected_ground_energy
 from worker.chemistry.projected_execution import (
+    ProjectedExecutionPolicy,
     backend_label,
     can_use_sector_action,
     num_qubits,
@@ -360,6 +363,7 @@ def _prepare_kqd_execution(
     hamiltonian: object,
     backend: object | None,
     backend_context: Any | None,
+    execution_policy: ProjectedExecutionPolicy | None = None,
 ) -> _KQDExecutionPlan:
     """Resolve the KQD execution path and base operator resources."""
     return prepare_kqd_execution(
@@ -372,6 +376,7 @@ def _prepare_kqd_execution(
         resolve_operator_matrix_fn=resolve_operator_matrix,
         num_qubits_fn=_num_qubits,
         backend_label_fn=_backend_label,
+        execution_policy=execution_policy,
     )
 
 
@@ -696,6 +701,7 @@ def run_kqd(
     config: dict[str, Any],
     progress_callback: ProgressCallback | None = None,
     backend_context: Any | None = None,
+    execution_policy: ProjectedExecutionPolicy | None = None,
 ) -> KQDResult:
     """Run a deterministic Krylov subspace diagonalization workflow."""
     resolved = resolve_algorithm_config(config, "kqd")
@@ -706,6 +712,7 @@ def run_kqd(
         hamiltonian=hamiltonian,
         backend=backend,
         backend_context=backend_context,
+        execution_policy=execution_policy,
     )
     logger.info(
         "KQD setup: hilbert_dim=%d krylov_dim=%d evolution=%s time_step=%.4f "

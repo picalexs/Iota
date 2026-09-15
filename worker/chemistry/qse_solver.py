@@ -69,6 +69,10 @@ from worker.chemistry.hamiltonian_action import (
 )
 from worker.chemistry.overlap import build_overlap_matrix
 from worker.chemistry.progress import ProgressCallback
+from worker.chemistry.projected_execution import (
+    QSEExecutionPolicy,
+    resolve_qse_execution_policy,
+)
 from worker.chemistry.projected_subspace import (
     projected_diagnostic_energy_is_reportable,
     solve_action_subspace,
@@ -247,12 +251,10 @@ def _build_excitation_basis(
 
 def _use_measured_qse(backend_context: object | None) -> bool:
     """Return whether QSE should measure H/S through the backend estimator."""
-    backend_target = getattr(backend_context, "backend_target", None)
-    if backend_target == "ibm_runtime":
-        return True
-    return backend_target == "aer_simulator" and (
-        getattr(backend_context, "noise_profile", None) is not None
-    )
+    return resolve_qse_execution_policy(
+        backend_context=backend_context,
+        reference_method="hf",
+    ).uses_measured_matrix_elements
 
 
 def run_qse(
@@ -262,6 +264,7 @@ def run_qse(
     config: dict[str, Any],
     progress_callback: ProgressCallback | None = None,
     backend_context: object | None = None,
+    execution_policy: QSEExecutionPolicy | None = None,
 ) -> QSEResult:
     """Run a deterministic projected-subspace solve workflow."""
     resolved = resolve_algorithm_config(config, "qse")
@@ -284,7 +287,11 @@ def run_qse(
 
     t_start = time.monotonic()
     reference_method_requested = str(resolved.get("reference_method", "vqe")).lower()
-    if _use_measured_qse(backend_context):
+    qse_policy = execution_policy or resolve_qse_execution_policy(
+        backend_context=backend_context,
+        reference_method=reference_method_requested,
+    )
+    if qse_policy.uses_measured_matrix_elements:
         measured_rank = min(max_subspace_dim, measured_qse_dimension_limit())
         logger.info(
             "QSE setup: max_subspace_dim=%d excitation=%s reference_method=%s "
