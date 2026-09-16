@@ -53,6 +53,24 @@ def test_run_spsa_stops_after_five_stable_accepted_energies() -> None:
     assert diagnostics["accepted_steps"] == 4
 
 
+def test_run_spsa_counts_blocked_iterations_separately_from_accepted_steps() -> None:
+    _, iterations, converged, diagnostics = run_spsa(
+        objective=lambda point: float(point[0] ** 2 + point[0]),
+        initial_point=np.array([0.0]),
+        max_iterations=3,
+        options={"learning_rate": 2.0, "blocking": True},
+        threshold=1e-12,
+        seed=3,
+        convergence_trace=[],
+        parameter_bounds=None,
+    )
+
+    assert iterations == 3
+    assert not converged
+    assert diagnostics["optimizer_iterations"] == 3
+    assert diagnostics["accepted_steps"] == 0
+
+
 @pytest.mark.parametrize(
     "options",
     [
