@@ -262,7 +262,10 @@ behavior when Redis or the worker is absent.
     sets the seeded evolution schedule used to generate the Krylov extension and
     is echoed in diagnostics; sample-union `subspace_saturated` is diagnostic
     only, and SKQD reports scientific convergence only after full selected-CI
-    sector recovery;
+    sector recovery. Direct sample-union runs set the extension status to
+    `not_applicable`. Legacy extension runs record the seed source; a
+    probability-only seed does not preserve relative phases and must not be
+    treated as paper-faithful hardware SKQD evidence;
   - `worker/chemistry/algorithms/skqd/extension.py` owns dense and fixed-sector
     Krylov extension construction and progress payloads;
     `worker/chemistry/algorithms/skqd/execution.py` owns SQD-seed resolution

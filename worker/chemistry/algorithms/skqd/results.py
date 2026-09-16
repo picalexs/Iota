@@ -129,7 +129,7 @@ def build_skqd_extension_diagnostics(
         "operator_dimension": float(plan.operator_dimension),
         "basis_rank": float(extension.basis_rank),
         "sqd_iterations": float(sqd_result.primary_iterations or 0),
-        "seeded_from_sqd_occupancies": extension.sqd_seed is not None,
+        "seeded_from_sqd_occupancies": extension.seed_source == "sqd_occupancies",
         "seeded_from_sqd": extension.sqd_seed is not None,
         "seed_source": extension.seed_source,
         "sqd_converged": bool(sqd_result.converged),
