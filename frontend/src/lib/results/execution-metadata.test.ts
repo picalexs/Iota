@@ -132,6 +132,12 @@ describe("execution metadata helpers", () => {
             used_physical_qubits: [73, 74],
           },
         },
+        matrix_element_summary: {
+          work_ledger: {
+            ledger_version: 1,
+            primitive_run_calls: 2,
+          },
+        },
       },
       created_at: "2026-05-17T12:05:00Z",
     };
@@ -148,6 +154,10 @@ describe("execution metadata helpers", () => {
     expect(metadata.effectiveEstimatorPrecision).toBe(0.0);
     expect(metadata.noiseSource).toBe("backend_derived");
     expect(metadata.noiseFingerprint).toBe("noise-hash");
+    expect(metadata.workLedger).toEqual({
+      ledger_version: 1,
+      primitive_run_calls: 2,
+    });
     expect(metadata.ibmJobId).toBe("job-from-result");
     expect(metadata.optimizationLevel).toBe(3);
     expect(metadata.depth).toBe(42);

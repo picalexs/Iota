@@ -15,6 +15,12 @@ export interface BenchmarkScatterExportPoint {
   energy: number;
   verdict: AccuracyVerdict;
   runId: string | null;
+  actualExecutionTarget?: string | null;
+  actualPathClass?: string | null;
+  primitiveFamily?: string | null;
+  noiseSource?: string | null;
+  noiseFingerprint?: string | null;
+  workLedger?: Record<string, unknown> | null;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -48,6 +54,12 @@ function downloadScatterCsv(points: readonly BenchmarkScatterExportPoint[]): voi
       "energy_ha",
       "verdict",
       "run_id",
+      "actual_execution_target",
+      "actual_path_class",
+      "primitive_family",
+      "noise_source",
+      "noise_fingerprint",
+      "work_ledger_json",
     ],
     ...points.map((point) => [
       point.moleculeKey,
@@ -59,6 +71,12 @@ function downloadScatterCsv(points: readonly BenchmarkScatterExportPoint[]): voi
       point.energy.toString(),
       point.verdict,
       point.runId ?? "",
+      point.actualExecutionTarget ?? "unknown",
+      point.actualPathClass ?? "unknown",
+      point.primitiveFamily ?? "unknown",
+      point.noiseSource ?? "unknown",
+      point.noiseFingerprint ?? "",
+      point.workLedger == null ? "" : JSON.stringify(point.workLedger),
     ]),
   ];
   const csv = rows

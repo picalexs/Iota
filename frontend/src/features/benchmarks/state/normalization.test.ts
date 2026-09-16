@@ -4,7 +4,9 @@ import type { RunRestartResponse, UUID } from "@/types/run";
 import { buildInitialEntries } from "@/pages/benchmark/benchmark-utils";
 import {
   buildBenchmarkWorkspaceSnapshotFromSavedRun,
+  benchmarkEntriesChanged,
   clearBenchmarkWorkspaceViewCache,
+  entrySaveSignature,
   getBenchmarkSubmissionConcurrency,
   getRestartTargetRunId,
   readBenchmarkWorkspaceViewCache,
@@ -85,5 +87,21 @@ describe("benchmark state normalization", () => {
     expect(readBenchmarkWorkspaceViewCache("benchmark-1")?.selectedMoleculeKeys).toEqual([
       preset.key,
     ]);
+  });
+
+  it("persists execution metadata changes in the saved-entry signature", () => {
+    const entry = savedBenchmarkRun().entries[0];
+    if (!entry) throw new Error("Expected a benchmark entry");
+
+    const updatedEntry = {
+      ...entry,
+      executionMetadata: {
+        shots: 1024,
+        actualExecutionTarget: "local_classical",
+      },
+    };
+
+    expect(entrySaveSignature(updatedEntry)).not.toBe(entrySaveSignature(entry));
+    expect(benchmarkEntriesChanged([entry], [updatedEntry])).toBe(true);
   });
 });

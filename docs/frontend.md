@@ -325,6 +325,13 @@ The server catalog owns cross-service identifiers, runtime limits, algorithm and
 goal recommendations, and chemical-accuracy target metadata. Keep benchmark
 fixtures in the frontend until a reviewed API contract makes them server-owned.
 
+Completed benchmark entries retain normalized execution metadata from the
+terminal run result. The state includes the actual execution target and path,
+primitive family, requested and effective sampling controls, Aer noise source
+and fingerprint, and the worker-observed work ledger when available. The visible
+accuracy-versus-runtime CSV exports these fields. A missing field means that the
+older result did not record that value; it does not prove hardware execution.
+
 ---
 
 ## 3. Theming System

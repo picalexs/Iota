@@ -19,6 +19,12 @@ export interface CompletedPoint {
   absErrorMha: number;
   verdict: AccuracyVerdict;
   tooltipSections: readonly ChartTooltipSection[];
+  actualExecutionTarget?: string | null;
+  actualPathClass?: string | null;
+  primitiveFamily?: string | null;
+  noiseSource?: string | null;
+  noiseFingerprint?: string | null;
+  workLedger?: Record<string, unknown> | null;
 }
 
 function isWhitespace(char: string): boolean {
@@ -112,6 +118,12 @@ export function buildCompletedPoints(
           absErrorMha: assessment.absErrorMha,
           verdict: assessment.verdict,
           tooltipSections: buildBenchmarkTooltipLines(preset, entry, assessment.absErrorMha),
+          actualExecutionTarget: entry.executionMetadata?.actualExecutionTarget ?? null,
+          actualPathClass: entry.executionMetadata?.actualPathClass ?? null,
+          primitiveFamily: entry.executionMetadata?.primitiveFamily ?? null,
+          noiseSource: entry.executionMetadata?.noiseSource ?? null,
+          noiseFingerprint: entry.executionMetadata?.noiseFingerprint ?? null,
+          workLedger: entry.executionMetadata?.workLedger ?? null,
         },
       ];
     }),

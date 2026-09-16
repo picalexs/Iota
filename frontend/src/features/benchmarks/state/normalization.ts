@@ -339,6 +339,7 @@ export function entrySaveSignature(entry: BenchmarkEntry): string {
     classicalRefs: entry.classicalRefs,
     elapsedSeconds: entry.elapsedSeconds,
     latestEventSequence: entry.latestEventSequence,
+    executionMetadata: entry.executionMetadata,
   });
 }
 
