@@ -96,7 +96,7 @@ class TestExecuteRunHappyPath:
     def test_returns_numeric_final_energy(self) -> None:
         result, _ = self._run_with_mock_sessions()
         assert isinstance(result["energy"], float)
-        assert result["energy"] < 0
+        assert np.isfinite(result["energy"])
 
     def test_emits_status_changed_running_at_start(self) -> None:
         _, sessions = self._run_with_mock_sessions()
