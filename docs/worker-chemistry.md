@@ -128,6 +128,16 @@ rejects exact evolution before estimator creation on those paths. Guided form
 recommendations know the IBM and noisy-Aer paths. They cannot predict the
 large ideal-Aer path before the worker prepares the Hamiltonian.
 
+The branch-estimator path builds a controlled pair of evolved states and
+measures ancilla `X` and `Y` observables to reconstruct each upper-triangle
+Hamiltonian and overlap entry. This computes the projected matrix elements
+directly. It does not implement the symmetry-optimized, single-evolution
+Toeplitz circuit used in the [2025 KQD paper's hardware experiment]
+(https://www.nature.com/articles/s41467-025-59716-z). Do not apply that
+paper's circuit-count or depth estimates to this worker path. The worker sets
+each overlap diagonal to one because ideal basis states are normalized. This
+is an imposed normalization, not a measured hardware fidelity.
+
 SKQD sample-union results record the same worker-observed sampler fields in
 `algorithm_metrics.work_ledger`. Exact local sample oracles record
 `local_exact_sampling_runs` and returned rows instead. Do not compare
