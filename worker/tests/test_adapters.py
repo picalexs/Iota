@@ -1340,6 +1340,31 @@ def test_normalize_result_for_skqd_dataclass() -> None:
     ]
 
 
+def test_normalize_result_promotes_skqd_work_ledger() -> None:
+    result = SKQDResult(
+        algorithm="skqd",
+        primary_energy=-0.81,
+        primary_iterations=2,
+        converged=False,
+        sqd_core={"status": "not_run"},
+        krylov_extension_diagnostics={
+            "work_ledger": {
+                "ledger_version": 1,
+                "sampler_run_attempts": 2,
+                "sampler_returned_raw_sample_rows": 16,
+            }
+        },
+    )
+
+    normalized = normalize_result(result)
+
+    assert normalized["algorithm_metrics"]["work_ledger"] == {
+        "ledger_version": 1,
+        "sampler_run_attempts": 2,
+        "sampler_returned_raw_sample_rows": 16,
+    }
+
+
 @pytest.mark.parametrize(
     ("selected_solution", "diagnostics", "expected_converged", "expected_criterion"),
     [

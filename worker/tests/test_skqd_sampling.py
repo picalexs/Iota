@@ -44,9 +44,9 @@ def test_sample_krylov_state_sources_samples_every_index_and_keeps_provenance() 
     assert result.work_ledger == {
         "ledger_version": 1,
         "counting_scope": "worker_observed",
-        "local_statevector_sampling_runs": 3,
-        "local_statevector_requested_samples_total": 12,
-        "local_statevector_returned_sample_rows": 12,
+        "local_exact_sampling_runs": 3,
+        "local_exact_requested_samples_total": 12,
+        "local_exact_returned_raw_sample_rows": 12,
     }
 
 
