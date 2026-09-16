@@ -131,6 +131,10 @@ def test_measured_excitation_operators_match_statevector_excitations() -> None:
     num_qubits = 4
     operators = build_measured_excitation_operators(
         num_qubits=num_qubits,
+        reference_state=build_hf_reference_state(
+            _HamiltonianBundle(_four_qubit_hamiltonian(), num_qubits=4),
+            fallback_dim=16,
+        ),
         excitation_level="singles_doubles",
         max_dimension=8,
     )
@@ -195,6 +199,32 @@ def test_measured_qse_assembles_hermitian_matrices_with_identity_reference() -> 
     assert float(np.real(projected[0, 0])) == pytest.approx(exact_energy, abs=1e-9)
     assert estimate.summary["matrix_element_strategy"] == "branch_estimator"
     assert estimate.summary["max_standard_error"] == 0.0
+
+
+def test_measured_qse_dimension_cap_counts_independent_hf_excitation_states() -> None:
+    """Zero-on-reference singles must not consume the cap ahead of doubles."""
+    hamiltonian = _HamiltonianBundle(
+        SparsePauliOp.from_list([("IIIIII", 0.5), ("ZIIIII", -0.25)]),
+        num_qubits=6,
+        n_alpha=1,
+        n_beta=1,
+        norb=3,
+    )
+    reference = build_hf_reference_state(hamiltonian, fallback_dim=64)
+    estimator = _MockEstimator(reference)
+
+    estimate = estimate_measured_qse_matrices(
+        hamiltonian=hamiltonian,
+        estimator=estimator,
+        excitation_level="singles_doubles",
+        max_dimension=8,
+        backend_context=None,
+    )
+
+    # This HF reference has four useful independent singles. The remaining
+    # three slots must be filled by useful doubles, not zero-on-reference singles.
+    assert estimate.summary["projected_dimension"] == 8
+    assert np.linalg.matrix_rank(estimate.overlap, tol=1e-10) == 8
 
 
 def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
@@ -278,10 +308,11 @@ def test_qse_dispatch_rejects_non_hf_reference_before_creating_estimator() -> No
     assert backend.create_estimator_calls == 0
 
 
-def test_measured_qse_rank_reduced_solve_is_reportable_diagnostic() -> None:
+def test_measured_qse_noisy_hf_solve_is_reportable_diagnostic() -> None:
     hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=5))
     reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
-    # Higher noise forces overlap thresholding to drop rank.
+    # The four-qubit (1, 1) sector has only four independent HF directions.
+    # Noisy measured QSE must keep this bounded solve diagnostic and reportable.
     estimator = _MockEstimator(reference, noise=0.08, seed=11)
 
     result = run_qse(
@@ -300,14 +331,14 @@ def test_measured_qse_rank_reduced_solve_is_reportable_diagnostic() -> None:
     )
 
     diagnostics = result.conditioning_summary
-    assert diagnostics["stability_state"] == "stabilized"
+    assert diagnostics["stability_state"] == "stable"
     assert int(diagnostics["retained_rank"]) >= 1
     assert result.converged is False
 
     normalized = normalize_result(result)
     # A reportable diagnostic keeps a finite reported energy.
     assert normalized["reported_energy"] is not None
-    assert normalized["reported_energy_source"] == "stabilized_projected_diagnostic"
+    assert normalized["reported_energy_source"] == "lowest_qse_projected_eigenvalue"
 
 
 def test_measured_qse_ibm_target_uses_mock_estimator_without_live_access() -> None:
@@ -445,19 +476,11 @@ def test_measured_qse_submits_only_hermitian_observables() -> None:
 
 
 def test_measured_qse_reconstructs_complex_off_diagonal_element() -> None:
-    """An off-diagonal element with a known non-zero imaginary part is recovered.
-
-    The reference state is chosen so that a specific overlap S_ij is genuinely
-    complex; the fix must reconstruct <O> = <O_re> + i <O_im> exactly, whereas
-    the old single-real-EV path would have discarded the imaginary part.
-    """
-    hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=23))
-    # A superposition reference makes off-diagonal overlaps complex in general.
-    raw = np.zeros(16, dtype=complex)
-    raw[0b0011] = 1.0
-    raw[0b0101] = 1.0j
-    raw[0b0110] = 0.5 - 0.5j
-    reference = raw / np.linalg.norm(raw)
+    """A Hermitian Y-containing Hamiltonian reconstructs a complex H_ij."""
+    hamiltonian = _HamiltonianBundle(
+        SparsePauliOp.from_list([("IIXY", 1.0)])
+    )
+    reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
 
     estimator = _HermitianStrictEstimator(reference)
     estimate = estimate_measured_qse_matrices(
@@ -472,6 +495,7 @@ def test_measured_qse_reconstructs_complex_off_diagonal_element() -> None:
     # excitation operators on the same reference state.
     operators = build_measured_excitation_operators(
         num_qubits=4,
+        reference_state=reference,
         excitation_level="singles_doubles",
         max_dimension=8,
     )
@@ -492,9 +516,11 @@ def test_measured_qse_reconstructs_complex_off_diagonal_element() -> None:
     assert np.allclose(estimate.projected_hamiltonian, expected_h, atol=1e-9)
     assert np.allclose(estimate.overlap, expected_s, atol=1e-9)
 
-    # At least one reconstructed off-diagonal overlap has a non-zero imaginary
-    # part, which the old real-only path could not have produced.
-    off_diagonal = estimate.overlap - np.diag(np.diag(estimate.overlap))
+    # At least one projected Hamiltonian element is genuinely complex. Its
+    # imaginary part comes from the Y-containing Hermitian observable.
+    off_diagonal = estimate.projected_hamiltonian - np.diag(
+        np.diag(estimate.projected_hamiltonian)
+    )
     assert np.max(np.abs(off_diagonal.imag)) > 1e-3
 
 

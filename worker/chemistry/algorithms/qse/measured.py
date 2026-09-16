@@ -23,9 +23,12 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from qiskit.quantum_info import SparsePauliOp
+from qiskit.quantum_info import SparsePauliOp, Statevector
 
-from worker.chemistry.algorithms.qse.excitations import fermionic_excitation_specs
+from worker.chemistry.algorithms.qse.excitations import (
+    apply_fermionic_excitation,
+    fermionic_excitation_specs,
+)
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_execution import validate_branch_estimator_feasibility
 
@@ -141,12 +144,36 @@ def _excitation_operator(
 def build_measured_excitation_operators(
     *,
     num_qubits: int,
+    reference_state: np.ndarray,
     excitation_level: str,
     max_dimension: int,
 ) -> list[SparsePauliOp]:
-    """Build ``A_0 = I`` followed by Jordan-Wigner excitation operators."""
+    """Build a capped set of independent excitation actions on the reference.
+
+    The dimension cap includes the identity/reference direction. Skip an
+    excitation when it annihilates the reference or its resulting state is
+    linearly dependent on an already selected direction. This lets useful
+    later excitations, including doubles, fill the available basis slots.
+    """
+    if (
+        isinstance(max_dimension, bool)
+        or not isinstance(max_dimension, (int, np.integer))
+        or max_dimension < 1
+    ):
+        raise ValueError("Measured QSE max_dimension must be a positive integer")
+    max_dimension = int(max_dimension)
+
+    reference = np.asarray(reference_state, dtype=complex)
+    if reference.ndim != 1 or reference.size != 2**num_qubits:
+        raise ValueError("Measured QSE reference_state size must match num_qubits")
+    reference_norm = float(np.linalg.norm(reference))
+    if not np.isfinite(reference_norm) or reference_norm <= 1e-12:
+        raise ValueError("Measured QSE reference_state must have a finite non-zero norm")
+    reference = reference / reference_norm
+
     identity = SparsePauliOp.from_list([("I" * num_qubits, 1.0)])
     operators: list[SparsePauliOp] = [identity]
+    orthonormal_states = [reference]
     for _kind, create_orbitals, annihilate_orbitals in fermionic_excitation_specs(
         num_qubits,
         excitation_level=excitation_level,
@@ -161,7 +188,29 @@ def build_measured_excitation_operators(
         # Skip operators that annihilate to zero on the full space.
         if len(operator) == 0:
             continue
+
+        candidate = apply_fermionic_excitation(
+            reference,
+            create_orbitals=create_orbitals,
+            annihilate_orbitals=annihilate_orbitals,
+            num_qubits=num_qubits,
+        )
+        candidate_norm = float(np.linalg.norm(candidate))
+        if not np.isfinite(candidate_norm) or candidate_norm <= 1e-12:
+            continue
+
+        residual = candidate / candidate_norm
+        # Re-orthogonalize once to keep the rank test stable for non-determinant
+        # reference states while limiting work to this small capped subspace.
+        for _ in range(2):
+            for basis_state in orthonormal_states:
+                residual -= np.vdot(basis_state, residual) * basis_state
+        residual_norm = float(np.linalg.norm(residual))
+        if not np.isfinite(residual_norm) or residual_norm <= 1e-10:
+            continue
+
         operators.append(operator)
+        orthonormal_states.append(residual / residual_norm)
     return operators
 
 
@@ -429,18 +478,11 @@ def estimate_measured_qse_matrices(
     pauli_hamiltonian = _resolve_pauli_hamiltonian(hamiltonian)
     num_qubits = _resolve_num_qubits(hamiltonian, pauli_hamiltonian)
     bounded_dimension = max(1, min(int(max_dimension), _MAX_MEASURED_QSE_DIM))
-    operators = build_measured_excitation_operators(
-        num_qubits=num_qubits,
-        excitation_level=excitation_level,
-        max_dimension=bounded_dimension,
-    )
-    dimension = len(operators)
-    pairs = [(row, col) for row in range(dimension) for col in range(row, dimension)]
 
     _emit_status(
         progress_callback=progress_callback,
-        pairs=pairs,
-        dimension=dimension,
+        pairs=[],
+        dimension=bounded_dimension,
         pauli_terms=len(pauli_hamiltonian),
         status="preparing_reference_circuit",
     )
@@ -449,6 +491,18 @@ def estimate_measured_qse_matrices(
         num_qubits=num_qubits,
         backend_context=backend_context,
     )
+    # Use the state prepared by the submitted circuit as the basis-selection
+    # reference. This keeps the cap filter tied to the measured state if the
+    # circuit preparation policy changes.
+    reference_state = Statevector.from_instruction(circuit).data
+    operators = build_measured_excitation_operators(
+        num_qubits=num_qubits,
+        reference_state=reference_state,
+        excitation_level=excitation_level,
+        max_dimension=bounded_dimension,
+    )
+    dimension = len(operators)
+    pairs = [(row, col) for row in range(dimension) for col in range(row, dimension)]
     layout = getattr(circuit, "layout", None)
     plans = _build_pair_measurement_plans(
         operators=operators,
@@ -542,6 +596,7 @@ def estimate_measured_qse_matrices(
         "hermitian_observable_decomposition": True,
         "projected_dimension": dimension,
         "projected_matrix_element_count": 2 * dimension**2,
+        "basis_cap_policy": "nonzero_independent_reference_actions",
         "pauli_terms": len(pauli_hamiltonian),
         "max_standard_error": max_standard_error,
         "hermitian_symmetrized": True,
