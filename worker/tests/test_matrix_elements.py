@@ -11,6 +11,7 @@ from worker.adapters.aer_adapter import AerAdapter
 from worker.adapters.base import BackendExecutionContext
 from worker.chemistry import matrix_elements
 from worker.chemistry.algorithms.kqd.workflow import run_kqd
+from worker.chemistry.algorithms.qfd.grid import build_qfd_time_grid
 from worker.chemistry.algorithms.qfd.workflow import run_qfd
 from worker.chemistry.eigensolver import (
     StabilizedGeneralizedEigenproblemResult,
@@ -58,7 +59,13 @@ def test_branch_estimator_handles_symmetric_negative_time_grid() -> None:
         pauli_hamiltonian=SparsePauliOp.from_list([("X", 1.0)]),
         num_qubits=1,
     )
-    time_points = [-0.4, 0.0, 0.4]
+    time_points = build_qfd_time_grid(
+        qfd_variant="qfd_original_symmetric",
+        num_time_points=3,
+        max_time=1.0,
+        time_grid_type="linear",
+        kappa=2.0 * np.pi / 0.4,
+    )
     estimate = estimate_projected_matrices_with_branch_estimator(
         hamiltonian=hamiltonian,
         estimator=StatevectorEstimator(),
@@ -67,16 +74,15 @@ def test_branch_estimator_handles_symmetric_negative_time_grid() -> None:
         algorithm="qfd",
     )
 
-    operator = hamiltonian.pauli_hamiltonian.to_matrix()
-    reference = build_reference_state(2)
-    states = [
-        exact_time_evolution_state(operator, reference, time_step=time_point)
-        for time_point in time_points
-    ]
-    basis = np.column_stack(states)
+    # QFD uses |phi_k> = exp(-i 2 pi k H / kappa) |phi_0>. For H=X and
+    # |phi_0>=|0>, S_ij=cos(t_i-t_j), while H_ij=i sin(t_i-t_j).
+    time_differences = np.subtract.outer(time_points, time_points)
+    expected_overlap = np.cos(time_differences)
+    expected_hamiltonian = 1j * np.sin(time_differences)
 
-    assert estimate.projected_hamiltonian == pytest.approx(basis.conj().T @ operator @ basis)
-    assert estimate.overlap == pytest.approx(basis.conj().T @ basis)
+    assert time_points == pytest.approx([-0.4, 0.0, 0.4])
+    assert estimate.projected_hamiltonian == pytest.approx(expected_hamiltonian)
+    assert estimate.overlap == pytest.approx(expected_overlap)
     assert estimate.summary["time_points"] == pytest.approx(time_points)
 
 
