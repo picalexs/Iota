@@ -242,6 +242,8 @@ behavior when Redis or the worker is absent.
   - KQD result and completion-payload construction lives in
     `worker/chemistry/algorithms/kqd/results.py`; `worker/chemistry/algorithms/kqd/workflow.py` retains
     injected private wrappers for compatibility;
+    KQD dense metadata now reports exact matrix evolution only for the exact
+    method and reports `dense_matrix_trotter` for the local Trotter method;
   - SKQD Krylov diagnostics are generated from projected Hamiltonian subspaces
     instead of synthetic arithmetic decrement ladders, use SQD selected
     bitstrings or an HF sector fallback as the seed, and normalize those seed

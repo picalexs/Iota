@@ -562,11 +562,12 @@ def _solve_kqd_dense_path(
     basis_matrix = np.column_stack(basis)
     reference_energy = float(np.real(np.vdot(reference_state, operator @ reference_state)))
     residual = operator @ reference_state - reference_energy * reference_state
-    implemented_evolution_method = (
-        "aer_pauli_lie_trotter"
-        if getattr(backend_context, "backend_target", None) == "aer_simulator"
-        else "exact_matrix_evolution"
-    )
+    if kqd_config.evolution_method == "exact":
+        implemented_evolution_method = "exact_matrix_evolution"
+    elif getattr(backend_context, "backend_target", None) == "aer_simulator":
+        implemented_evolution_method = "aer_pauli_lie_trotter"
+    else:
+        implemented_evolution_method = "dense_matrix_trotter"
     reference_descriptor = build_reference_descriptor(
         state=reference_state,
         reference_source=reference_source,
