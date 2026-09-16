@@ -26,7 +26,7 @@ def build_qfd_time_grid(
         kmax = (num_time_points - 1) // 2
         indices = np.arange(-kmax, kmax + 1, dtype=float)
         return 2.0 * np.pi * indices / float(kappa)
-    if qfd_variant not in {"qfd_chemistry_forward", "qfd_custom_grid"}:
+    if qfd_variant != "qfd_chemistry_forward":
         raise ValueError(f"unsupported QFD variant: {qfd_variant}")
     return build_time_grid(
         num_time_points=num_time_points,

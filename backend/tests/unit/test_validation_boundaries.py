@@ -160,6 +160,7 @@ def _qfd_payload(
     *,
     qfd_variant: str = "qfd_chemistry_forward",
     kappa: float = 1.0,
+    time_grid_type: str = "linear",
 ) -> RunCreate:
     return _run_create(
         algorithm=RunAlgorithm.QFD,
@@ -170,6 +171,7 @@ def _qfd_payload(
             "trotter_steps": trotter_steps,
             "qfd_variant": qfd_variant,
             "kappa": kappa,
+            "time_grid_type": time_grid_type,
         },
     )
 
@@ -310,6 +312,14 @@ class TestKQDHardLimits:
 
 
 class TestQFDHardLimits:
+    def test_custom_variant_is_rejected_by_schema(self) -> None:
+        with pytest.raises(ValidationError):
+            _qfd_payload(qfd_variant="qfd_custom_grid")
+
+    def test_unknown_time_grid_type_is_rejected_by_schema(self) -> None:
+        with pytest.raises(ValidationError):
+            _qfd_payload(time_grid_type="typo")
+
     def test_original_symmetric_variant_accepts_odd_grid(self) -> None:
         result = validate_run_request(
             _qfd_payload(

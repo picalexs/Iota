@@ -32,6 +32,8 @@ def build_time_grid(
     if normalized_grid_type == "geometric":
         positive_times = np.geomspace(max_time / num_time_points, max_time, num_time_points - 1)
         return np.concatenate([np.array([0.0]), positive_times.astype(float)])
+    if normalized_grid_type != "linear":
+        raise ValueError("grid_type must be one of: geometric, linear")
 
     return np.linspace(0.0, max_time, num_time_points, dtype=float)
 

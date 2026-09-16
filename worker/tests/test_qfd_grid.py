@@ -31,3 +31,14 @@ def test_chemistry_forward_grid_keeps_existing_nonnegative_convention() -> None:
     )
 
     assert grid == pytest.approx(np.linspace(0.0, 0.6, 4))
+
+
+def test_qfd_grid_rejects_undefined_custom_variant() -> None:
+    with pytest.raises(ValueError, match="unsupported QFD variant"):
+        build_qfd_time_grid(
+            qfd_variant="qfd_custom_grid",
+            num_time_points=4,
+            max_time=0.6,
+            time_grid_type="linear",
+            kappa=2.0,
+        )

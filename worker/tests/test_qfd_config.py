@@ -57,6 +57,16 @@ def test_resolve_qfd_config_rejects_even_original_grid() -> None:
         )
 
 
+def test_resolve_qfd_config_rejects_undefined_custom_grid_variant() -> None:
+    with pytest.raises(ValueError, match="qfd_variant must be one of"):
+        resolve_qfd_config({"qfd_variant": "qfd_custom_grid"})
+
+
+def test_resolve_qfd_config_rejects_unknown_time_grid_type() -> None:
+    with pytest.raises(ValueError, match="time_grid_type must be one of"):
+        resolve_qfd_config({"time_grid_type": "typo"})
+
+
 def test_qfd_solver_exposes_the_resolved_config_boundary() -> None:
     assert qfd_solver.QFDConfig is QFDConfig
     assert qfd_solver.resolve_qfd_config is resolve_qfd_config
