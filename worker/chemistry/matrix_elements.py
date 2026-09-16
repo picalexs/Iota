@@ -125,8 +125,11 @@ def estimate_projected_matrices_with_branch_estimator(
     chunk_size = _estimator_pub_chunk_size(backend_context)
 
     completed = 0
+    primitive_run_calls = 0
+    primitive_successful_runs = 0
     for chunk_start in range(0, len(pubs), chunk_size):
         chunk_end = min(chunk_start + chunk_size, len(pubs))
+        primitive_run_calls += 1
         max_standard_error, completed = _accumulate_matrix_element_chunk(
             estimator=estimator,
             pubs=pubs,
@@ -141,6 +144,7 @@ def estimate_projected_matrices_with_branch_estimator(
             completed=completed,
             max_standard_error=max_standard_error,
         )
+        primitive_successful_runs += 1
 
     projected = _hermitian_symmetrized(projected)
     overlap = _hermitian_symmetrized(overlap)
@@ -159,6 +163,8 @@ def estimate_projected_matrices_with_branch_estimator(
         backend_context=backend_context,
         estimator_pub_chunk_size=chunk_size,
         overlap_diagonal_normalized=True,
+        primitive_run_calls=primitive_run_calls,
+        primitive_successful_runs=primitive_successful_runs,
     )
     return MatrixElementEstimate(projected, overlap, summary)
 
@@ -453,6 +459,8 @@ def _build_branch_estimator_summary(
     backend_context: Any | None,
     estimator_pub_chunk_size: int,
     overlap_diagonal_normalized: bool,
+    primitive_run_calls: int,
+    primitive_successful_runs: int,
 ) -> dict[str, Any]:
     """Build the persisted summary for branch-estimator matrix-element solves."""
     return {
@@ -471,6 +479,14 @@ def _build_branch_estimator_summary(
         "overlap_diagonal_normalized": overlap_diagonal_normalized,
         "residual_diagnostics_available": False,
         "backend_target": getattr(backend_context, "backend_target", None),
+        "work_ledger": {
+            "ledger_version": 1,
+            "counting_scope": "worker_observed",
+            "primitive_run_calls": primitive_run_calls,
+            "primitive_successful_runs": primitive_successful_runs,
+            "primitive_pub_count": len(pubs),
+            "primitive_observable_slots": len(pubs) * len(observables),
+        },
     }
 
 

@@ -82,6 +82,12 @@ Every algorithm result must preserve these meanings:
 - primary energy and iteration units; and
 - convergence state and convergence reason.
 
+Branch-estimator KQD and QFD results also include a worker-observed
+`algorithm_metrics.matrix_element_summary.work_ledger`. It records primitive
+run calls, successful runs, PUB count, and observable slots. It does not claim
+provider billing or hidden runtime retries. Other algorithm work ledgers are
+tracked separately before cross-algorithm benchmark comparisons.
+
 Do not infer actual execution from the requested backend label. A local Aer
 run is not IBM hardware evidence. A queued or planned run is not completed
 execution evidence.
