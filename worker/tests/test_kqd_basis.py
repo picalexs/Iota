@@ -1,8 +1,12 @@
 """Direct tests for KQD Krylov-basis helpers."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
+from qiskit.quantum_info import SparsePauliOp
 
+from worker.adapters.base import BackendExecutionContext
 from worker.chemistry.algorithms.kqd.basis import build_krylov_basis, build_sector_krylov_basis
 
 
@@ -26,6 +30,34 @@ def test_build_krylov_basis_emits_dense_time_evolution_progress() -> None:
     assert events[0]["step"] == "time_evolution"
     assert events[0]["time_evolution_backend"] == "dense_matrix"
     assert events[-1]["completed_iterations"] == 2
+
+
+def test_aer_context_honors_exact_kqd_evolution() -> None:
+    hamiltonian = SimpleNamespace(
+        pauli_hamiltonian=SparsePauliOp.from_list([("X", 1.0), ("Z", 0.7)])
+    )
+    operator = hamiltonian.pauli_hamiltonian.to_matrix()
+    reference = np.array([1.0, 0.0], dtype=complex)
+    time_step = 0.4
+    events: list[dict[str, object]] = []
+
+    basis = build_krylov_basis(
+        hamiltonian,
+        operator,
+        reference,
+        target_rank=2,
+        evolution_method="exact",
+        time_step=time_step,
+        trotter_steps=1,
+        progress_callback=events.append,
+        backend_context=BackendExecutionContext(backend_target="aer_simulator"),
+    )
+    eigenvalues, eigenvectors = np.linalg.eigh(operator)
+    expected = eigenvectors @ (np.exp(-1j * eigenvalues * time_step) * (eigenvectors.conj().T @ reference))
+    expected /= np.linalg.norm(expected)
+
+    assert basis[1] == pytest.approx(expected)
+    assert events[1]["time_evolution_backend"] == "dense_matrix"
 
 
 def test_build_sector_krylov_basis_keeps_sector_progress_metadata() -> None:

@@ -32,7 +32,7 @@ def prepare_dense_krylov_spectrum(
     ),
 ) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
     """Prepare exact dense evolution data when KQD can reuse it."""
-    if evolution_method != "exact" or use_aer:
+    if evolution_method != "exact":
         return None, None, None
     eigenvalues, eigenvectors = prepare_exact_time_evolution_fn(operator_matrix)
     return eigenvalues, eigenvectors, eigenvectors.conj().T @ reference
@@ -65,14 +65,6 @@ def evolve_dense_krylov_state(
     )
     if np.isclose(time_point, 0.0):
         return reference.copy()
-    if use_aer:
-        return aer_time_evolution_fn(
-            hamiltonian,
-            reference,
-            time_step=time_point,
-            trotter_steps=trotter_steps,
-            context=backend_context,
-        )
     if evolution_method == "exact":
         if eigenvalues is None or eigenvectors is None:
             raise RuntimeError("KQD exact evolution spectrum was not prepared")
@@ -82,6 +74,14 @@ def evolve_dense_krylov_state(
             reference,
             time_step=time_point,
             state_projection=reference_projection,
+        )
+    if use_aer:
+        return aer_time_evolution_fn(
+            hamiltonian,
+            reference,
+            time_step=time_point,
+            trotter_steps=trotter_steps,
+            context=backend_context,
         )
     return trotterized_time_evolution_fn(
         operator_matrix,
@@ -263,7 +263,7 @@ def build_krylov_basis(
             time_point=time_point,
             time_step=time_step,
             trotter_steps=trotter_steps,
-            use_aer=use_aer,
+            use_aer=use_aer and evolution_method != "exact",
         )
 
     if not basis:
