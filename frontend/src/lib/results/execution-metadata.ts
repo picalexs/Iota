@@ -294,10 +294,15 @@ function getExecutionMetadataSources(
   const ibmStatusPayload = latestEventPayload(events, "ibm_status_poll");
   const resultMetrics = pickNestedRecord(resultPayload?.algorithm_metrics);
   const responseMetrics = pickNestedRecord(result?.algorithm_metrics);
+  const resultProvenance = pickNestedRecord(
+    resultMetrics?.benchmark_provenance,
+    responseMetrics?.benchmark_provenance,
+  );
   const resultExecution = pickNestedRecord(
     resultPayload?.backend_execution,
     resultMetrics?.backend_execution,
     responseMetrics?.backend_execution,
+    resultProvenance?.execution,
   );
   const transpilation = pickNestedRecord(
     resultExecution,
@@ -475,6 +480,7 @@ function getResultWorkLedger(
   const metrics = result?.algorithm_metrics;
   if (!isRecord(metrics)) return null;
   const candidates = [
+    pickNestedRecord(metrics.benchmark_provenance)?.work_ledger,
     metrics.work_ledger,
     pickNestedRecord(metrics.matrix_element_summary)?.work_ledger,
     pickNestedRecord(metrics.sci_result_package)?.work_ledger,
