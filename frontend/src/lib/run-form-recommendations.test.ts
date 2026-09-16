@@ -118,7 +118,7 @@ describe("buildRecommendedAdvancedPatch", () => {
       reference_method: "hf",
       excitation_level: "singles",
       max_subspace_dim: 4,
-      vqe_reference_ansatz_name: "EfficientSU2",
+      vqe_reference_ansatz_name: "NumberPreserving",
     });
   });
 
@@ -164,7 +164,7 @@ describe("buildRecommendedAdvancedPatch", () => {
       reference_method: "hf",
       excitation_level: "singles_doubles",
       max_subspace_dim: 8,
-      vqe_reference_ansatz_name: "EfficientSU2",
+      vqe_reference_ansatz_name: "NumberPreserving",
       vqe_reference_optimizer_name: "COBYLA",
       vqe_reference_max_iterations: 256,
       vqe_reference_reps: 1,

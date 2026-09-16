@@ -297,19 +297,19 @@ function buildQfdPatch(goal: EasyGoal): RecommendedAdvancedPatch {
 function buildQsePatch(goal: EasyGoal): RecommendedAdvancedPatch {
   const vqeReferenceByGoal = {
     fastest: {
-      ansatz: "EfficientSU2",
+      ansatz: "NumberPreserving",
       optimizer: "COBYLA",
       iterations: 128,
       reps: 1,
     },
     balanced: {
-      ansatz: "EfficientSU2",
+      ansatz: "NumberPreserving",
       optimizer: "COBYLA",
       iterations: 256,
       reps: 1,
     },
     best_accuracy: {
-      ansatz: "EfficientSU2",
+      ansatz: "NumberPreserving",
       optimizer: "COBYLA",
       iterations: 512,
       reps: 1,

@@ -31,7 +31,7 @@ _ANSATZ_METADATA: dict[str, AnsatzMetadata] = {
     "efficientsu2": {
         "label": "EfficientSU2",
         "aliases": ["efficient_su2", "efficientsu2"],
-        "description": "Hardware-efficient SU(2) ansatz used as the balanced default.",
+        "description": "Hardware-efficient SU(2) ansatz with single-qubit rotations and CX entanglement.",
         "default_reps": 2,
     },
     "numberpreserving": {

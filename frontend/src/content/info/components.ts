@@ -32,7 +32,7 @@ export const COMPONENT_INFO: Record<InfoComponentId, InfoEntry> = {
       {
         kind: "text",
         heading: "Hardware-efficient versus chemistry-inspired circuits",
-        body: "The thesis chapter compares chemistry-inspired constructions such as UCCSD with hardware-efficient templates. Chemistry-inspired ansatzes encode orbital excitations more directly, but they usually compile into longer circuits. This app instead exposes hardware-efficient templates because they are lighter-weight, available directly in Qiskit, and practical on statevector, Aer, and IBM Runtime paths.",
+        body: "Molecular VQE defaults to `NumberPreserving`, which prepares the declared alpha and beta electron counts and keeps both counts fixed. This custom ansatz is not UCCSD and does not guarantee total-spin conservation. The app also exposes hardware-efficient templates for users who need different circuit families; those templates do not preserve the molecular particle sector by construction.",
       },
       {
         kind: "list",
@@ -40,7 +40,8 @@ export const COMPONENT_INFO: Record<InfoComponentId, InfoEntry> = {
         items: [
           "`RealAmplitudes`: alternating `R_y` layers and CX entanglement. It keeps amplitudes real and is often the simplest baseline when you want fewer parameters and a cleaner convergence story.",
           "`TwoLocal`: a general alternating pattern of single-qubit rotation blocks and entangling blocks. In this app it is built with `R_y` plus `R_z` rotations and `CX` entanglers, so it is more flexible than `RealAmplitudes` but usually also more expensive.",
-          "`EfficientSU2`: repeated single-qubit `SU(2)`-style rotations plus CX entanglement. It is the most expressive of the three exposed templates, but that broader search space also means more parameters and a higher risk of slow or noisy optimization.",
+          "`EfficientSU2`: repeated single-qubit `SU(2)`-style rotations plus CX entanglement. It is the most expressive of the three hardware-efficient templates, but that broader search space also means more parameters and a higher risk of slow or noisy optimization.",
+          "`NumberPreserving`: a Hartree-Fock-seeded circuit with gates that preserve the declared alpha and beta electron counts. It is the default for molecular VQE, but it does not guarantee total-spin conservation or match the UCCSD ansatz.",
         ],
       },
       {
@@ -63,7 +64,8 @@ export const COMPONENT_INFO: Record<InfoComponentId, InfoEntry> = {
         kind: "list",
         heading: "How to choose in practice",
         items: [
-          "Start with `RealAmplitudes` when you want a compact baseline and easier debugging.",
+          "Start with the molecular `NumberPreserving` default when you need the requested electron sector.",
+          "Choose `RealAmplitudes` when you want a compact hardware-efficient baseline and accept that it does not preserve the molecular particle sector.",
           "Move to `EfficientSU2` when the shallow real-valued family stalls too early and you can afford extra circuit depth.",
           "Use `TwoLocal` when you specifically want the app's `R_y`/`R_z` structure and a middle ground between the other two templates.",
           "Increase `reps` one step at a time and always re-check the transpiled circuit, not just the logical template.",

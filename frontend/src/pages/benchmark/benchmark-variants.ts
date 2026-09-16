@@ -296,7 +296,7 @@ function applyQseAdvancedConfig(
     provided_sector_rows: mapQseProvidedSectorRows(config, values),
     excitation_level: config.excitation_level,
     max_subspace_dim: config.max_subspace_dim ?? null,
-    vqe_reference_ansatz_name: config.vqe_reference_ansatz_name ?? "EfficientSU2",
+    vqe_reference_ansatz_name: config.vqe_reference_ansatz_name ?? "NumberPreserving",
     vqe_reference_optimizer_name: config.vqe_reference_optimizer_name ?? "COBYLA",
     vqe_reference_max_iterations: config.vqe_reference_max_iterations ?? null,
     vqe_reference_reps: config.vqe_reference_reps ?? null,
