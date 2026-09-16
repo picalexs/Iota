@@ -118,7 +118,7 @@ export const ALGORITHM_INFO: Record<RunAlgorithm, InfoEntry> = {
       },
       {
         heading: "Controls that change behavior",
-        body: "The most important decisions are reference quality and basis size: `reference_method`, `excitation_level`, and `max_subspace_dim`. If the reference itself is built variationally, the VQE reference controls (`vqe_reference_ansatz_name`, `vqe_reference_optimizer_name`, `vqe_reference_max_iterations`, `vqe_reference_reps`) directly affect the QSE starting point. `regularization` has a path-specific role: measured QSE uses it as an overlap-mode cutoff floor, dense exact QSE uses it for intermediate progress estimates, and fixed-sector QSE records it only in overlap diagnostics. `overlap_threshold` prunes basis directions. `residual_tolerance` sets the residual convergence threshold.",
+        body: "The most important decisions are reference quality and basis size: `reference_method`, `excitation_level`, and `max_subspace_dim`. If the reference itself is built variationally, the VQE reference controls (`vqe_reference_ansatz_name`, `vqe_reference_optimizer_name`, `vqe_reference_max_iterations`, `vqe_reference_reps`) directly affect the QSE starting point. `regularization` has a path-specific role: measured QSE uses it as an overlap-mode cutoff floor, dense exact QSE uses it for intermediate progress estimates, and fixed-sector QSE does not apply it. The final dense exact solve does not shift the projected metric. `overlap_threshold` prunes basis directions. `residual_tolerance` sets the residual convergence threshold.",
       },
       {
         heading: "Typical failure modes",

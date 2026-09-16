@@ -87,7 +87,6 @@ def build_sector_excitation_basis(
     excitation_level: str,
     target_rank: int,
     overlap_threshold: float,
-    regularization: float,
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
     sector_excitation_specs_fn: abc.Callable[..., list[ExcitationSpec]] = sector_excitation_specs,
@@ -136,7 +135,7 @@ def build_sector_excitation_basis(
                 action,
                 np.column_stack(basis),
                 residual_tolerance=residual_tolerance,
-                regularization=regularization,
+                regularization=0.0,
             )
             if partial_eigs_m.size:
                 partial_energy_m = float(partial_eigs_m[0])

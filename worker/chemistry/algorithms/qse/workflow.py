@@ -51,7 +51,6 @@ from worker.chemistry.circuit_artifacts import (
 )
 from worker.chemistry.eigensolver import (
     build_hf_reference_state,
-    projected_ritz_diagnostics,
     resolve_operator_matrix,
     solve_exact_generalized_eigensystem,
     solve_generalized_eigenproblem,
@@ -172,7 +171,6 @@ def _build_sector_excitation_basis(
     excitation_level: str,
     target_rank: int,
     overlap_threshold: float,
-    regularization: float,
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
@@ -183,7 +181,6 @@ def _build_sector_excitation_basis(
         excitation_level=excitation_level,
         target_rank=target_rank,
         overlap_threshold=overlap_threshold,
-        regularization=regularization,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
         sector_excitation_specs_fn=sector_excitation_specs,
@@ -341,8 +338,6 @@ def run_qse(
             resolve_reference_state_fn=_resolve_reference_state,
             build_excitation_basis_fn=_build_excitation_basis,
             build_overlap_matrix_fn=build_overlap_matrix,
-            solve_generalized_eigenproblem_fn=solve_generalized_eigenproblem,
-            projected_ritz_diagnostics_fn=projected_ritz_diagnostics,
             real_scalar_fn=real_scalar,
             solve_generalized_eigensystem_fn=solve_exact_generalized_eigensystem,
             execution_mode="dense_exact_emulation",

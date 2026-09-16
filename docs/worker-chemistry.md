@@ -120,8 +120,11 @@ progress estimates. Fixed-sector QSE records it in overlap diagnostics but
 does not use it in the final energy solve. Result metadata keeps the requested
 value and reports `regularization_scope` and
 `final_metric_diagonal_shift` in `conditioning_summary`. Dense exact QSE uses
-it for intermediate basis-progress estimates. Fixed-sector QSE uses it for
-those estimates and overlap diagnostics. Neither path shifts the final metric.
+it only for intermediate basis-progress estimates. Fixed-sector QSE does not
+use it. Neither final solve shifts the projected metric. The
+legacy `conditioning_summary.regularization` field
+remains path-specific. Use the explicit fields to compare the requested value
+with a final metric shift.
 
 Measured QSE prepares a Hartree–Fock reference and builds directions
 `A_i |psi_ref>` from its fixed excitation pool. The dimension cap includes the
