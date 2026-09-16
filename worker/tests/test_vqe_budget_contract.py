@@ -120,7 +120,8 @@ def test_vqe_work_ledger_counts_objective_and_final_reevaluation_once(monkeypatc
 @pytest.mark.parametrize(
     ("backend_target", "estimator_precision", "expected_mode"),
     [
-        ("statevector", 0.0, "exact_statevector"),
+        ("statevector", 0.0, "exact_expectation"),
+        ("aer_simulator", 0.0, "exact_expectation"),
         ("ibm_runtime", 0.25, "estimator_precision"),
     ],
 )

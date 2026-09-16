@@ -246,6 +246,23 @@ def test_aer_estimator_records_and_applies_precision_without_sampler_option_leak
     assert metadata["uncertainty_policy"] == "aer_estimator_default_precision"
 
 
+def test_aer_exact_estimator_metadata_does_not_claim_configured_shots() -> None:
+    adapter = AerAdapter()
+    context = BackendExecutionContext(
+        backend_target="aer_simulator",
+        shots=256,
+        estimator_precision=0.0,
+    )
+
+    adapter.create_estimator(context)
+    metadata = adapter.execution_metadata(context)
+
+    assert metadata["measurement_mode"] == "exact"
+    assert metadata["requested_shots"] == 256
+    assert metadata["shots"] is None
+    assert metadata["effective_shots"] is None
+
+
 @pytest.mark.parametrize(
     ("precision", "expected_std"),
     [(0.0, 0.0), (0.125, 0.125)],
@@ -812,6 +829,34 @@ def test_ibm_adapter_execution_metadata_resolves_backend_name_before_primitive_c
     metadata = adapter.execution_metadata(context)
 
     assert metadata["resolved_backend_name"] == "ibm_brisbane"
+
+
+def test_ibm_precision_estimator_metadata_does_not_claim_configured_shots() -> None:
+    backend = SimpleNamespace(name="ibm_brisbane", simulator=False)
+    service = SimpleNamespace(backend=lambda name: backend)
+    adapter = IBMAdapter(
+        service_factory=lambda **_: service,
+        estimator_factory=lambda **_: SimpleNamespace(run=lambda *args, **kwargs: object()),
+    )
+    context = BackendExecutionContext(
+        backend_target="ibm_runtime",
+        backend_options={
+            "backend_name": "ibm_brisbane",
+            "token": "fake-token",
+            "instance": "fake-instance",
+        },
+        shots=512,
+        estimator_precision=0.25,
+    )
+
+    adapter.create_estimator(context)
+    metadata = adapter.execution_metadata(context)
+
+    assert metadata["measurement_mode"] == "precision_sampled"
+    assert metadata["requested_shots"] == 512
+    assert metadata["effective_estimator_precision"] == 0.25
+    assert metadata["shots"] is None
+    assert metadata["effective_shots"] is None
 
 
 def test_ibm_adapter_uses_least_error_selection_policy_for_resolution() -> None:
