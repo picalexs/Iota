@@ -440,8 +440,22 @@ Typed estimate envelope used by `RunResponse`, validation responses, and
 
 | Source            | Fields                                         | Current status                                                         |
 | ----------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
-| `custom_preset`   | `preset`, `strength`                           | Supported for `aer_simulator`; rejected for non-noise-capable targets. |
-| `backend_derived` | `reference_backend`, optional `temperature_mk` | Supported by the Aer adapter through fake-provider backend resolution. |
+| `custom_preset`   | `preset` plus preset-specific fields | Supported for `aer_simulator`; rejected for non-noise-capable targets. |
+| `backend_derived` | `reference_backend`, optional `temperature_mk` | Supported for `aer_simulator`; the reference must be an IBM backend. |
+
+Custom preset fields are:
+
+- `depolarizing_cx`: `strength` in `[0, 1]`, applied to `cx` gates.
+- `readout_bias`: `p01` for `P(1|0)` and `p10` for `P(0|1)`, each in `[0, 1]`.
+- `thermal_relaxation`: positive `t1_us`, `t2_us`, and `gate_time_us` values.
+  The worker requires `t2_us <= 2 * t1_us`.
+
+Backend-derived noise loads the named IBM backend through the active IBM Runtime
+credential profile. It passes the selected temperature in milli-Kelvin to Aer
+and records the resolved backend name, backend version, basis gates, coupling
+map, and model fingerprint in execution metadata. The worker fails the run when
+it cannot load the requested backend. It does not substitute a simulator or a
+different backend.
 
 Relevant upstream references for these runtime targets are Qiskit Aer
 `AerSimulator`, Qiskit Aer noise models, IBM Runtime service docs, and IBM

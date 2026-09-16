@@ -126,10 +126,23 @@ describe("runFormSchema", () => {
         },
         noise_profile: {
           source: "backend_derived",
-          reference_backend: "aer_simulator",
+          reference_backend: "ibm_brisbane",
         },
       }).success,
     ).toBe(true);
+  });
+
+  it("rejects simulator names as backend-derived noise references", () => {
+    const result = runFormSchema.safeParse({
+      ...validFormData,
+      backend_target: "aer_simulator",
+      noise_profile: {
+        source: "backend_derived",
+        reference_backend: "aer_simulator",
+      },
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it("accepts KQD on ideal Aer statevector simulation", () => {
@@ -156,7 +169,8 @@ describe("runFormSchema", () => {
         noise_profile: {
           source: "custom_preset",
           preset: "readout_bias",
-          strength: 0.01,
+          p01: 0.01,
+          p10: 0.02,
         },
         advanced_kqd: {
           ...validFormData.advanced_kqd,
@@ -175,7 +189,8 @@ describe("runFormSchema", () => {
       noise_profile: {
         source: "custom_preset",
         preset: "readout_bias",
-        strength: 0.01,
+        p01: 0.01,
+        p10: 0.02,
       },
       advanced_kqd: {
         ...validFormData.advanced_kqd,

@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from worker.chemistry.projected_subspace import projected_diagnostic_energy_is_reportable
+from worker.exceptions import InvalidResultError
 from worker.persistence.run_repository import normalize_payload_value
 
 ResultPersistencePayload = tuple[
@@ -42,10 +43,22 @@ def terminal_runtime_metadata(
 def _coerce_non_negative_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    numeric = int(value)
-    if numeric < 0:
+    numeric = float(value)
+    if not math.isfinite(numeric) or not numeric.is_integer() or numeric < 0:
         return None
-    return numeric
+    return int(numeric)
+
+
+def _required_non_negative_int(value: Any, *, field: str) -> int:
+    if value is None:
+        return 0
+    normalized = _coerce_non_negative_int(value)
+    if normalized is None:
+        raise InvalidResultError(
+            f"invalid_{field}",
+            f"solver result field '{field}' must be a finite non-negative integer",
+        )
+    return normalized
 
 
 def _completed_iterations_from_estimate(latest_estimate: Any) -> int | None:
@@ -159,7 +172,7 @@ def normalize_result_for_persistence(
     converged_raw = result.get("converged")
     algorithm_metrics_raw = result.get("algorithm_metrics")
 
-    iterations = int(iterations_raw) if isinstance(iterations_raw, (int, float)) else 0
+    iterations = _required_non_negative_int(iterations_raw, field="iterations")
     optimal_parameters_value = (
         normalize_payload_value(optimal_parameters_raw)
         if isinstance(optimal_parameters_raw, list)
@@ -197,7 +210,11 @@ def normalize_result_for_persistence(
 
 
 def _finite_float(value: Any) -> float | None:
-    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+    if (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(float(value))
+    ):
         return float(value)
     return None
 

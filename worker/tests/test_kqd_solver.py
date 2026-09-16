@@ -14,7 +14,6 @@ from worker.adapters.result_adapter import normalize_result
 from worker.chemistry.algorithms.kqd.workflow import (
     _build_krylov_basis,
     _build_sector_krylov_basis,
-    _projected_matrix_converged,
     run_kqd,
 )
 from worker.chemistry.eigensolver import (
@@ -23,6 +22,7 @@ from worker.chemistry.eigensolver import (
 )
 from worker.chemistry.hamiltonian_action import build_hamiltonian_action
 from worker.chemistry.overlap import build_overlap_matrix
+from worker.chemistry.projected_subspace import projected_matrix_converged
 from worker.chemistry.sector_basis import hartree_fock_sector_state
 from worker.jobs.dispatcher import dispatch_algorithm
 
@@ -435,21 +435,21 @@ def test_run_kqd_returns_stabilized_noisy_projected_solve_as_diagnostic(
 
 
 def test_projected_matrix_converged_requires_stable_overlap_gate() -> None:
-    assert _projected_matrix_converged(
+    assert projected_matrix_converged(
         {
             "stability_state": "stable",
             "overlap_condition": 128.0,
             "overlap_min_eigenvalue": 1e-3,
         }
     )
-    assert not _projected_matrix_converged(
+    assert not projected_matrix_converged(
         {
             "stability_state": "stabilized",
             "overlap_condition": 128.0,
             "overlap_min_eigenvalue": 1e-3,
         }
     )
-    assert not _projected_matrix_converged(
+    assert not projected_matrix_converged(
         {
             "stability_state": "stable",
             "overlap_condition": 128.0,

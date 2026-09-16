@@ -50,7 +50,6 @@ from worker.chemistry.projected_execution import (
     backend_label,
     can_use_sector_action,
     num_qubits,
-    num_spatial_orbitals,
     should_use_branch_matrix_elements,
     validate_branch_estimator_feasibility,
 )
@@ -75,23 +74,12 @@ logger = logging.getLogger(__name__)
 _NO_QFD_FILTER_EIGENVALUES = "QFD projected solve produced no filter eigenvalues"
 
 
-# Re-export private names for existing solver tests and importers.
-_num_qubits = num_qubits
-_num_spatial_orbitals = num_spatial_orbitals
-_can_use_sector_action = can_use_sector_action
-_should_use_branch_matrix_elements = should_use_branch_matrix_elements
-_backend_label = backend_label
-
-
-_QFDExecutionPlan = QFDExecutionPlan
-
-
 def _build_hf_reference_state_with_source(
     hamiltonian: object,
     *,
     fallback_dim: int | None = None,
 ) -> tuple[np.ndarray, str]:
-    """Keep the legacy patchable HF helper while persisting its source."""
+    """Build the HF reference and preserve its source metadata."""
     return build_hf_reference_state(
         hamiltonian,
         fallback_dim=fallback_dim,
@@ -132,7 +120,7 @@ def _build_sector_qfd_states(
     time_grid_type: str,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy sector-state helper import-compatible."""
+    """Adapt sector-state inputs to the state builder."""
     return build_sector_qfd_states(
         action,
         reference_state,
@@ -152,18 +140,18 @@ def _prepare_qfd_execution(
     backend: object | None,
     backend_context: Any | None,
     execution_policy: ProjectedExecutionPolicy | None = None,
-) -> _QFDExecutionPlan:
+) -> QFDExecutionPlan:
     """Resolve the QFD execution path and any reusable dense evolution data."""
     return prepare_qfd_execution(
         hamiltonian=hamiltonian,
         backend=backend,
         backend_context=backend_context,
-        should_use_branch_matrix_elements_fn=_should_use_branch_matrix_elements,
-        can_use_sector_action_fn=_can_use_sector_action,
+        should_use_branch_matrix_elements_fn=should_use_branch_matrix_elements,
+        can_use_sector_action_fn=can_use_sector_action,
         build_hamiltonian_action_fn=build_hamiltonian_action,
         resolve_operator_matrix_fn=resolve_operator_matrix,
-        num_qubits_fn=_num_qubits,
-        backend_label_fn=_backend_label,
+        num_qubits_fn=num_qubits,
+        backend_label_fn=backend_label,
         prepare_dense_spectrum_fn=_prepare_dense_qfd_spectrum,
         execution_policy=execution_policy,
     )
@@ -194,7 +182,7 @@ def _solve_qfd_branch_path(
     *,
     hamiltonian: object,
     backend: object | None,
-    plan: _QFDExecutionPlan,
+    plan: QFDExecutionPlan,
     time_grid: np.ndarray,
     num_time_points: int,
     max_time: float,
@@ -223,7 +211,7 @@ def _solve_qfd_branch_path(
     overlap = estimate.overlap
     reference_state, reference_source = _build_hf_reference_state_with_source(
         hamiltonian,
-        fallback_dim=2 ** max(0, _num_qubits(hamiltonian)),
+        fallback_dim=2 ** max(0, num_qubits(hamiltonian)),
     )
     reference_descriptor = build_reference_descriptor(
         state=reference_state,
@@ -283,7 +271,7 @@ def _solve_qfd_branch_path(
         "time_points": float(num_time_points),
         "max_time": float(max_time),
     }
-    converged = _projected_matrix_converged(diagnostics) and (
+    converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
     matrix_element_summary["convergence_basis"] = (
@@ -380,7 +368,7 @@ def _solve_qfd_sector_path(
         states_matrix,
         residual_tolerance=residual_tolerance,
     )
-    converged = _projected_matrix_converged(diagnostics) and (
+    converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
     matrix_element_summary = {
@@ -450,7 +438,7 @@ def _build_dense_qfd_states(
     time_grid_type: str,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy dense-state helper import-compatible."""
+    """Adapt dense-state inputs to the state builder."""
     return build_dense_qfd_states(
         evolution_context=evolution_context,
         time_grid=time_grid,
@@ -469,7 +457,7 @@ def _evolve_dense_qfd_state(
     evolution_context: _QFDDenseEvolutionContext,
     time_point: float,
 ) -> np.ndarray:
-    """Keep the legacy dense-state evolution helper import-compatible."""
+    """Adapt dense evolution inputs to the state builder."""
     return evolve_dense_qfd_state(
         evolution_context=evolution_context,
         time_point=time_point,
@@ -482,7 +470,7 @@ def _dense_qfd_partial_energy(
     operator: np.ndarray,
     dense_states: list[np.ndarray],
 ) -> float | None:
-    """Keep the legacy dense partial-energy helper import-compatible."""
+    """Adapt dense partial-energy inputs to the state builder."""
     return dense_qfd_partial_energy(
         operator,
         dense_states,
@@ -504,7 +492,7 @@ def _emit_dense_qfd_progress(
     use_aer: bool,
     trotter_steps: int,
 ) -> None:
-    """Keep the legacy dense progress helper import-compatible."""
+    """Adapt dense progress inputs to the state builder."""
     emit_dense_qfd_progress(
         progress_callback=progress_callback,
         index=index,
@@ -522,7 +510,7 @@ def _solve_qfd_dense_path(
     *,
     hamiltonian: object,
     operator: np.ndarray,
-    plan: _QFDExecutionPlan,
+    plan: QFDExecutionPlan,
     time_grid: np.ndarray,
     num_time_points: int,
     max_time: float,
@@ -577,7 +565,7 @@ def _solve_qfd_dense_path(
         states_matrix,
         residual_tolerance=residual_tolerance,
     )
-    converged = _projected_matrix_converged(diagnostics) and (
+    converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
     matrix_element_summary = {
@@ -794,6 +782,3 @@ def _emit_qfd_completion(
             qfd_variant=qfd_variant,
         ),
     )
-
-
-_projected_matrix_converged = projected_matrix_converged

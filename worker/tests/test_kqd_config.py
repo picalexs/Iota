@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from worker.chemistry.algorithms.kqd import workflow as kqd_solver
 from worker.chemistry.algorithms.kqd.config import KQDConfig, resolve_kqd_config
 
 
@@ -26,11 +25,6 @@ def test_resolve_kqd_config_applies_defaults_and_bounds() -> None:
         trotter_steps=32,
         residual_tolerance=0.001,
     )
-
-
-def test_kqd_solver_keeps_legacy_configuration_aliases() -> None:
-    assert kqd_solver._KQDConfig is KQDConfig
-    assert kqd_solver._resolve_kqd_config is resolve_kqd_config
 
 
 @pytest.mark.parametrize(

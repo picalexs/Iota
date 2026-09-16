@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from worker.exceptions import InvalidResultError
 from worker.jobs.result_normalization import (
     build_terminal_latest_estimate,
     normalize_result_for_persistence,
@@ -79,6 +80,12 @@ def test_normalize_accepts_zero_as_a_valid_algorithm_energy() -> None:
     assert energy == 0.0
     assert provenance["reported_energy"] == 0.0
     assert provenance["reported_energy_is_valid"] is True
+
+
+@pytest.mark.parametrize("iterations", [-1, 1.5, float("nan"), float("inf"), True, "3"])
+def test_normalize_rejects_invalid_iteration_counts(iterations: object) -> None:
+    with pytest.raises(InvalidResultError, match="iterations"):
+        normalize_result_for_persistence({"energy": -1.0, "iterations": iterations})
 
 
 def test_normalize_rejects_stabilized_branch_energy_without_residual() -> None:

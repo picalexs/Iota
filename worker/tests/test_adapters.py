@@ -8,7 +8,8 @@ from qiskit.circuit.library import XXPlusYYGate
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters import base as adapter_base
-from worker.adapters.aer_adapter import AerAdapter, _load_fake_backend
+from worker.adapters.aer_adapter import AerAdapter
+from worker.adapters.aer_noise import AerNoiseConfiguration
 from worker.adapters.base import BackendAdapter, BackendExecutionContext
 from worker.adapters.ibm_adapter import IBMAdapter, _RuntimeTranspiler
 from worker.adapters.result_adapter import normalize_result
@@ -264,169 +265,6 @@ def test_aer_estimator_returns_declared_standard_error(precision: float, expecte
     assert float(result.data.stds) == expected_std
 
 
-def test_aer_backend_derived_noise_uses_explicit_profile_credentials(monkeypatch) -> None:
-    class FakeNoiseModel:
-        basis_gates = ["rz", "sx", "x", "cx"]
-
-        @classmethod
-        def from_backend(cls, backend):
-            assert backend == "resolved-backend"
-            return cls()
-
-    monkeypatch.setattr(
-        "worker.adapters.aer_adapter._load_fake_backend",
-        lambda name, options: "resolved-backend",
-    )
-    monkeypatch.setattr("qiskit_aer.noise.NoiseModel", FakeNoiseModel)
-
-    adapter = AerAdapter()
-    context = BackendExecutionContext(
-        backend_target="aer_simulator",
-        backend_options={
-            "method": "automatic",
-            "shots": 256,
-            "token": "profile-token",
-            "instance": "profile-instance",
-            "channel": "ibm_quantum_platform",
-        },
-        noise_profile={
-            "source": "backend_derived",
-            "reference_backend": "ibm_brisbane",
-        },
-        shots=256,
-        simulator_method="automatic",
-    )
-
-    primitive_options, metadata = adapter._build_primitive_options(context)
-
-    assert primitive_options["backend_options"]["noise_model"].basis_gates == [
-        "rz",
-        "sx",
-        "x",
-        "cx",
-    ]
-    assert metadata["noise_summary"] == {
-        "enabled": True,
-        "source": "backend_derived",
-        "reference_backend": "ibm_brisbane",
-        "basis_gates": ["rz", "sx", "x", "cx"],
-    }
-
-
-def test_aer_backend_derived_noise_labels_default_reference_fallback(monkeypatch) -> None:
-    class FakeNoiseModel:
-        basis_gates = ["rz"]
-
-        @classmethod
-        def from_backend(cls, _backend):
-            return cls()
-
-    monkeypatch.setattr(
-        "worker.adapters.aer_adapter._load_fake_backend",
-        lambda name, _options: name,
-    )
-    monkeypatch.setattr("qiskit_aer.noise.NoiseModel", FakeNoiseModel)
-
-    context = BackendExecutionContext(
-        backend_target="aer_simulator",
-        noise_profile={
-            "source": "backend_derived",
-            "reference_backend": "aer_simulator",
-        },
-    )
-
-    _, metadata = AerAdapter()._build_primitive_options(context)
-
-    assert metadata["noise_summary"]["reference_backend"] == "ibm_brisbane"
-    assert metadata["noise_summary"]["requested_reference_backend"] == "aer_simulator"
-    assert metadata["noise_summary"]["fallback_reason"] == (
-        "aer_simulator_noise_reference_replaced_with_default_backend_profile"
-    )
-
-
-def test_load_fake_backend_prefers_live_runtime_for_unsupported_ibm_name(monkeypatch) -> None:
-    runtime_calls: list[tuple[str, dict[str, object]]] = []
-
-    def runtime_lookup(backend_name: str, backend_options: dict[str, object]) -> str:
-        runtime_calls.append((backend_name, backend_options))
-        return "runtime-backend"
-
-    monkeypatch.setattr("worker.adapters.aer_adapter._load_runtime_backend", runtime_lookup)
-
-    backend = _load_fake_backend("ibm_pittsburgh", {})
-
-    assert backend == "runtime-backend"
-    assert runtime_calls == [("ibm_pittsburgh", {})]
-
-
-def test_load_fake_backend_falls_back_to_alias_when_runtime_unavailable(monkeypatch) -> None:
-    def unavailable_runtime(backend_name: str, backend_options: dict[str, object]):
-        raise BackendError("no credentials")
-
-    monkeypatch.setattr("worker.adapters.aer_adapter._load_runtime_backend", unavailable_runtime)
-
-    backend = _load_fake_backend("ibm_pittsburgh", {})
-
-    assert backend.__class__.__name__ == "FakeFez"
-
-
-def test_load_fake_backend_falls_back_to_nighthawk_on_provider_error(monkeypatch) -> None:
-    def unavailable_runtime(_backend_name: str, _backend_options: dict[str, object]):
-        raise RuntimeError("IAM DNS is unavailable")
-
-    monkeypatch.setattr("worker.adapters.aer_adapter._load_runtime_backend", unavailable_runtime)
-
-    backend = _load_fake_backend("ibm_phoenix", {})
-
-    assert backend.__class__.__name__ == "FakeNighthawk"
-
-
-def test_aer_backend_derived_phoenix_noise_labels_packaged_fallback(monkeypatch) -> None:
-    class FakeNighthawk:
-        pass
-
-    class FakeNoiseModel:
-        basis_gates = ["rz", "sx", "x", "cx"]
-
-        @classmethod
-        def from_backend(cls, backend):
-            assert backend.__class__.__name__ == "FakeNighthawk"
-            return cls()
-
-    monkeypatch.setattr(
-        "worker.adapters.aer_adapter._load_fake_backend",
-        lambda _name, _options: FakeNighthawk(),
-    )
-    monkeypatch.setattr("qiskit_aer.noise.NoiseModel", FakeNoiseModel)
-
-    context = BackendExecutionContext(
-        backend_target="aer_simulator",
-        noise_profile={
-            "source": "backend_derived",
-            "reference_backend": "ibm_phoenix",
-        },
-    )
-
-    _, metadata = AerAdapter()._build_primitive_options(context)
-
-    assert metadata["noise_summary"]["reference_backend"] == "ibm_phoenix"
-    assert metadata["noise_summary"]["resolved_backend_name"] == "fake_nighthawk"
-    assert metadata["noise_summary"]["fallback_reason"] == (
-        "live_backend_unavailable_packaged_fake_nighthawk"
-    )
-
-
-def test_load_fake_backend_uses_exact_packaged_backend_without_runtime(monkeypatch) -> None:
-    def fail_runtime(backend_name: str, backend_options: dict[str, object]):
-        pytest.fail("exact packaged fake backend must not require a runtime lookup")
-
-    monkeypatch.setattr("worker.adapters.aer_adapter._load_runtime_backend", fail_runtime)
-
-    backend = _load_fake_backend("ibm_brisbane", {})
-
-    assert backend.__class__.__name__ == "FakeBrisbane"
-
-
 def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_builds(
     monkeypatch,
 ) -> None:
@@ -444,13 +282,19 @@ def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_b
             del default_shots, seed
             sampler_options.append(options)
 
-    def fake_build_noise_model(noise_profile, backend_options):
+    def fake_resolve_noise_profile(noise_profile, backend_options):
         build_noise_calls.append((noise_profile, backend_options))
-        return noise_model, {"enabled": True, "source": "custom_preset"}
+        return AerNoiseConfiguration(
+            noise_model=noise_model,
+            summary={"enabled": True, "source": "custom_preset"},
+        )
 
     monkeypatch.setattr("qiskit_aer.primitives.EstimatorV2", FakeEstimatorV2)
     monkeypatch.setattr(SAMPLER_V2_PATCH_PATH, FakeSamplerV2)
-    monkeypatch.setattr("worker.adapters.aer_adapter._build_noise_model", fake_build_noise_model)
+    monkeypatch.setattr(
+        "worker.adapters.aer_adapter.resolve_aer_noise_profile",
+        fake_resolve_noise_profile,
+    )
 
     adapter = AerAdapter()
     context = BackendExecutionContext(
@@ -484,6 +328,8 @@ def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_b
     assert second_metadata["noise_summary"] == {"enabled": True, "source": "custom_preset"}
     assert estimator_options[0]["backend_options"]["noise_model"] is noise_model
     assert sampler_options[0]["backend_options"]["noise_model"] is noise_model
+    assert estimator_options[0]["backend_options"]["method"] == "automatic"
+    assert sampler_options[0]["backend_options"]["method"] == "automatic"
 
 
 def test_ibm_adapter_raises_without_credentials(monkeypatch) -> None:

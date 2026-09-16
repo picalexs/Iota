@@ -94,7 +94,6 @@ interface BenchmarkBackendOptionsState {
 }
 
 export const DEFAULT_BENCHMARK_BACKEND_MODE: BenchmarkBackendMode = "statevector";
-export const DEFAULT_NOISE_REFERENCE_BACKEND = "ibm_brisbane";
 
 export function benchmarkEntryDisplayLabel(
   entry: Pick<BenchmarkEntry, "algorithm" | "variantLabel">,

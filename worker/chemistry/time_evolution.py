@@ -129,7 +129,8 @@ def aer_pauli_time_evolution_state(
     from qiskit.circuit.library import PauliEvolutionGate
     from qiskit.quantum_info import SparsePauliOp
     from qiskit.synthesis import LieTrotter
-    from qiskit_aer import AerSimulator
+
+    from worker.chemistry.matrix_element_circuits import build_aer_simulator
 
     pauli_hamiltonian = getattr(hamiltonian, "pauli_hamiltonian", None)
     if not isinstance(pauli_hamiltonian, SparsePauliOp):
@@ -144,10 +145,7 @@ def aer_pauli_time_evolution_state(
             "'statevector', or 'matrix_product_state'."
         )
 
-    simulator_options: dict[str, Any] = {}
-    if simulator_method != "automatic":
-        simulator_options["method"] = simulator_method
-    simulator = AerSimulator(**simulator_options)
+    simulator = build_aer_simulator(context)
 
     circuit = QuantumCircuit(num_qubits)
     circuit.initialize([complex(value) for value in state_array], list(range(num_qubits)))

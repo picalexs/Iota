@@ -6,6 +6,7 @@ export type IbmBackendWarmupProgress = Readonly<{
 }>;
 
 export type IbmCredentialProfilesChangedDetail = Readonly<{
+  profilesChanged?: boolean;
   activeProfileId?: string | null;
   backendCapabilitiesRefresh?: "started" | "progress" | "completed" | "failed";
   backendWarmupProgress?: IbmBackendWarmupProgress | null;

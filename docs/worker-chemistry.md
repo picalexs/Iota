@@ -8,19 +8,22 @@ Use it when you maintain an existing algorithm or add a new one.
 The worker follows this flow:
 
 1. `worker/jobs/execute_run.py` prepares the Hamiltonian and backend context.
-2. `worker/jobs/dispatcher.py` selects an `AlgorithmDefinition`.
-3. The definition selects the required primitive and solver entry point.
+2. `worker/jobs/dispatcher.py` looks up a package-owned `AlgorithmDefinition`.
+3. The definition selects the required primitive and workflow entry point.
 4. The algorithm resolves its configuration and runs its workflow.
 5. `worker/adapters/result_adapter.py` normalizes the typed result for storage.
 
-The dispatcher owns algorithm registration. It does not own algorithm
-mathematics.
+The dispatcher owns the generic dispatch boundary. Each algorithm package owns
+its definition, primitive decision, and workflow entry point.
 
 ## Module ownership
 
 | Module | Owns |
 | --- | --- |
-| `worker/jobs/dispatcher.py` | Algorithm definitions, supported keys, and primitive creation. |
+| `worker/chemistry/algorithm_contracts.py` | Shared definition and primitive contracts. |
+| `worker/chemistry/algorithms/registry.py` | Static list of package-owned definitions. |
+| `worker/jobs/dispatcher.py` | Generic lookup, configuration resolution, and runner call. |
+| `worker/adapters/aer_noise.py` | Aer noise validation, model construction, topology, and provenance. |
 | `worker/chemistry/projected_execution.py` | KQD/QFD path selection and QSE measurement policy. |
 | `worker/chemistry/types.py` | Shared execution-plan and result records. |
 | `worker/chemistry/algorithms/<name>/config.py` | Resolved options and validation for one algorithm. |
@@ -28,8 +31,21 @@ mathematics.
 | `worker/adapters/result_adapter.py` | Conversion from worker results to persisted API payloads. |
 | `worker/chemistry/algorithms/<name>/workflow.py` | Public workflow entry point for one algorithm. |
 
-The package root uses lazy exports. Prefer explicit imports from the owning
-module in new code.
+Algorithm package roots keep no shared workflow exports. Prefer explicit
+imports from the owning module in new code.
+
+## Aer noise contract
+
+An absent `noise_profile` uses ideal Aer simulation. A `custom_preset` builds
+only the selected synthetic error model. A `backend_derived` profile loads the
+named IBM backend through the active credential profile and builds a local Aer
+model from its calibration data.
+
+The worker rejects simulator names, missing credentials, unavailable backend
+references, unknown fields, and incomplete preset parameters. It records the
+requested and resolved backend names, temperature, topology, basis gates, and
+model fingerprint in non-secret metadata. It does not substitute another
+backend.
 
 ## Add an algorithm
 
@@ -39,12 +55,17 @@ Complete these steps in order:
 2. Create `worker/chemistry/algorithms/<name>/`.
 3. Add `config.py` with one frozen resolved configuration record.
 4. Add `workflow.py` for the public algorithm workflow.
-5. Add `execution.py` only when the algorithm has a separate execution path.
-6. Add `results.py` for result construction and completion progress.
-7. Add an `AlgorithmDefinition` entry in `worker/jobs/dispatcher.py`.
-8. Declare the primitive requirement in the definition.
+5. Add `definition.py` with `ALGORITHM_DEFINITION`, its primitive requirement,
+   and its package-owned runner.
+6. Add the definition to the static tuple in
+   `worker/chemistry/algorithms/registry.py`.
+7. Add `execution.py` only when the algorithm has a separate execution path.
+8. Add `results.py` for result construction and completion progress.
 9. Add tests for configuration, kernels, workflow, dispatch, and result mapping.
 10. Update this guide and the worker capability documentation.
+
+Do not add an algorithm-specific branch to `worker/jobs/dispatcher.py`. Keep
+backend execution strategies separate from algorithm definitions.
 
 Keep backend execution strategies separate from algorithms. For example,
 branch-estimator, sector matrix-free, and dense projected execution are paths
@@ -89,6 +110,6 @@ tests.
 ## Current transition
 
 The algorithm packages own the workflow entry points, kernels, configuration
-records, and result builders. Keep shared chemistry modules focused on
-cross-algorithm behavior. Remove a compatibility alias only after all internal
-imports and tests use the package workflow.
+records, result builders, and dispatch definitions. Keep shared chemistry
+modules focused on cross-algorithm behavior. Remove a compatibility alias only
+after all internal imports and tests use the package workflow.

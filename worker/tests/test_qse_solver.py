@@ -7,11 +7,11 @@ import pytest
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.result_adapter import normalize_result
+from worker.chemistry.algorithms.qse.basis import real_scalar
 from worker.chemistry.algorithms.qse.config import QSEConfig, resolve_qse_config
+from worker.chemistry.algorithms.qse.sector import sector_excitation_specs
 from worker.chemistry.algorithms.qse.workflow import (
     _build_excitation_basis,
-    _real_scalar,
-    _sector_excitation_specs,
     run_qse,
 )
 from worker.chemistry.backend_selector import select_backend
@@ -118,7 +118,7 @@ def test_qse_sector_excitation_specs_prioritize_coupled_doubles() -> None:
     )
     action = cast(HamiltonianAction, _CoupledSectorAction(int(np.argmax(np.abs(target_state)))))
 
-    specs = _sector_excitation_specs(reference, action, excitation_level="singles_doubles")
+    specs = sector_excitation_specs(reference, action, excitation_level="singles_doubles")
 
     assert specs[0] == ("double", (2, 6), (0, 4))
 
@@ -192,7 +192,7 @@ def test_qse_hf_reference_emits_reference_circuit_artifact() -> None:
 
 
 def test_qse_real_scalar_accepts_numerical_imaginary_residue() -> None:
-    assert _real_scalar(1.25 + 1e-9j, label="test energy") == pytest.approx(1.25)
+    assert real_scalar(1.25 + 1e-9j, label="test energy") == pytest.approx(1.25)
 
 
 def test_qse_reference_energy_tolerates_complex_matrix_residue() -> None:

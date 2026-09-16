@@ -123,7 +123,6 @@ _seed_state_from_sqd_result_with_source = seed_state_from_sqd_result_with_source
 _sector_seed_state_from_sqd_result_with_source = sector_seed_state_from_sqd_result_with_source
 _statevector_bitstring_distribution = statevector_bitstring_distribution
 _time_evolved_bitstring_distribution = time_evolved_bitstring_distribution
-_orthonormalize_krylov_candidate = orthonormalize_candidate
 _dense_skqd_partial_energy = orthonormal_projected_ground_energy
 _sector_skqd_partial_energy = matrix_free_projected_ground_energy
 _emit_skqd_krylov_progress = emit_skqd_krylov_progress
@@ -139,7 +138,7 @@ def _build_krylov_extension(
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
 ) -> tuple[np.ndarray, int, dict[str, float], np.ndarray | None]:
-    """Keep the legacy dense SKQD extension helper import-compatible."""
+    """Adapt dense SKQD inputs to the extension module."""
     return _build_krylov_extension_kernel(
         operator,
         reference_state=_resolve_dense_krylov_seed(
@@ -151,7 +150,7 @@ def _build_krylov_extension(
         time_step=time_step,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
-        orthonormalize_fn=_orthonormalize_krylov_candidate,
+        orthonormalize_fn=orthonormalize_candidate,
         partial_energy_fn=_dense_skqd_partial_energy,
         prepare_spectrum_fn=prepare_exact_time_evolution,
         evolve_state_fn=exact_time_evolution_state_from_spectrum,
@@ -170,7 +169,7 @@ def _build_sector_krylov_extension(
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
 ) -> tuple[np.ndarray, int, dict[str, float], np.ndarray | None]:
-    """Keep the legacy sector SKQD extension helper import-compatible."""
+    """Adapt sector SKQD inputs to the extension module."""
     return _build_sector_krylov_extension_kernel(
         action,
         reference_state=_resolve_sector_krylov_seed(action, seed_state),
@@ -179,7 +178,7 @@ def _build_sector_krylov_extension(
         time_step=time_step,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
-        orthonormalize_fn=_orthonormalize_krylov_candidate,
+        orthonormalize_fn=orthonormalize_candidate,
         partial_energy_fn=_sector_skqd_partial_energy,
         solve_action_subspace_fn=solve_action_subspace,
         emit_progress_fn=_emit_skqd_krylov_progress,
@@ -239,7 +238,7 @@ def _prepare_skqd_execution(hamiltonian: object) -> _SKQDExecutionPlan:
 
 def _resolve_legacy_sampling_time_step(
     *,
-    skqd_config: "_SKQDConfig",
+    skqd_config: SKQDConfig,
     plan: _SKQDExecutionPlan,
 ) -> float:
     """Resolve the legacy Krylov extension time step, applying paper auto-scaling.
@@ -342,15 +341,11 @@ def _emit_skqd_completion(
     )
 
 
-_SKQDConfig = SKQDConfig
-_resolve_skqd_config = resolve_skqd_config
-
-
 def _run_skqd_sample_union(
     *,
     hamiltonian: object,
     backend: object | None,
-    skqd_config: _SKQDConfig,
+    skqd_config: SKQDConfig,
     plan: Any,
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
@@ -487,7 +482,7 @@ def run_skqd(
 ) -> SKQDResult:
     """Run direct SKQD sample-union mode or the explicit legacy extension."""
     resolved = resolve_algorithm_config(config, "skqd")
-    skqd_config = _resolve_skqd_config(resolved)
+    skqd_config = resolve_skqd_config(resolved)
 
     t_start = time.monotonic()
     plan = _prepare_skqd_execution(hamiltonian)

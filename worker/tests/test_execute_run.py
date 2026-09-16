@@ -544,7 +544,8 @@ class TestExecuteRunHappyPath:
                     "noise_profile": {
                         "source": "custom_preset",
                         "preset": "readout_bias",
-                        "strength": 0.02,
+                        "p01": 0.02,
+                        "p10": 0.04,
                     },
                     "advanced_config": {
                         "algorithm": "vqe",
