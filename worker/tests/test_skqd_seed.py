@@ -110,7 +110,7 @@ def test_seed_state_from_sqd_result_prefers_bitstrings_then_occupancies() -> Non
         ),
         target_size=16,
     )
-    assert bitstring_source == "sqd_bitstring_probabilities"
+    assert bitstring_source == "sqd_final_bitstring_probabilities"
     assert bitstring_state is not None
     assert int(np.argmax(np.abs(bitstring_state))) == 5
 
@@ -123,10 +123,62 @@ def test_seed_state_from_sqd_result_prefers_bitstrings_then_occupancies() -> Non
         ),
         target_size=16,
     )
-    assert occupancy_source == "sqd_occupancies"
+    assert occupancy_source == "sqd_final_occupancies"
     assert occupancy_state is not None
     assert int(np.argmax(np.abs(occupancy_state))) == 5
     assert seed_state_from_sqd_result(_result({}), target_size=16) is None
+
+
+def test_seed_state_from_sqd_result_prefers_best_iteration_samples() -> None:
+    package = {
+        "best_occupancies": [0.9, 0.1, 0.8, 0.2],
+        "final_occupancies": [0.1, 0.9, 0.2, 0.8],
+        "nelec": [1, 1],
+        "best_bitstring_probabilities": [{"bitstring": "0101", "probability": 1.0}],
+        "final_bitstring_probabilities": [{"bitstring": "1010", "probability": 1.0}],
+    }
+
+    state, source = seed_state_from_sqd_result_with_source(_result(package), target_size=16)
+
+    assert source == "sqd_best_bitstring_probabilities"
+    assert state is not None
+    assert int(np.argmax(np.abs(state))) == 5
+
+
+def test_seed_state_from_sqd_result_uses_final_samples_when_best_samples_are_missing() -> None:
+    state, source = seed_state_from_sqd_result_with_source(
+        _result(
+            {
+                "final_occupancies": [0.6, 0.4, 0.7, 0.3],
+                "nelec": [1, 1],
+                "final_bitstring_probabilities": [
+                    {"bitstring": "1010", "probability": 1.0}
+                ],
+            }
+        ),
+        target_size=16,
+    )
+
+    assert source == "sqd_final_bitstring_probabilities"
+    assert state is not None
+    assert int(np.argmax(np.abs(state))) == 10
+
+
+def test_seed_state_from_sqd_result_prefers_best_occupancies() -> None:
+    state, source = seed_state_from_sqd_result_with_source(
+        _result(
+            {
+                "best_occupancies": [0.9, 0.1, 0.9, 0.1],
+                "final_occupancies": [0.1, 0.9, 0.1, 0.9],
+                "nelec": [1, 1],
+            }
+        ),
+        target_size=16,
+    )
+
+    assert source == "sqd_best_occupancies"
+    assert state is not None
+    assert int(np.argmax(np.abs(state))) == 5
 
 
 @pytest.mark.parametrize("occupancies", [[float("nan"), 0.4, 0.7, 0.3], [float("inf")] * 4])
@@ -173,9 +225,41 @@ def test_sector_seed_state_from_sqd_result_uses_sector_normalization() -> None:
         action=SimpleNamespace(norb=2, nelec=(1, 1), dimension=4),  # type: ignore[arg-type]
     )
 
-    assert source == "sqd_bitstring_probabilities"
+    assert source == "sqd_final_bitstring_probabilities"
     assert state is not None
     assert np.linalg.norm(state) == pytest.approx(1.0)
+
+
+def test_sector_seed_state_prefers_best_iteration_distribution() -> None:
+    action = SimpleNamespace(norb=2, nelec=(1, 1), dimension=4)
+    state, source = sector_seed_state_from_sqd_result_with_source(
+        _result(
+            {
+                "best_bitstring_probabilities": [
+                    {"bitstring": "0101", "probability": 1.0}
+                ],
+                "final_bitstring_probabilities": [
+                    {"bitstring": "1010", "probability": 1.0}
+                ],
+            }
+        ),
+        action=action,  # type: ignore[arg-type]
+    )
+    final_state, _ = sector_seed_state_from_sqd_result_with_source(
+        _result(
+            {
+                "final_bitstring_probabilities": [
+                    {"bitstring": "1010", "probability": 1.0}
+                ],
+            }
+        ),
+        action=action,  # type: ignore[arg-type]
+    )
+
+    assert source == "sqd_best_bitstring_probabilities"
+    assert state is not None
+    assert final_state is not None
+    assert not np.array_equal(state, final_state)
 
 
 def test_skqd_solver_keeps_legacy_seed_aliases() -> None:
