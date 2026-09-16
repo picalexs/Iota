@@ -201,7 +201,7 @@ def test_branch_estimator_submits_pub_chunks_for_live_progress() -> None:
         num_qubits=1,
     )
 
-    estimate_projected_matrices_with_branch_estimator(
+    estimate = estimate_projected_matrices_with_branch_estimator(
         hamiltonian=hamiltonian,
         estimator=estimator,
         time_points=[0.0, 0.1, 0.2],
@@ -216,6 +216,14 @@ def test_branch_estimator_submits_pub_chunks_for_live_progress() -> None:
     assert events[-1]["completed_iterations"] == 6
     assert events[-1]["step"] == "projected_subspace_progress"
     assert events[-1]["convergence_iteration"] == 3
+    assert estimate.summary["work_ledger"] == {
+        "ledger_version": 1,
+        "counting_scope": "worker_observed",
+        "primitive_run_calls": 2,
+        "primitive_successful_runs": 2,
+        "primitive_pub_count": 6,
+        "primitive_observable_slots": 24,
+    }
 
 
 def test_branch_estimator_batches_cpu_aer_noise_pubs() -> None:
