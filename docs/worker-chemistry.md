@@ -101,6 +101,12 @@ stable projected energy can still be reported as an estimate. Dense and
 fixed-sector paths calculate a full-space residual and can apply their
 convergence threshold.
 
+Measured QSE prepares a Hartree–Fock reference and builds directions
+`A_i |psi_ref>` from its fixed excitation pool. The dimension cap includes the
+reference direction. The worker skips directions that are zero or linearly
+dependent on earlier directions. This is a bounded fixed-pool QSE path. It is
+not a full adaptive operator-pool solver.
+
 QFD branch-estimator runs use seven time points when the user omits the count.
 The branch path supports at most eight points. The worker rejects larger
 explicit values before it creates the estimator primitive. Dense and
@@ -131,6 +137,13 @@ For sampler circuits, Krylov index `k` uses `k` fixed `time_step` intervals.
 The worker scales the Trotter repetition count with `k` so each interval keeps
 the configured step size. Circuit metadata records the applied repetition
 count.
+Supplied SQD circuits must measure every qubit once into its same-index
+classical bit. All measurements must be terminal. The worker rejects malformed
+non-binary sample strings.
+
+KQD `exact` mode uses exact matrix evolution, including for an Aer target.
+Branch-estimator KQD supports Trotter evolution only. The runner validates this
+setting before it creates an estimator primitive.
 
 VQE records `shot_budget_mode` as `fixed_shots`, `estimator_precision`, or
 `exact_expectation`. Statevector execution and Aer EstimatorV2 with zero
@@ -145,10 +158,22 @@ VQE counts objective callbacks separately from backend `run()` calls. It counts
 for those returned handles. For fixed-shot runs, `primitive_shots` is a nominal
 estimate from configured shots per returned PUB. It is not a provider-reported
 physical shot total. Check `primitive_shot_count_basis` before comparing totals.
+For sampled objectives, VQE reports an independent reevaluation at the final
+parameter vector when the evaluation budget allows it. Otherwise, it reports a
+sampled observation at that vector and marks the uncertainty status. It does
+not select the minimum noisy objective observation as the reported energy.
+
+For measured projected solves, the eigensolver raises its overlap-eigenvalue
+cutoff to four times the maximum measured overlap-entry standard error. This is
+a rank-selection heuristic, not a matrix-level uncertainty bound. Result
+metadata records the method so callers do not treat it as propagated
+covariance.
 
 QFD grid metadata records `symmetric_kappa` for the original symmetric variant
 and `forward` for the chemistry-forward variant. The configured `max_time` and
 `time_grid_type` do not define the symmetric grid.
+Result metadata records these values as requested but inactive. It also records
+the applied `kappa` grid.
 The original symmetric variant requires `kappa` to cover the spectral width
 plus an overage. If the user omits `kappa`, the worker derives it from the exact
 dense spectrum or a conservative Pauli-coefficient L1 bound. The worker rejects
@@ -158,6 +183,13 @@ and source.
 Do not infer actual execution from the requested backend label. A local Aer
 run is not IBM hardware evidence. A queued or planned run is not completed
 execution evidence.
+
+## VQE particle sector
+
+Molecular VQE uses `NumberPreserving` when the caller omits `ansatz_name`.
+This ansatz preserves the declared alpha and beta electron counts. It does not
+guarantee total-spin conservation and is not UCCSD. An explicit ansatz choice
+remains unchanged.
 
 ## Test tiers
 
