@@ -241,7 +241,7 @@ def _projected_energy_is_reportable(
     result: dict[str, Any],
     metrics: dict[str, Any],
 ) -> bool:
-    """Accept stable or reportable-diagnostic branch energies; reject unstable ones."""
+    """Accept stable or reportable-diagnostic projected energies."""
     algorithm = result.get("algorithm")
     if not isinstance(algorithm, str):
         algorithm = metrics.get("algorithm")
@@ -251,12 +251,11 @@ def _projected_energy_is_reportable(
     matrix_summary = metrics.get("matrix_element_summary")
     if not isinstance(matrix_summary, dict):
         return True
-    if matrix_summary.get("matrix_element_strategy") != "branch_estimator":
-        return True
+    branch_estimator = matrix_summary.get("matrix_element_strategy") == "branch_estimator"
 
     diagnostics = _projected_stability_diagnostics(metrics)
-    if not isinstance(diagnostics, dict):
-        return False
+    if not isinstance(diagnostics, dict) or "stability_state" not in diagnostics:
+        return not branch_estimator
     return projected_diagnostic_energy_is_reportable(diagnostics)
 
 
@@ -269,7 +268,7 @@ def _projected_stability_diagnostics(metrics: dict[str, Any]) -> Any:
 
 
 def _projected_energy_is_stabilized_diagnostic(metrics: dict[str, Any]) -> bool:
-    """Return whether a reportable branch energy is a rank-reduced diagnostic."""
+    """Return whether a reportable projected energy is rank-reduced and diagnostic."""
     diagnostics = _projected_stability_diagnostics(metrics)
     if not isinstance(diagnostics, dict):
         return False

@@ -14,7 +14,12 @@ from worker.chemistry.algorithms.qfd.execution import (
     QFDExecutionPlan,
     prepare_qfd_execution,
 )
-from worker.chemistry.algorithms.qfd.grid import build_qfd_time_grid, qfd_grid_metadata
+from worker.chemistry.algorithms.qfd.grid import (
+    build_qfd_time_grid,
+    qfd_grid_metadata,
+    qfd_spectral_width_bound,
+    resolve_qfd_symmetric_kappa,
+)
 from worker.chemistry.algorithms.qfd.results import (
     build_qfd_completion_payload,
     build_qfd_result,
@@ -41,6 +46,7 @@ from worker.chemistry.hamiltonian_action import (
 )
 from worker.chemistry.matrix_elements import (
     estimate_projected_matrices_with_branch_estimator,
+    hardware_projected_dimension_limit,
 )
 from worker.chemistry.overlap import build_overlap_matrix, overlap_metrics
 from worker.chemistry.progress import ProgressCallback
@@ -271,13 +277,15 @@ def _solve_qfd_branch_path(
         "time_points": float(num_time_points),
         "max_time": float(max_time),
     }
-    converged = projected_matrix_converged(diagnostics) and (
+    projected_solver_converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
+    matrix_element_summary["projected_solver_converged"] = bool(projected_solver_converged)
     matrix_element_summary["convergence_basis"] = (
-        "projected_overlap_condition_and_generalized_residual"
+        "projected_solver_only_full_space_residual_unavailable"
     )
-    matrix_element_summary["residual_kind"] = "projected_generalized_eigenpair"
+    matrix_element_summary["residual_kind"] = "projected_gevp_equation"
+    converged = False
     qfd_elapsed = time.monotonic() - t_start
     matrix_element_summary["timing_breakdown"] = {
         "matrix_element_estimation_seconds": projected_solve_started - t_start,
@@ -656,7 +664,24 @@ def run_qfd(
 ) -> QFDResult:
     """Run a deterministic filter-diagonalization workflow."""
     resolved = resolve_algorithm_config(config, "qfd")
-    qfd_config: QFDConfig = resolve_qfd_config(resolved)
+    uses_branch_estimator = (
+        execution_policy.actual_path == "branch_estimator"
+        if execution_policy is not None
+        else should_use_branch_matrix_elements(
+            hamiltonian=hamiltonian,
+            backend=backend,
+            backend_context=backend_context,
+        )
+    )
+    qfd_config: QFDConfig = resolve_qfd_config(
+        resolved,
+        default_num_time_points=7 if uses_branch_estimator else 16,
+    )
+    if uses_branch_estimator and qfd_config.num_time_points > hardware_projected_dimension_limit():
+        raise ValueError(
+            "QFD branch matrix-element execution supports at most "
+            f"{hardware_projected_dimension_limit()} time points per run"
+        )
 
     t_start = time.monotonic()
     plan = _prepare_qfd_execution(
@@ -665,6 +690,22 @@ def run_qfd(
         backend_context=backend_context,
         execution_policy=execution_policy,
     )
+    kappa_diagnostics: dict[str, object] = {}
+    if qfd_config.qfd_variant == "qfd_original_symmetric":
+        raw_kappa = resolved.get("kappa")
+        if raw_kappa is None:
+            raw_kappa = resolved.get("spectral_scale")
+        spectral_width_bound, bound_source = qfd_spectral_width_bound(
+            operator_matrix=plan.operator,
+            pauli_hamiltonian=getattr(hamiltonian, "pauli_hamiltonian", None),
+            eigenvalues=plan.eigenvalues,
+        )
+        effective_kappa, kappa_diagnostics = resolve_qfd_symmetric_kappa(
+            qfd_config.kappa if raw_kappa is not None else None,
+            spectral_width_bound=spectral_width_bound,
+            bound_source=bound_source,
+        )
+        qfd_config = replace(qfd_config, kappa=effective_kappa)
     logger.info(
         "QFD setup: hilbert_dim=%d num_time_points=%d max_time=%.4f grid=%s "
         "trotter_steps=%d time_evolution_backend=%s",
@@ -694,6 +735,7 @@ def run_qfd(
         qfd_variant=qfd_config.qfd_variant,
         kappa=qfd_config.kappa,
     )
+    grid_metadata.update(kappa_diagnostics)
     if plan.use_branch_matrix_elements:
         result = _solve_qfd_branch_path(
             hamiltonian=hamiltonian,

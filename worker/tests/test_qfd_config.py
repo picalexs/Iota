@@ -30,6 +30,11 @@ def test_resolve_qfd_config_applies_defaults_and_bounds() -> None:
     )
 
 
+def test_resolve_qfd_config_accepts_execution_path_default() -> None:
+    result = resolve_qfd_config({}, default_num_time_points=7)
+
+    assert result.num_time_points == 7
+
 def test_resolve_qfd_config_validates_original_symmetric_grid() -> None:
     result = resolve_qfd_config(
         {

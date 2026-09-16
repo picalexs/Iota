@@ -118,14 +118,16 @@ def _is_branch_estimator_result(result: AlgorithmResult) -> bool:
     )
 
 
-def _branch_projected_energy_is_reportable(result: AlgorithmResult) -> bool:
-    """Allow branch-estimator energy for a stable or reportable-diagnostic metric."""
-    if not _is_branch_estimator_result(result):
+def _projected_energy_is_reportable(result: AlgorithmResult) -> bool:
+    """Allow stable or reportable-diagnostic projected energies."""
+    projected_result = isinstance(result, (KQDResult, QFDResult, QSEResult))
+    branch_estimator = _is_branch_estimator_result(result)
+    if not projected_result and not branch_estimator:
         return True
 
     diagnostics = _branch_stability_diagnostics(result)
-    if not isinstance(diagnostics, dict):
-        return False
+    if not isinstance(diagnostics, dict) or "stability_state" not in diagnostics:
+        return not branch_estimator
     return projected_diagnostic_energy_is_reportable(diagnostics)
 
 
@@ -141,10 +143,8 @@ def _branch_stability_diagnostics(result: AlgorithmResult) -> Any:
     return getattr(result, "conditioning_summary", {})
 
 
-def _branch_projected_energy_is_diagnostic(result: AlgorithmResult) -> bool:
-    """Return whether a reportable branch energy is a rank-reduced diagnostic."""
-    if not _is_branch_estimator_result(result):
-        return False
+def _projected_energy_is_diagnostic(result: AlgorithmResult) -> bool:
+    """Return whether a reportable projected energy is a rank-reduced diagnostic."""
     diagnostics = _branch_stability_diagnostics(result)
     if not isinstance(diagnostics, dict):
         return False
@@ -179,35 +179,35 @@ def _energy_provenance(result: AlgorithmResult) -> dict[str, Any]:
         return _sqd_energy_provenance(result)
 
     if isinstance(result, KQDResult):
-        if not _branch_projected_energy_is_reportable(result):
+        if not _projected_energy_is_reportable(result):
             return _primary_energy_provenance(result, "unavailable_unstable_projected_solve") | {
                 "final_energy": None,
                 "best_observed_energy": None,
                 "reported_energy": None,
             }
-        if _branch_projected_energy_is_diagnostic(result):
+        if _projected_energy_is_diagnostic(result):
             return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
         return _primary_energy_provenance(result, "lowest_krylov_ritz_value")
 
     if isinstance(result, QFDResult):
-        if not _branch_projected_energy_is_reportable(result):
+        if not _projected_energy_is_reportable(result):
             return _primary_energy_provenance(result, "unavailable_unstable_projected_solve") | {
                 "final_energy": None,
                 "best_observed_energy": None,
                 "reported_energy": None,
             }
-        if _branch_projected_energy_is_diagnostic(result):
+        if _projected_energy_is_diagnostic(result):
             return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
         return _primary_energy_provenance(result, "lowest_filter_eigenvalue")
 
     if isinstance(result, QSEResult):
-        if not _branch_projected_energy_is_reportable(result):
+        if not _projected_energy_is_reportable(result):
             return _primary_energy_provenance(result, "unavailable_unstable_projected_solve") | {
                 "final_energy": None,
                 "best_observed_energy": None,
                 "reported_energy": None,
             }
-        if _branch_projected_energy_is_diagnostic(result):
+        if _projected_energy_is_diagnostic(result):
             return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
         return _primary_energy_provenance(result, "lowest_qse_projected_eigenvalue")
 
@@ -292,7 +292,7 @@ def _sqd_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[
 def _kqd_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[str, Any]:
     assert isinstance(result, KQDResult)
     branch_estimator = _is_branch_estimator_result(result)
-    reportable = _branch_projected_energy_is_reportable(result)
+    reportable = _projected_energy_is_reportable(result)
     if not reportable:
         source = "unavailable_unstable_projected_solve"
         selection_rule = (
@@ -323,7 +323,7 @@ def _kqd_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[
 def _qfd_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[str, Any]:
     assert isinstance(result, QFDResult)
     branch_estimator = _is_branch_estimator_result(result)
-    reportable = _branch_projected_energy_is_reportable(result)
+    reportable = _projected_energy_is_reportable(result)
     if not reportable:
         source = "unavailable_unstable_projected_solve"
         selection_rule = (
@@ -848,10 +848,25 @@ def _projected_convergence_metadata(
             convergence_failure_reason="projected_system_stability_unavailable",
         )
     else:
-        scientific_converged = bool(result.converged) and residual <= threshold
-        metadata["scientific_converged"] = scientific_converged
-        if not scientific_converged:
-            metadata["convergence_failure_reason"] = "solver_reported_not_converged"
+        if _is_branch_estimator_result(result):
+            summary = getattr(result, "matrix_element_summary", {})
+            projected_converged = summary.get("projected_solver_converged")
+            if not isinstance(projected_converged, bool):
+                projected_converged = bool(result.converged) and residual <= threshold
+            metadata.update(
+                scientific_converged=None,
+                projected_solver_converged=projected_converged,
+                convergence_criterion=(
+                    "projected_overlap_stability_and_residual; "
+                    "full_space_ritz_residual_unavailable"
+                ),
+                convergence_failure_reason="full_space_residual_unavailable",
+            )
+        else:
+            scientific_converged = bool(result.converged) and residual <= threshold
+            metadata["scientific_converged"] = scientific_converged
+            if not scientific_converged:
+                metadata["convergence_failure_reason"] = "solver_reported_not_converged"
     return metadata
 
 

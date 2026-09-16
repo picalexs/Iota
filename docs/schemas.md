@@ -297,6 +297,10 @@ matrix-free path. They are the supported larger-active-space QSE references.
 QSE `max_subspace_dim` is capped at 96. QFD
 advanced payloads include `trotter_steps` for Pauli-evolution circuit synthesis
 on Aer/IBM branch-estimator paths and Aer state-propagation paths.
+QFD uses 16 time points by default on local dense and fixed-sector paths. It
+uses 7 by default on branch-estimator paths. Branch-estimator paths support at
+most 8 points. The worker rejects larger values before it creates the
+estimator primitive.
 Measured QSE on noisy Aer or IBM Runtime supports `reference_method="hf"` only,
 because its measured circuit prepares the Hartree-Fock reference state. Use
 statevector or ideal Aer for non-HF QSE references.
@@ -531,9 +535,12 @@ The `stability_summary.raw_spectrum_definition` field identifies this as
 `regularized_unfiltered_generalized_spectrum`; it is not an unregularized
 generalized spectrum. The same summary includes overlap-threshold diagnostics
 and `selected_level_index` for the retained level used as the canonical
-energy. A stabilized retained solve can still produce the canonical `energy`
-while leaving `converged=false`; only a fully stable retained overlap solve is
-treated as converged on that path.
+energy. A stable retained overlap solve can produce the canonical `energy`
+while leaving `converged=false`. Branch-estimator residuals apply only to the
+measured projected generalized eigenproblem. They do not measure the full-space
+Ritz residual. The worker records `projected_solver_converged` for that limited
+check and leaves `scientific_converged` unknown when the projected system is
+stable. Dense and fixed-sector paths can evaluate the full-space residual.
 
 When present, `algorithm_metrics.circuit_artifacts` is a list of typed
 quantum-circuit artifacts:

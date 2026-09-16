@@ -455,7 +455,7 @@ def _solve_kqd_branch_path(
             "trotter_steps": kqd_config.trotter_steps,
             "projected_dimension": basis_rank,
             "projected_matrix_element_count": 2 * basis_rank * basis_rank,
-            "residual_kind": "projected_generalized_eigenpair",
+            "residual_kind": "projected_gevp_equation",
             "basis_index_convention": _KRYLOV_BASIS_INDEX_CONVENTION,
             "reference_state_source": reference_source,
             "reference_descriptor": reference_descriptor,
@@ -744,12 +744,16 @@ def run_kqd(
     }
     if plan.use_branch_matrix_elements:
         projected_residual = solve_data.residual_diagnostics["relative_ritz_residual"]
-        converged = projected_matrix_converged(diagnostics) and (
+        projected_solver_converged = projected_matrix_converged(diagnostics) and (
             projected_residual <= kqd_config.residual_tolerance
         )
-        matrix_element_summary["convergence_basis"] = (
-            "projected_overlap_condition_and_generalized_residual"
+        matrix_element_summary["projected_solver_converged"] = bool(
+            projected_solver_converged
         )
+        matrix_element_summary["convergence_basis"] = (
+            "projected_solver_only_full_space_residual_unavailable"
+        )
+        converged = False
     else:
         converged = projected_matrix_converged(diagnostics) and (
             solve_data.residual_diagnostics["relative_ritz_residual"]

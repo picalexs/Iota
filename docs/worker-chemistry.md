@@ -90,6 +90,22 @@ sampler and recovery work in
 provider billing or hidden runtime retries. Other algorithm work ledgers are
 tracked separately before cross-algorithm benchmark comparisons.
 
+Branch-estimator KQD and QFD measure projected Hamiltonian and overlap
+matrices. Their residual is the residual of that measured generalized
+eigenproblem. It is not a full-space Ritz residual. A small projected residual
+does not prove scientific convergence. The worker records
+`projected_solver_converged` for the projected solve. It leaves
+`scientific_converged` unknown when the projected system is stable and keeps
+top-level `converged` false because the full-space residual is unavailable. A
+stable projected energy can still be reported as an estimate. Dense and
+fixed-sector paths calculate a full-space residual and can apply their
+convergence threshold.
+
+QFD branch-estimator runs use seven time points when the user omits the count.
+The branch path supports at most eight points. The worker rejects larger
+explicit values before it creates the estimator primitive. Dense and
+fixed-sector QFD keep the sixteen-point default.
+
 SKQD sample-union results record the same worker-observed sampler fields in
 `algorithm_metrics.work_ledger`. Exact local sample oracles record
 `local_exact_sampling_runs` and returned rows instead. Do not compare
@@ -129,6 +145,11 @@ physical shot total. Check `primitive_shot_count_basis` before comparing totals.
 QFD grid metadata records `symmetric_kappa` for the original symmetric variant
 and `forward` for the chemistry-forward variant. The configured `max_time` and
 `time_grid_type` do not define the symmetric grid.
+The original symmetric variant requires `kappa` to cover the spectral width
+plus an overage. If the user omits `kappa`, the worker derives it from the exact
+dense spectrum or a conservative Pauli-coefficient L1 bound. The worker rejects
+an explicit value below that bound. Grid metadata records the bound, overage,
+and source.
 
 Do not infer actual execution from the requested backend label. A local Aer
 run is not IBM hardware evidence. A queued or planned run is not completed

@@ -26,11 +26,15 @@ class QFDConfig:
     residual_tolerance: float
 
 
-def resolve_qfd_config(resolved: Mapping[str, Any]) -> QFDConfig:
+def resolve_qfd_config(
+    resolved: Mapping[str, Any],
+    *,
+    default_num_time_points: int = 16,
+) -> QFDConfig:
     """Resolve user QFD options into bounded internal values."""
     num_time_points = bounded_int(
         resolved.get("num_time_points"),
-        default=16,
+        default=default_num_time_points,
         low=2,
         high=128,
     )

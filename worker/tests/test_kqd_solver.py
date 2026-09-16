@@ -365,12 +365,16 @@ def test_run_kqd_ibm_context_uses_estimator_matrix_elements(
         result.matrix_element_summary["execution_selection_reason"]
         == "requested_ibm_runtime_requires_branch_estimator"
     )
-    assert result.matrix_element_summary["residual_kind"] == "projected_generalized_eigenpair"
+    assert result.matrix_element_summary["residual_kind"] == "projected_gevp_equation"
+    assert result.converged is False
+    assert result.matrix_element_summary["projected_solver_converged"] is True
     assert "max_standard_error" in result.matrix_element_summary
     assert result.orthogonality_metrics["relative_ritz_residual"] >= 0.0
     assert result.stability_summary["stability_state"] in {"stable", "stabilized"}
     assert result.raw_ritz_values
     assert events[-1]["time_evolution_backend"] == "hardware_branch_estimator"
+    assert events[-1]["scientific_converged"] is None
+    assert events[-1]["termination_reason"] == "full_space_residual_unavailable"
 
 
 def test_run_kqd_returns_stabilized_noisy_projected_solve_as_diagnostic(
@@ -609,9 +613,8 @@ def test_run_kqd_custom_aer_noise_returns_finite_reported_or_diagnostic_result()
     assert np.isfinite(result.primary_energy)
     assert result.matrix_element_summary["matrix_element_strategy"] == "branch_estimator"
     assert result.matrix_element_summary["overlap_diagonal_normalized"] is True
-    if result.stability_summary["stability_state"] == "stabilized":
-        assert result.converged is False
-        assert result.stability_summary["diagnostic_only"] is True
+    assert result.converged is False
+    assert isinstance(result.matrix_element_summary["projected_solver_converged"], bool)
 
 
 def test_run_kqd_branch_rejects_exact_evolution_claim() -> None:

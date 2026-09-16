@@ -1283,6 +1283,71 @@ def test_normalize_result_rejects_unstable_projected_convergence() -> None:
     assert convergence["convergence_failure_reason"] == "projected_system_unstable"
 
 
+@pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
+def test_normalize_result_does_not_infer_scientific_convergence_from_branch_gevp(
+    algorithm: str,
+) -> None:
+    stable_diagnostics = {
+        "stability_state": "stable",
+        "overlap_condition": 1.0,
+        "overlap_min_eigenvalue": 1.0,
+        "relative_ritz_residual": 1e-15,
+        "residual_convergence_threshold": 1e-8,
+    }
+    if algorithm == "kqd":
+        result = KQDResult(
+            algorithm=algorithm,
+            primary_energy=-0.5,
+            primary_iterations=2,
+            converged=False,
+            ritz_values=[-0.5],
+            krylov_rank=2,
+            orthogonality_metrics=stable_diagnostics,
+            matrix_element_summary={
+                "matrix_element_strategy": "branch_estimator",
+                "projected_solver_converged": True,
+            },
+        )
+    else:
+        result = QFDResult(
+            algorithm=algorithm,
+            primary_energy=-0.5,
+            primary_iterations=2,
+            converged=False,
+            filter_eigenvalues=[-0.5],
+            conditioning_summary=stable_diagnostics,
+            matrix_element_summary={
+                "matrix_element_strategy": "branch_estimator",
+                "projected_solver_converged": True,
+            },
+            stability_summary=stable_diagnostics,
+        )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["scientific_converged"] is None
+    assert convergence["projected_solver_converged"] is True
+    assert convergence["convergence_failure_reason"] == "full_space_residual_unavailable"
+
+
+def test_normalize_result_rejects_invalid_local_qfd_energy() -> None:
+    normalized = normalize_result(
+        QFDResult(
+            algorithm="qfd",
+            primary_energy=0.0,
+            primary_iterations=3,
+            converged=False,
+            filter_eigenvalues=[0.0],
+            conditioning_summary={"stability_state": "invalid"},
+            matrix_element_summary={"matrix_element_strategy": "dense_classical"},
+            stability_summary={"stability_state": "invalid", "retained_rank": 0},
+        )
+    )
+
+    assert normalized["reported_energy"] is None
+    assert normalized["reported_energy_source"] == "unavailable_unstable_projected_solve"
+
+
 def test_normalize_result_rejects_scientific_convergence_with_invalid_reference() -> None:
     result = VQEResult(
         algorithm="vqe",
