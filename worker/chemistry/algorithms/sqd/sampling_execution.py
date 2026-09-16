@@ -132,8 +132,14 @@ def _ensure_measurements(circuit: Any, *, num_bits: int) -> Any:
         measured = circuit.copy()
 
     measurement_map = []
+    seen_measurement = False
     for instruction in measured.data:
-        if instruction.operation.name != "measure":
+        operation_name = instruction.operation.name
+        if operation_name == "measure":
+            seen_measurement = True
+        elif seen_measurement and operation_name != "barrier" and instruction.qubits:
+            raise ValueError("SQD sampling circuit measurements must be terminal")
+        if operation_name != "measure":
             continue
         if len(instruction.qubits) != 1 or len(instruction.clbits) != 1:
             raise ValueError("SQD sampling circuit must measure each qubit exactly once")

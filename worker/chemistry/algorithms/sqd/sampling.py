@@ -14,6 +14,8 @@ def bitstrings_to_matrix(bitstrings: list[Any], *, num_bits: int) -> np.ndarray:
         normalized = str(bitstring).replace(" ", "")
         if len(normalized) != num_bits:
             raise ValueError("SQD sampler bitstring width does not match Hamiltonian qubits")
+        if any(char not in "01" for char in normalized):
+            raise ValueError("SQD sampler bitstring must contain only binary characters")
         matrix[row, :] = [char == "1" for char in normalized]
     return matrix
 
