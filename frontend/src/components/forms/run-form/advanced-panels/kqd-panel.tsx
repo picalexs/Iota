@@ -19,15 +19,22 @@ import { kqdUsesKnownBranchEstimatorPath } from "@/lib/run-form-recommendations"
 
 interface KQDPanelProps {
   disabled?: boolean;
+  requiresBranchEstimator?: boolean;
   onResetRecommended?: () => void;
 }
 
-export function KQDPanel({ disabled, onResetRecommended }: KQDPanelProps) {
+export function KQDPanel({
+  disabled,
+  requiresBranchEstimator: requiresBranchEstimatorOverride,
+  onResetRecommended,
+}: KQDPanelProps) {
   const form = useRunFormContext();
   const values = form.watch("advanced_kqd");
   const backendTarget = form.watch("backend_target");
   const hasNoiseProfile = form.watch("noise_profile") !== null;
-  const requiresBranchEstimator = kqdUsesKnownBranchEstimatorPath(backendTarget, hasNoiseProfile);
+  const requiresBranchEstimator =
+    requiresBranchEstimatorOverride ??
+    kqdUsesKnownBranchEstimatorPath(backendTarget, hasNoiseProfile);
 
   return (
     <div className="space-y-4">

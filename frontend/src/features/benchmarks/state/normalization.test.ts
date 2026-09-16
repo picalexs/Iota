@@ -12,7 +12,10 @@ import {
   readBenchmarkWorkspaceViewCache,
   writeBenchmarkWorkspaceViewCache,
 } from "./normalization";
-import { createSimpleBenchmarkVariant } from "@/pages/benchmark/benchmark-variants";
+import {
+  createAdvancedBenchmarkVariant,
+  createSimpleBenchmarkVariant,
+} from "@/pages/benchmark/benchmark-variants";
 import type { SavedBenchmarkRun } from "@/pages/benchmark/benchmark-storage";
 
 const preset = BENCHMARK_MOLECULE_PRESETS[0];
@@ -54,6 +57,22 @@ describe("benchmark state normalization", () => {
     expect(snapshot.selectedAlgorithms).toEqual(["vqe"]);
     expect(snapshot.algorithmVariants).toHaveLength(1);
     expect(snapshot.entries).toHaveLength(1);
+  });
+
+  it("preserves an exact KQD config when restoring an IBM benchmark row", () => {
+    const savedRun = {
+      ...savedBenchmarkRun(),
+      selectedBackendMode: "ibm_runtime" as const,
+      entries: buildInitialEntries([preset], [createAdvancedBenchmarkVariant("kqd", 0.0016)]),
+    };
+
+    const snapshot = buildBenchmarkWorkspaceSnapshotFromSavedRun(savedRun);
+
+    expect(snapshot.selectedBackendMode).toBe("ibm_runtime");
+    expect(snapshot.algorithmVariants[0]?.advancedConfig).toMatchObject({
+      algorithm: "kqd",
+      evolution_method: "exact",
+    });
   });
 
   it("uses explicit submission concurrency for each backend mode", () => {

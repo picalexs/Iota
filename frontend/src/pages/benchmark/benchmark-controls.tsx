@@ -17,6 +17,7 @@ import { BenchmarkAdvancedAlgorithmSection } from "./benchmark-advanced-algorith
 import { BenchmarkModeSection } from "./benchmark-mode-section";
 import { useBenchmarkBasisSets } from "./use-benchmark-basis-sets";
 import type { BenchmarkAlgorithmVariant, BenchmarkVariantMode } from "./benchmark-variants";
+import { kqdRequiresBranchEstimatorForBackendMode } from "./benchmark-variants";
 import {
   getBackendNameLabel,
   getBenchmarkCompletionRatio,
@@ -252,6 +253,9 @@ export function BenchmarkControls({
               disabledAlgorithms={disabledAlgorithms}
               algorithmVariants={algorithmVariants}
               chemicalAccuracyHa={chemicalAccuracyHa}
+              requiresBranchEstimator={kqdRequiresBranchEstimatorForBackendMode(
+                selectedBackendMode,
+              )}
               onAddAdvancedVariant={onAddAdvancedVariant}
               onSetAdvancedVariantCount={onSetAdvancedVariantCount}
               onDuplicateAdvancedVariant={onDuplicateAdvancedVariant}
