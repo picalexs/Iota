@@ -72,8 +72,10 @@ def run_spsa(
     best_energy = objective(theta)
     accepted_energy_trace = [float(best_energy)]
     accepted_steps = 0
+    optimizer_iterations = 0
 
     for step in range(max_iterations):
+        optimizer_iterations += 1
         ck = perturbation / float((step + 1) ** 0.101)
         ak = learning_rate / float((step + 1) ** 0.602)
         delta = rng.choice(np.array([-1.0, 1.0]), size=theta.shape[0])
@@ -100,7 +102,7 @@ def run_spsa(
         if is_delta_converged(accepted_energy_trace, threshold=threshold):
             break
 
-    iterations = max(len(convergence_trace), accepted_steps, 1)
+    iterations = max(len(convergence_trace), optimizer_iterations, 1)
     converged = is_delta_converged(accepted_energy_trace, threshold=threshold)
     diagnostics = {
         "optimizer_kind": "spsa",
@@ -108,7 +110,8 @@ def run_spsa(
         "accepted_energy_trace": accepted_energy_trace,
         "function_evaluations": len(convergence_trace),
         "objective_evaluations": len(convergence_trace),
-        "optimizer_iterations": accepted_steps,
+        "optimizer_iterations": optimizer_iterations,
+        "optimizer_iteration_attempts": optimizer_iterations,
         "convergence_threshold": threshold,
     }
     return best_theta, iterations, converged, diagnostics
