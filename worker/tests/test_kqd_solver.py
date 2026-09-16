@@ -11,6 +11,7 @@ from qiskit.quantum_info import SparsePauliOp
 from worker.adapters.aer_adapter import AerAdapter
 from worker.adapters.base import BackendExecutionContext
 from worker.adapters.result_adapter import normalize_result
+from worker.chemistry.algorithms.kqd.definition import run_kqd_algorithm
 from worker.chemistry.algorithms.kqd.workflow import (
     _build_krylov_basis,
     _build_sector_krylov_basis,
@@ -636,6 +637,27 @@ def test_run_kqd_branch_rejects_exact_evolution_claim() -> None:
                 backend_target="aer_simulator",
                 noise_profile={"source": "backend_derived", "reference_backend": "ibm_kyiv"},
             ),
+        )
+
+
+def test_kqd_runner_rejects_unsupported_ibm_evolution_before_primitive_creation() -> None:
+    class _Backend:
+        def create_estimator(self, _context: object) -> object:
+            raise AssertionError("unsupported KQD config must fail before primitive creation")
+
+    with pytest.raises(ValueError, match="supports evolution_method='trotter' only"):
+        run_kqd_algorithm(
+            _Backend(),
+            {
+                "algorithm": "kqd",
+                "advanced_config": {
+                    "algorithm": "kqd",
+                    "evolution_method": "exact",
+                },
+            },
+            _single_qubit_x_hamiltonian(),
+            None,
+            BackendExecutionContext(backend_target="ibm_runtime"),
         )
 
 
