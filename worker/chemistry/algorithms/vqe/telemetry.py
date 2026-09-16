@@ -33,6 +33,8 @@ class VQEObjectiveState:
     convergence_trace: list[float] = field(default_factory=list)
     standard_error_trace: list[float | None] = field(default_factory=list)
     evaluation_count: int = 0
+    evaluation_attempt_count: int = 0
+    evaluation_failure_count: int = 0
     previous_energy: float | None = None
     best_energy: float | None = None
     best_point: np.ndarray | None = None
@@ -50,19 +52,24 @@ class VQEObjectiveState:
             raise FunctionEvaluationLimitReached(
                 f"VQE reached max_function_evaluations={self.max_function_evaluations}"
             )
-        observation = self.energy_evaluator(parameter_values)
-        standard_error: float | None = None
-        if isinstance(observation, tuple) and len(observation) == 2:
-            raw_energy, raw_standard_error = observation
-            if raw_standard_error is not None:
-                standard_error = float(raw_standard_error)
-                if not np.isfinite(standard_error) or standard_error < 0.0:
-                    standard_error = None
-        else:
-            raw_energy = observation
-        energy = float(raw_energy)
-        if not np.isfinite(energy):
-            raise ValueError("VQE objective returned a non-finite energy")
+        self.evaluation_attempt_count += 1
+        try:
+            observation = self.energy_evaluator(parameter_values)
+            standard_error: float | None = None
+            if isinstance(observation, tuple) and len(observation) == 2:
+                raw_energy, raw_standard_error = observation
+                if raw_standard_error is not None:
+                    standard_error = float(raw_standard_error)
+                    if not np.isfinite(standard_error) or standard_error < 0.0:
+                        standard_error = None
+            else:
+                raw_energy = observation
+            energy = float(raw_energy)
+            if not np.isfinite(energy):
+                raise ValueError("VQE objective returned a non-finite energy")
+        except Exception:
+            self.evaluation_failure_count += 1
+            raise
         self._record_evaluation(energy, parameter_values, standard_error=standard_error)
         return energy
 

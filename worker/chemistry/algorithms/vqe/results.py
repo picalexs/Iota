@@ -36,12 +36,20 @@ def _objective_observation_diagnostics(
         standard_error_trace = standard_error_trace[: len(trace)]
 
     objective_evaluations = len(trace)
+    objective_evaluation_attempts = max(
+        objective_evaluations,
+        int(getattr(objective_state, "evaluation_attempt_count", objective_evaluations) or 0),
+    )
+    objective_evaluation_failures = max(
+        0,
+        int(getattr(objective_state, "evaluation_failure_count", 0) or 0),
+    )
     initial_point_evaluations = max(0, min(initial_point_evaluations, objective_evaluations))
     final_reevaluation_evaluations = max(
         0,
         int(getattr(objective_state, "final_reevaluation_count", 0) or 0),
     )
-    primitive_submissions = objective_evaluations + final_reevaluation_evaluations
+    primitive_submissions = objective_evaluation_attempts + final_reevaluation_evaluations
     shots = getattr(objective_state, "shots", None)
     total_shots = primitive_submissions * int(shots) if shots is not None else None
     available_uncertainties = sum(value is not None for value in standard_error_trace)
@@ -73,7 +81,10 @@ def _objective_observation_diagnostics(
         "initial_point_evaluations": initial_point_evaluations,
         "optimizer_objective_evaluations": objective_evaluations - initial_point_evaluations,
         "objective_evaluations": objective_evaluations,
+        "objective_evaluation_attempts": objective_evaluation_attempts,
+        "objective_evaluation_failures": objective_evaluation_failures,
         "final_reevaluation_evaluations": final_reevaluation_evaluations,
+        "primitive_run_attempts": primitive_submissions,
         "primitive_pubs": primitive_submissions,
         "primitive_jobs": primitive_submissions,
         "shots_per_pub": int(shots) if shots is not None else None,
@@ -87,7 +98,10 @@ def _objective_observation_diagnostics(
         "objective_uncertainty_status": uncertainty_status,
         "initial_point_evaluations": initial_point_evaluations,
         "optimizer_objective_evaluations": objective_evaluations - initial_point_evaluations,
+        "objective_evaluation_attempts": objective_evaluation_attempts,
+        "objective_evaluation_failures": objective_evaluation_failures,
         "final_reevaluation_evaluations": final_reevaluation_evaluations,
+        "primitive_run_attempts": primitive_submissions,
         "primitive_pubs": primitive_submissions,
         "primitive_jobs": primitive_submissions,
         "shots_per_pub": int(shots) if shots is not None else None,

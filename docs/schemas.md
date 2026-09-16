@@ -586,7 +586,9 @@ under `final_energy` and the best observed objective under
 SPSA stability rather than "minimum seen once" semantics. VQE diagnostics also
 record `reported_iterations_unit="objective_evaluations"` while
 `optimizer_iterations` keeps the optimizer-native attempted-step count and SPSA
-keeps rejected blocking steps separate under `accepted_steps`. SKQD flattens the
+keeps rejected blocking steps separate under `accepted_steps`; the VQE work
+ledger also separates objective evaluation attempts and failures from successful
+observations. SKQD flattens the
 representative SQD seed artifact as a top-level `sqd_seed` artifact. QSE emits
 reference artifacts for circuit-defined `reference_method="hf"` and
 `reference_method="vqe"`. KQD/QFD branch-estimator results expose retained
