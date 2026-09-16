@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 StateDataBuilder = Callable[[Any, np.ndarray, int], tuple[Any, Any, Any]]
 CircuitArtifactBuilder = Callable[..., list[dict[str, Any]]]
 BestEnergySelector = Callable[[float | None, list[float]], float]
+SectorDiagnosticsBuilder = Callable[[np.ndarray], dict[str, Any]]
 
 
 def _objective_observation_diagnostics(
@@ -270,6 +271,17 @@ def _update_vqe_truth_diagnostics(
             )
         )
     )
+    sector_required = isinstance(diagnostics.get("sector_target"), dict)
+    sector_valid = diagnostics.get("ideal_ansatz_sector_valid")
+    sector_convergence_failure = None
+    convergence_was_valid_before_sector_check = scientific_converged
+    if sector_required and sector_valid is not True:
+        sector_convergence_failure = (
+            "particle_sector_leakage"
+            if sector_valid is False
+            else "particle_sector_validity_unverified"
+        )
+        scientific_converged = False
     native_message = diagnostics.get("message")
     diagnostics.update(
         {
@@ -280,6 +292,10 @@ def _update_vqe_truth_diagnostics(
             "numerical_stability": numerical_stability,
             "scientific_converged": scientific_converged,
             "budget_exhausted": budget_exhausted,
+            "convergence_failure_reason": sector_convergence_failure
+            if convergence_was_valid_before_sector_check
+            and sector_convergence_failure is not None
+            else diagnostics.get("convergence_failure_reason"),
         }
     )
 
@@ -432,6 +448,7 @@ def build_vqe_initial_point_limit_result(
     best_energy_selector_fn: BestEnergySelector,
     build_circuit_artifacts_fn: CircuitArtifactBuilder,
     objective_state: Any | None = None,
+    sector_diagnostics_fn: SectorDiagnosticsBuilder | None = None,
 ) -> VQEResult:
     """Build the early-stop result when warm-start selection hits the eval cap."""
     initial_point = best_point if best_point is not None else candidate_points[0]
@@ -492,6 +509,8 @@ def build_vqe_initial_point_limit_result(
         "best_observed_standard_error": best_observed_standard_error,
         "best_objective_evaluation": best_objective_evaluation,
     }
+    if sector_diagnostics_fn is not None:
+        diagnostics.update(sector_diagnostics_fn(np.asarray(initial_point, dtype=float)))
     if objective_state is not None:
         diagnostics.update(
             _objective_observation_diagnostics(
@@ -763,6 +782,9 @@ def build_vqe_result(
         float(value) for value in best_observed_point
     ]
     optimizer_diagnostics["best_objective_evaluation"] = best_objective_evaluation
+    sector_diagnostics_fn = result_dependencies.get("sector_diagnostics_fn")
+    if callable(sector_diagnostics_fn):
+        optimizer_diagnostics.update(sector_diagnostics_fn(reported_point))
     _update_vqe_truth_diagnostics(
         optimizer_diagnostics,
         objective_state=objective_state,

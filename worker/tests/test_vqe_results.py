@@ -71,6 +71,12 @@ def test_build_parameterless_vqe_result_preserves_sampled_energy_uncertainty() -
 
 
 def test_build_vqe_initial_point_limit_result_uses_best_observed_point() -> None:
+    checked_points: list[list[float]] = []
+
+    def sector_diagnostics(point: np.ndarray) -> dict[str, object]:
+        checked_points.append([float(value) for value in point])
+        return {"sector_target": {"num_electrons_alpha": 1, "num_electrons_beta": 1}}
+
     result = build_vqe_initial_point_limit_result(
         ansatz=SimpleNamespace(),
         ansatz_name="hf",
@@ -85,12 +91,14 @@ def test_build_vqe_initial_point_limit_result_uses_best_observed_point() -> None
         exc=RuntimeError("limit"),
         best_energy_selector_fn=lambda energy, trace: energy if energy is not None else trace[-1],
         build_circuit_artifacts_fn=_build_artifacts,
+        sector_diagnostics_fn=sector_diagnostics,
     )
 
     assert result.primary_energy == -1.2
     assert result.optimal_parameters == [0.4]
     assert result.converged is False
     assert result.optimizer_diagnostics["message"] == "limit"
+    assert checked_points == [[0.4]]
 
 
 def test_build_vqe_result_prefers_the_best_observed_parameters() -> None:
@@ -127,6 +135,7 @@ def test_build_vqe_result_checks_sector_at_reported_parameters() -> None:
     def sector_diagnostics(point: np.ndarray) -> dict[str, object]:
         checked_points.append([float(value) for value in point])
         return {
+            "sector_target": {"num_electrons_alpha": 1, "num_electrons_beta": 1},
             "ideal_sector_leakage": 0.25,
             "ideal_sector_leakage_tolerance": 1e-10,
             "ideal_ansatz_sector_valid": False,
@@ -167,6 +176,46 @@ def test_build_vqe_result_checks_sector_at_reported_parameters() -> None:
     assert result.optimizer_diagnostics["scientific_converged"] is False
     assert result.optimizer_diagnostics["convergence_failure_reason"] == (
         "particle_sector_leakage"
+    )
+
+
+def test_build_vqe_result_rejects_unverified_molecular_sector() -> None:
+    diagnostics = {
+        "success": True,
+        "convergence_threshold": 1.0,
+        "final_delta_energy": 0.1,
+        "optimizer_kind": "scipy",
+    }
+    result = build_vqe_result(
+        ansatz=SimpleNamespace(),
+        ansatz_name="EfficientSU2",
+        optimizer_name="COBYLA",
+        reps=1,
+        num_qubits=22,
+        include_statevector_data=False,
+        optimal_point=np.array([0.8]),
+        final_energy=-0.5,
+        iterations=2,
+        converged=True,
+        objective_state=SimpleNamespace(
+            convergence_trace=[-0.4, -0.6],
+            best_energy=-0.6,
+            best_point=np.array([0.2]),
+        ),
+        optimizer_diagnostics=diagnostics,
+        compute_state_data_fn=lambda *_: (None, None, None),
+        build_circuit_artifacts_fn=_build_artifacts,
+        sector_diagnostics_fn=lambda _point: {
+            "sector_target": {"num_electrons_alpha": 1, "num_electrons_beta": 1},
+            "ideal_sector_leakage": None,
+            "ideal_ansatz_sector_valid": None,
+            "sector_diagnostic_source": "statevector_qubit_cap",
+        },
+    )
+
+    assert result.optimizer_diagnostics["scientific_converged"] is False
+    assert result.optimizer_diagnostics["convergence_failure_reason"] == (
+        "particle_sector_validity_unverified"
     )
 
 

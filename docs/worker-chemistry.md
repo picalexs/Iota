@@ -241,7 +241,18 @@ execution evidence.
 Molecular VQE uses `NumberPreserving` when the caller omits `ansatz_name`.
 This ansatz preserves the declared alpha and beta electron counts. It does not
 guarantee total-spin conservation and is not UCCSD. An explicit ansatz choice
-remains unchanged.
+remains unchanged. The worker measures ideal ansatz leakage for the selected
+reported parameter vector. For circuits with at most 20 qubits, it uses an
+ideal statevector. It marks `scientific_converged` false when leakage exceeds
+`1e-10`, and records `particle_sector_leakage` as the failure reason. Above
+20 qubits, the worker avoids statevector allocation. It accepts the
+`NumberPreserving` circuit invariant. It marks other ansatz sectors as
+unverified and does not report scientific convergence. This check does not
+measure particle leakage on Aer noise or IBM hardware. Optimizer success remains
+a separate status. See the
+[Qiskit Nature UCC contract](https://qiskit-community.github.io/qiskit-nature/_modules/qiskit_nature/second_q/circuit/library/ansatzes/ucc.html)
+and its
+[qubit-mapper sector guide](https://qiskit-community.github.io/qiskit-nature/tutorials/06_qubit_mappers.html).
 
 ## Test tiers
 

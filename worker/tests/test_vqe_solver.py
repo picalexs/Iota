@@ -6,11 +6,14 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.base import BackendExecutionContext
 from worker.adapters.result_adapter import normalize_result
 from worker.chemistry.algorithms.vqe import workflow as vqe_solver
+from worker.chemistry.algorithms.vqe.state_data import sector_diagnostics_from_ansatz
+from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.algorithms.vqe.workflow import run_vqe
 
 
@@ -118,7 +121,40 @@ def test_number_preserving_vqe_records_zero_ideal_sector_leakage() -> None:
     )
 
 
-def test_run_vqe_preserves_explicit_ansatz_for_molecular_sector() -> None:
+def test_large_vqe_sector_check_does_not_build_statevector() -> None:
+    generic_ansatz = QuantumCircuit(22, name="EfficientSU2")
+    unverified = sector_diagnostics_from_ansatz(
+        generic_ansatz,
+        np.array([], dtype=float),
+        num_spatial_orbitals=11,
+        num_electrons_alpha=1,
+        num_electrons_beta=1,
+    )
+
+    number_preserving_ansatz = build_ansatz(
+        ansatz_name="NumberPreserving",
+        num_qubits=22,
+        reps=1,
+        num_electrons_alpha=1,
+        num_electrons_beta=1,
+    )
+    invariant = sector_diagnostics_from_ansatz(
+        number_preserving_ansatz,
+        np.zeros(number_preserving_ansatz.num_parameters),
+        num_spatial_orbitals=11,
+        num_electrons_alpha=1,
+        num_electrons_beta=1,
+    )
+
+    assert unverified["ideal_sector_leakage"] is None
+    assert unverified["ideal_ansatz_sector_valid"] is None
+    assert unverified["sector_diagnostic_source"] == "statevector_qubit_cap"
+    assert invariant["ideal_sector_leakage"] is None
+    assert invariant["ideal_ansatz_sector_valid"] is True
+    assert invariant["sector_diagnostic_source"] == "number_preserving_ansatz_invariant"
+
+
+def test_run_vqe_preserves_explicit_ansatz_and_invalidates_sector_leakage() -> None:
     backend = _FakeEstimator()
     hamiltonian = SimpleNamespace(
         pauli_hamiltonian=SparsePauliOp.from_list([("IIII", 1.0)]),
@@ -128,7 +164,7 @@ def test_run_vqe_preserves_explicit_ansatz_for_molecular_sector() -> None:
         num_electrons_beta=1,
     )
 
-    run_vqe(
+    result = run_vqe(
         hamiltonian=hamiltonian,
         backend=backend,
         config={
@@ -141,6 +177,11 @@ def test_run_vqe_preserves_explicit_ansatz_for_molecular_sector() -> None:
     )
 
     assert backend.calls[0][0].name == "EfficientSU2"
+    assert result.optimizer_diagnostics["ideal_sector_leakage"] > 1e-10
+    assert result.optimizer_diagnostics["ideal_ansatz_sector_valid"] is False
+    assert result.optimizer_diagnostics["scientific_converged"] is False
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+    assert convergence["scientific_converged"] is False
 
 
 def test_run_vqe_uses_generic_default_without_chemistry_metadata() -> None:

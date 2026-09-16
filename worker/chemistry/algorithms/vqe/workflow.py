@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 from qiskit.quantum_info import SparsePauliOp
@@ -145,6 +145,7 @@ def _build_vqe_initial_point_limit_result(
     convergence_trace: list[float],
     exc: Exception,
     objective_state: VQEObjectiveState | None = None,
+    sector_diagnostics_fn: Callable[[np.ndarray], dict[str, Any]] | None = None,
 ) -> VQEResult:
     """Adapt evaluation-limit inputs to the result builder."""
     return build_vqe_initial_point_limit_result(
@@ -160,6 +161,7 @@ def _build_vqe_initial_point_limit_result(
         convergence_trace=convergence_trace,
         exc=exc,
         objective_state=objective_state,
+        sector_diagnostics_fn=sector_diagnostics_fn,
         best_energy_selector_fn=best_or_latest_energy,
         build_circuit_artifacts_fn=_build_vqe_circuit_artifacts,
     )
@@ -282,6 +284,7 @@ def _select_initial_point_or_limit_result(
     reps: int,
     optimizer_diagnostics: dict[str, Any],
     initial_point_diagnostics: dict[str, Any],
+    sector_diagnostics_fn: Callable[[np.ndarray], dict[str, Any]] | None,
 ) -> tuple[np.ndarray, dict[str, Any]] | VQEResult:
     try:
         initial_point, selected_initial_diagnostics = _select_initial_point(
@@ -302,6 +305,7 @@ def _select_initial_point_or_limit_result(
             convergence_trace=objective.convergence_trace,
             exc=exc,
             objective_state=objective,
+            sector_diagnostics_fn=sector_diagnostics_fn,
         )
     merged_diagnostics = {
         **optimizer_diagnostics,
@@ -430,6 +434,7 @@ def _build_vqe_result(
     converged: bool,
     objective_state: VQEObjectiveState,
     optimizer_diagnostics: dict[str, Any],
+    sector_diagnostics_fn: Callable[[np.ndarray], dict[str, Any]] | None,
 ) -> VQEResult:
     """Adapt canonical VQE inputs to the result builder."""
     return build_vqe_result(
@@ -445,6 +450,7 @@ def _build_vqe_result(
         converged=converged,
         objective_state=objective_state,
         optimizer_diagnostics=optimizer_diagnostics,
+        sector_diagnostics_fn=sector_diagnostics_fn,
         compute_state_data_fn=_compute_quantum_state_data,
         build_circuit_artifacts_fn=_build_vqe_circuit_artifacts,
     )
@@ -532,27 +538,27 @@ def _update_independent_reevaluation(
         )
 
 
-def _update_sector_diagnostics(
-    diagnostics: dict[str, Any],
-    *,
+def _sector_diagnostics_builder(
     hamiltonian: object,
+    *,
     ansatz: Any,
-    parameter_point: np.ndarray,
-) -> None:
+) -> Callable[[np.ndarray], dict[str, Any]] | None:
     if not all(
         isinstance(getattr(hamiltonian, name, None), int)
         for name in ("num_spatial_orbitals", "num_electrons_alpha", "num_electrons_beta")
     ):
-        return
-    diagnostics.update(
-        _sector_diagnostics_from_ansatz(
+        return None
+
+    def build(parameter_point: np.ndarray) -> dict[str, Any]:
+        return _sector_diagnostics_from_ansatz(
             ansatz,
             parameter_point,
             num_spatial_orbitals=int(hamiltonian.num_spatial_orbitals),
             num_electrons_alpha=int(hamiltonian.num_electrons_alpha),
             num_electrons_beta=int(hamiltonian.num_electrons_beta),
         )
-    )
+
+    return build
 
 
 def run_vqe(
@@ -794,6 +800,10 @@ def run_vqe(
         ).items()
     }
     optimizer_diagnostics.update(sector_metadata)
+    sector_diagnostics_fn = _sector_diagnostics_builder(
+        hamiltonian,
+        ansatz=ansatz,
+    )
     if ansatz.num_parameters == 0:
         return _run_parameterless_vqe(
             objective=objective_state,
@@ -817,6 +827,7 @@ def run_vqe(
         reps=vqe_config.reps,
         optimizer_diagnostics=optimizer_diagnostics,
         initial_point_diagnostics=initial_point_diagnostics,
+        sector_diagnostics_fn=sector_diagnostics_fn,
     )
     if isinstance(selected_initial_point, VQEResult):
         return selected_initial_point
@@ -854,13 +865,6 @@ def run_vqe(
         final_energy=final_energy,
         include_statevector_data=include_statevector_data,
     )
-    _update_sector_diagnostics(
-        optimizer_diagnostics,
-        hamiltonian=hamiltonian,
-        ansatz=ansatz,
-        parameter_point=optimal_point,
-    )
-
     return _build_vqe_result(
         ansatz=ansatz,
         ansatz_name=vqe_config.ansatz_name,
@@ -874,4 +878,5 @@ def run_vqe(
         converged=converged,
         objective_state=objective_state,
         optimizer_diagnostics=optimizer_diagnostics,
+        sector_diagnostics_fn=sector_diagnostics_fn,
     )
