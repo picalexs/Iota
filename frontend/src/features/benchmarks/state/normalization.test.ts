@@ -96,9 +96,10 @@ describe("benchmark state normalization", () => {
     const updatedEntry = {
       ...entry,
       executionMetadata: {
+        ...(entry.executionMetadata ?? {}),
         shots: 1024,
         actualExecutionTarget: "local_classical",
-      },
+      } as NonNullable<typeof entry.executionMetadata>,
     };
 
     expect(entrySaveSignature(updatedEntry)).not.toBe(entrySaveSignature(entry));
