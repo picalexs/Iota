@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from worker.chemistry.algorithms.sqd import workflow as sqd_solver
+from worker.chemistry.algorithms.sqd import sampling_execution as sqd_sampling_execution
 from worker.chemistry.algorithms.sqd.workflow import (
     _aggregate_bitstring_frequencies,
     _build_hf_reference_circuit,
@@ -276,6 +277,45 @@ def test_sample_bitstring_matrix_propagates_run_cancellation_without_retry() -> 
         )
 
     assert sampler.calls == 1
+
+
+def test_sample_bitstring_matrix_records_retry_work(monkeypatch) -> None:
+    class _Sampler:
+        def __init__(self) -> None:
+            self.shots: list[int] = []
+
+        def run(self, *args, **kwargs):
+            del args
+            self.shots.append(kwargs["shots"])
+            if len(self.shots) == 1:
+                raise RuntimeError("transient sampler failure")
+            return object()
+
+    monkeypatch.setattr(
+        sqd_sampling_execution,
+        "extract_sampler_bitstrings",
+        lambda _result: ["0000", "0000"],
+    )
+    sampler = _Sampler()
+    ledger: dict[str, int] = {}
+
+    matrix = _sample_bitstring_matrix(
+        sampler,
+        num_bits=4,
+        total_samples=8,
+        num_elec_a=0,
+        num_elec_b=0,
+        work_ledger=ledger,
+    )
+
+    assert matrix.shape == (2, 4)
+    assert sampler.shots == [8, 16]
+    assert ledger == {
+        "sampler_run_attempts": 2,
+        "sampler_retry_count": 1,
+        "sampler_requested_shots_total": 24,
+        "sampler_returned_raw_sample_rows": 2,
+    }
 
 
 def test_open_shell_selected_ci_strings_preserve_alpha_on_right_half() -> None:
