@@ -322,6 +322,24 @@ def build_parameterless_vqe_result(
     """Build the parameterless VQE result without invoking an optimizer."""
     final_energy = objective(initial_point)
     final_parameters = [float(value) for value in np.asarray(initial_point, dtype=float)]
+    standard_error_trace = list(getattr(objective, "standard_error_trace", []) or [])
+    final_standard_error = (
+        float(standard_error_trace[-1])
+        if standard_error_trace
+        and isinstance(standard_error_trace[-1], (int, float))
+        and np.isfinite(float(standard_error_trace[-1]))
+        and float(standard_error_trace[-1]) >= 0.0
+        else None
+    )
+    estimator_precision = getattr(objective, "estimator_precision", None)
+    noisy_objective = getattr(objective, "shots", None) is not None or (
+        isinstance(estimator_precision, (int, float)) and float(estimator_precision) > 0.0
+    )
+    reported_energy_source = (
+        "final_noisy_objective_observation"
+        if noisy_objective
+        else "final_optimizer_objective"
+    )
     if include_statevector_data:
         bloch_vectors, dm_real, dm_imag = compute_state_data_fn(
             ansatz,
@@ -339,7 +357,19 @@ def build_parameterless_vqe_result(
         "optimizer_iterations": 0,
         "final_energy": float(final_energy),
         "best_observed_energy": float(final_energy),
-        "reported_energy_source": "final_optimizer_objective",
+        "reported_energy": float(final_energy),
+        "reported_energy_source": reported_energy_source,
+        "reported_energy_standard_error": final_standard_error,
+        "reported_energy_uncertainty_source": (
+            "objective_standard_error_trace" if final_standard_error is not None else None
+        ),
+        "reported_energy_uncertainty_status": (
+            "available"
+            if noisy_objective and final_standard_error is not None
+            else "unavailable_from_backend"
+            if noisy_objective
+            else "exact_expectation"
+        ),
         "final_parameters": final_parameters,
         "best_observed_parameters": final_parameters,
         "best_objective_evaluation": 1,
@@ -362,7 +392,7 @@ def build_parameterless_vqe_result(
         reps=reps,
         optimal_point=initial_point,
         final_point=initial_point,
-        reported_energy_source="final_optimizer_objective",
+        reported_energy_source=reported_energy_source,
     )
     _attach_reference_descriptor(
         diagnostics,
@@ -408,6 +438,30 @@ def build_vqe_initial_point_limit_result(
     final_energy = best_energy_selector_fn(best_energy, convergence_trace)
     selected_parameters = [float(value) for value in np.asarray(initial_point, dtype=float)]
     best_objective_evaluation = int(np.argmin(convergence_trace)) + 1 if convergence_trace else None
+    standard_error_trace = list(
+        getattr(objective_state, "standard_error_trace", []) or []
+    )
+    best_observed_standard_error = (
+        standard_error_trace[best_objective_evaluation - 1]
+        if best_objective_evaluation is not None
+        and best_objective_evaluation <= len(standard_error_trace)
+        else None
+    )
+    noisy_objective = bool(
+        objective_state is not None
+        and (
+            getattr(objective_state, "shots", None) is not None
+            or (
+                isinstance(getattr(objective_state, "estimator_precision", None), (int, float))
+                and float(objective_state.estimator_precision) > 0.0
+            )
+        )
+    )
+    reported_energy_source = (
+        "best_observed_noisy_objective_evaluation"
+        if noisy_objective
+        else "best_observed_optimizer_evaluation"
+    )
     diagnostics = {
         **optimizer_diagnostics,
         **initial_point_diagnostics,
@@ -419,9 +473,23 @@ def build_vqe_initial_point_limit_result(
         "optimizer_iterations": 0,
         "final_energy": float(final_energy),
         "best_observed_energy": float(final_energy),
-        "reported_energy_source": "best_observed_optimizer_evaluation",
+        "reported_energy_source": reported_energy_source,
+        "reported_energy_standard_error": best_observed_standard_error,
+        "reported_energy_uncertainty_source": (
+            "best_observed_standard_error" if best_observed_standard_error is not None else None
+        ),
+        "reported_energy": float(final_energy),
+        "reported_energy_uncertainty_status": (
+            "available"
+            if noisy_objective and best_observed_standard_error is not None
+            else "unavailable_from_backend"
+            if noisy_objective
+            else "exact_expectation"
+        ),
         "final_parameters": selected_parameters,
+        "reported_parameters": selected_parameters,
         "best_observed_parameters": selected_parameters,
+        "best_observed_standard_error": best_observed_standard_error,
         "best_objective_evaluation": best_objective_evaluation,
     }
     if objective_state is not None:
@@ -443,6 +511,17 @@ def build_vqe_initial_point_limit_result(
             objective_state=objective_state,
             converged=False,
         )
+        if noisy_objective:
+            diagnostics.update(
+                {
+                    "independent_final_energy": None,
+                    "independent_reevaluation_status": "skipped_max_function_evaluations",
+                    "independent_reevaluation_mode": "estimator_backend",
+                    "independent_reevaluation_parameters": None,
+                    "independent_final_standard_error": None,
+                    "independent_uncertainty_status": "skipped_max_function_evaluations",
+                }
+            )
     artifacts = build_circuit_artifacts_fn(
         ansatz=ansatz,
         ansatz_name=ansatz_name,
@@ -450,7 +529,7 @@ def build_vqe_initial_point_limit_result(
         reps=reps,
         optimal_point=np.asarray(initial_point, dtype=float),
         final_point=np.asarray(initial_point, dtype=float),
-        reported_energy_source="best_observed_optimizer_evaluation",
+        reported_energy_source=reported_energy_source,
     )
     _attach_reference_descriptor(
         diagnostics,
@@ -546,22 +625,143 @@ def build_vqe_result(
         else float(final_energy)
     )
     final_point = np.asarray(optimal_point, dtype=float)
-    reported_point = np.asarray(
+    best_observed_point = np.asarray(
         objective_state.best_point if objective_state.best_point is not None else optimal_point,
         dtype=float,
     )
+    reported_point = best_observed_point
     best_objective_evaluation = int(np.argmin(convergence_trace)) + 1 if convergence_trace else None
-    reported_energy_source = reported_vqe_energy_source(
-        final_energy=final_energy,
-        best_observed_energy=best_observed_energy,
-        final_point=final_point,
-        reported_point=reported_point,
+    standard_error_trace = list(getattr(objective_state, "standard_error_trace", []) or [])
+    best_observed_standard_error = (
+        standard_error_trace[best_objective_evaluation - 1]
+        if best_objective_evaluation is not None
+        and best_objective_evaluation <= len(standard_error_trace)
+        else None
     )
+    objective_shots = getattr(objective_state, "shots", None)
+    objective_precision = getattr(objective_state, "estimator_precision", None)
+    noisy_objective = objective_shots is not None or (
+        isinstance(objective_precision, (int, float)) and float(objective_precision) > 0.0
+    )
+
+    reported_energy = best_observed_energy
+    reported_energy_standard_error = best_observed_standard_error
+    reported_energy_uncertainty_source = (
+        "best_observed_standard_error" if best_observed_standard_error is not None else None
+    )
+    reported_energy_uncertainty_status = (
+        "available"
+        if noisy_objective and best_observed_standard_error is not None
+        else "unavailable_from_backend"
+        if noisy_objective
+        else "exact_expectation"
+    )
+    if noisy_objective:
+        reported_point = final_point
+        reported_energy_standard_error = None
+        reported_energy_uncertainty_source = None
+        reported_energy_uncertainty_status = "independent_reevaluation_unavailable"
+        independent_parameters = optimizer_diagnostics.get(
+            "independent_reevaluation_parameters"
+        )
+        independent_point_matches = False
+        if independent_parameters is not None:
+            try:
+                candidate_independent_point = np.asarray(independent_parameters, dtype=float)
+            except (TypeError, ValueError):
+                candidate_independent_point = np.asarray([], dtype=float)
+            independent_point_matches = bool(
+                candidate_independent_point.shape == final_point.shape
+                and np.allclose(candidate_independent_point, final_point, atol=1e-12, rtol=0.0)
+            )
+        independent_energy = optimizer_diagnostics.get("independent_final_energy")
+        independent_status = optimizer_diagnostics.get("independent_reevaluation_status")
+        independent_energy_valid = isinstance(independent_energy, (int, float)) and np.isfinite(
+            float(independent_energy)
+        )
+        if (
+            independent_status == "completed"
+            and independent_point_matches
+            and independent_energy_valid
+        ):
+            reported_energy = float(independent_energy)
+            reported_energy_source = "independent_final_reevaluation"
+            raw_standard_error = optimizer_diagnostics.get("independent_final_standard_error")
+            reported_energy_standard_error = (
+                float(raw_standard_error)
+                if isinstance(raw_standard_error, (int, float))
+                and np.isfinite(float(raw_standard_error))
+                and float(raw_standard_error) >= 0.0
+                else None
+            )
+            reported_energy_uncertainty_source = (
+                "independent_final_standard_error"
+                if reported_energy_standard_error is not None
+                else None
+            )
+            reported_energy_uncertainty_status = (
+                "available"
+                if reported_energy_standard_error is not None
+                else "unavailable_from_backend"
+            )
+        else:
+            reported_energy = float(final_energy)
+            reported_energy_source = "optimizer_final_noisy_observation"
+            best_point_matches = bool(
+                best_observed_point.shape == final_point.shape
+                and np.allclose(best_observed_point, final_point, atol=1e-12, rtol=0.0)
+            )
+            best_energy_matches = bool(
+                np.isfinite(best_observed_energy)
+                and abs(float(best_observed_energy) - float(final_energy)) <= 1e-12
+            )
+            if best_point_matches and best_energy_matches:
+                reported_energy_source = "best_observed_noisy_optimizer_evaluation"
+                reported_energy_standard_error = best_observed_standard_error
+                reported_energy_uncertainty_source = (
+                    "best_observed_standard_error"
+                    if best_observed_standard_error is not None
+                    else None
+                )
+                reported_energy_uncertainty_status = (
+                    "available"
+                    if best_observed_standard_error is not None
+                    else "unavailable_from_backend"
+                )
+            elif independent_status == "completed" and not independent_point_matches:
+                reported_energy_uncertainty_status = "reevaluation_parameter_mismatch"
+            elif independent_status in {"failed", "skipped_max_function_evaluations"}:
+                reported_energy_uncertainty_status = str(independent_status)
+            else:
+                reported_energy_uncertainty_status = "independent_reevaluation_unavailable"
+    else:
+        reported_energy_source = reported_vqe_energy_source(
+            final_energy=final_energy,
+            best_observed_energy=best_observed_energy,
+            final_point=final_point,
+            reported_point=reported_point,
+        )
     optimizer_diagnostics["final_energy"] = float(final_energy)
     optimizer_diagnostics["best_observed_energy"] = best_observed_energy
+    optimizer_diagnostics["best_observed_standard_error"] = best_observed_standard_error
     optimizer_diagnostics["reported_energy_source"] = reported_energy_source
+    optimizer_diagnostics["reported_energy"] = float(reported_energy)
+    optimizer_diagnostics["reported_energy_standard_error"] = reported_energy_standard_error
+    optimizer_diagnostics["reported_energy_uncertainty_source"] = (
+        reported_energy_uncertainty_source
+    )
+    optimizer_diagnostics["reported_energy_uncertainty_status"] = (
+        reported_energy_uncertainty_status
+    )
+    optimizer_diagnostics["reported_parameters"] = [float(value) for value in reported_point]
+    if noisy_objective:
+        optimizer_diagnostics["independent_reevaluation_parameter_match"] = (
+            independent_point_matches
+        )
     optimizer_diagnostics["final_parameters"] = [float(value) for value in final_point]
-    optimizer_diagnostics["best_observed_parameters"] = [float(value) for value in reported_point]
+    optimizer_diagnostics["best_observed_parameters"] = [
+        float(value) for value in best_observed_point
+    ]
     optimizer_diagnostics["best_objective_evaluation"] = best_objective_evaluation
     _update_vqe_truth_diagnostics(
         optimizer_diagnostics,
@@ -571,7 +771,7 @@ def build_vqe_result(
 
     logger.info(
         "VQE finished: energy=%.8f final_energy=%.8f converged=%s iterations=%d optimizer=%s",
-        best_observed_energy,
+        reported_energy,
         final_energy,
         converged,
         iterations,
@@ -601,11 +801,11 @@ def build_vqe_result(
         artifacts=artifacts,
         ansatz_name=ansatz_name,
         include_statevector_data=include_statevector_data,
-        energy=best_observed_energy,
+        energy=reported_energy,
     )
     return VQEResult(
         algorithm="vqe",
-        primary_energy=best_observed_energy,
+        primary_energy=reported_energy,
         primary_iterations=iterations,
         converged=converged,
         optimal_parameters=[float(value) for value in reported_point],

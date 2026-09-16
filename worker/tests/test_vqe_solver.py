@@ -107,15 +107,57 @@ def test_number_preserving_vqe_records_zero_ideal_sector_leakage() -> None:
             "algorithm": "vqe",
             "max_iterations": 2,
             "optimizer_name": "COBYLA",
-            "ansatz_name": "NumberPreserving",
             "initial_point_strategy": "zero",
         },
     )
 
+    assert backend.calls[0][0].name == "NumberPreserving"
     assert result.optimizer_diagnostics["ideal_sector_leakage"] == pytest.approx(0.0)
     assert result.optimizer_diagnostics["sector_diagnostic_source"] == (
         "ideal_statevector_from_ansatz"
     )
+
+
+def test_run_vqe_preserves_explicit_ansatz_for_molecular_sector() -> None:
+    backend = _FakeEstimator()
+    hamiltonian = SimpleNamespace(
+        pauli_hamiltonian=SparsePauliOp.from_list([("IIII", 1.0)]),
+        num_qubits=4,
+        num_spatial_orbitals=2,
+        num_electrons_alpha=1,
+        num_electrons_beta=1,
+    )
+
+    run_vqe(
+        hamiltonian=hamiltonian,
+        backend=backend,
+        config={
+            "algorithm": "vqe",
+            "max_iterations": 2,
+            "optimizer_name": "COBYLA",
+            "ansatz_name": "EfficientSU2",
+            "initial_point_strategy": "zero",
+        },
+    )
+
+    assert backend.calls[0][0].name == "EfficientSU2"
+
+
+def test_run_vqe_uses_generic_default_without_chemistry_metadata() -> None:
+    backend = _FakeEstimator()
+
+    run_vqe(
+        hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+        backend=backend,
+        config={
+            "algorithm": "vqe",
+            "max_iterations": 2,
+            "optimizer_name": "COBYLA",
+            "initial_point_strategy": "zero",
+        },
+    )
+
+    assert backend.calls[0][0].name == "EfficientSU2"
 
 
 def test_run_vqe_supports_spsa_runtime_path() -> None:
@@ -271,6 +313,7 @@ def test_run_vqe_hard_stops_scipy_by_function_evaluations(monkeypatch) -> None:
     result = run_vqe(
         hamiltonian=hamiltonian,
         backend=backend,
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime", shots=256),
         config={
             "algorithm": "vqe",
             "max_iterations": 20,
@@ -289,6 +332,14 @@ def test_run_vqe_hard_stops_scipy_by_function_evaluations(monkeypatch) -> None:
         result.optimizer_diagnostics["independent_reevaluation_status"]
         == "skipped_max_function_evaluations"
     )
+    assert (
+        result.optimizer_diagnostics["reported_energy_source"]
+        == "best_observed_noisy_optimizer_evaluation"
+    )
+    assert (
+        result.optimizer_diagnostics["reported_energy_uncertainty_status"]
+        == "available"
+    )
     assert result.optimizer_diagnostics["termination_reason"] == "max_function_evaluations"
     assert result.optimizer_diagnostics["objective_evaluations"] == 3
     assert result.optimizer_diagnostics["function_evaluations"] == 3
@@ -300,7 +351,7 @@ def test_run_vqe_hard_stops_scipy_by_function_evaluations(monkeypatch) -> None:
     assert metrics["max_function_evaluations"] == 3
 
 
-def test_run_vqe_reports_best_observed_energy_and_keeps_final_optimizer_state(
+def test_run_vqe_reports_independent_noisy_energy_and_keeps_optimizer_state(
     monkeypatch,
 ) -> None:
     backend = _FakeEstimator()
@@ -328,6 +379,7 @@ def test_run_vqe_reports_best_observed_energy_and_keeps_final_optimizer_state(
     result = run_vqe(
         hamiltonian=hamiltonian,
         backend=backend,
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime", shots=256),
         config={
             "algorithm": "vqe",
             "max_iterations": 4,
@@ -340,13 +392,28 @@ def test_run_vqe_reports_best_observed_energy_and_keeps_final_optimizer_state(
     expected_zero_parameters = [0.0] * len(result.optimal_parameters)
     expected_final_parameters = [0.5] * len(result.optimal_parameters)
 
-    assert result.primary_energy == pytest.approx(0.0)
-    assert result.optimal_parameters == pytest.approx(expected_zero_parameters)
-    assert result.optimizer_diagnostics["final_energy"] > result.primary_energy
+    assert result.primary_energy == pytest.approx(
+        result.optimizer_diagnostics["independent_final_energy"]
+    )
+    assert result.primary_energy == pytest.approx(
+        result.optimizer_diagnostics["final_energy"]
+    )
+    assert result.optimal_parameters == pytest.approx(expected_final_parameters)
+    assert result.optimizer_diagnostics["best_observed_energy"] == pytest.approx(0.0)
     assert (
         result.optimizer_diagnostics["reported_energy_source"]
-        == "best_observed_optimizer_evaluation"
+        == "independent_final_reevaluation"
     )
+    assert result.optimizer_diagnostics["reported_energy_standard_error"] == pytest.approx(
+        result.optimizer_diagnostics["independent_final_standard_error"]
+    )
+    assert result.optimizer_diagnostics["reported_energy_uncertainty_source"] == (
+        "independent_final_standard_error"
+    )
+    assert result.optimizer_diagnostics["independent_reevaluation_parameters"] == pytest.approx(
+        expected_final_parameters
+    )
+    assert backend.calls[-1][2][0] == pytest.approx(expected_final_parameters)
     assert result.optimizer_diagnostics["best_observed_parameters"] == pytest.approx(
         expected_zero_parameters
     )
@@ -356,9 +423,72 @@ def test_run_vqe_reports_best_observed_energy_and_keeps_final_optimizer_state(
 
     metrics = normalize_result(result)["algorithm_metrics"]
     artifacts = metrics["circuit_artifacts"]
-    assert [artifact["role"] for artifact in artifacts] == ["ansatz", "final", "optimizer_final"]
-    assert artifacts[1]["label"] == "Best observed VQE circuit"
-    assert artifacts[2]["label"] == "Last optimizer circuit"
+    assert [artifact["role"] for artifact in artifacts] == ["ansatz", "final"]
+    assert artifacts[1]["label"] == "Final VQE circuit"
+    assert artifacts[1]["source"] == "optimized_parameters"
+
+
+def test_run_vqe_marks_failed_noisy_final_reevaluation(monkeypatch) -> None:
+    backend = _FakeEstimator()
+    hamiltonian = SparsePauliOp.from_list([("Z", 1.0)])
+    allow_reevaluation_failure = False
+    evaluate_energy = vqe_solver._evaluate_energy_with_uncertainty
+
+    def fail_only_during_final_reevaluation(**kwargs):
+        if allow_reevaluation_failure:
+            raise RuntimeError("independent evaluation failed")
+        return evaluate_energy(**kwargs)
+
+    def fake_minimize(objective, x0, method, options, bounds):
+        nonlocal allow_reevaluation_failure
+        del method, options, bounds
+        best_point = np.zeros_like(x0)
+        final_point = np.full_like(x0, 0.5)
+        best_energy = objective(best_point)
+        final_energy = objective(final_point)
+        assert best_energy < final_energy
+        allow_reevaluation_failure = True
+        return SimpleNamespace(
+            x=final_point,
+            fun=final_energy,
+            success=True,
+            status=0,
+            message="ok",
+            nfev=2,
+            nit=2,
+        )
+
+    monkeypatch.setattr(
+        vqe_solver,
+        "_evaluate_energy_with_uncertainty",
+        fail_only_during_final_reevaluation,
+    )
+    monkeypatch.setattr(vqe_solver, "minimize", fake_minimize)
+
+    result = run_vqe(
+        hamiltonian=hamiltonian,
+        backend=backend,
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime", shots=256),
+        config={
+            "algorithm": "vqe",
+            "max_iterations": 4,
+            "optimizer_name": "COBYLA",
+            "ansatz_name": "EfficientSU2",
+            "initial_point": [0.2, -0.3, 0.1, -0.1, 0.05, -0.05],
+        },
+    )
+
+    diagnostics = result.optimizer_diagnostics
+    assert diagnostics["independent_reevaluation_status"] == "failed"
+    assert diagnostics["independent_reevaluation_error"] == "RuntimeError"
+    assert diagnostics["independent_reevaluation_parameters"] == pytest.approx(
+        result.optimal_parameters
+    )
+    assert result.primary_energy == pytest.approx(diagnostics["final_energy"])
+    assert diagnostics["reported_energy_source"] == "optimizer_final_noisy_observation"
+    assert diagnostics["reported_energy_standard_error"] is None
+    assert diagnostics["reported_energy_uncertainty_source"] is None
+    assert diagnostics["reported_energy_uncertainty_status"] == "failed"
 
 
 def test_run_vqe_emits_ansatz_and_final_circuit_artifacts() -> None:

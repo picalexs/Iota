@@ -264,6 +264,11 @@ def _vqe_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[
             "Use the independent energy reevaluation at the optimizer's final parameter vector. "
             "Keep its uncertainty and optimizer success as separate diagnostics."
         )
+    elif source == "final_noisy_objective_observation":
+        selection_rule = (
+            "Use the sole sampled objective evaluation for a parameterless ansatz. "
+            "Keep its standard error separate from convergence status."
+        )
     elif source in {
         "optimizer_final_noisy_observation",
         "best_observed_noisy_optimizer_evaluation",

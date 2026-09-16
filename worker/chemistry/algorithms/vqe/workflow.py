@@ -478,6 +478,7 @@ def _update_independent_reevaluation(
     include_statevector_data: bool,
 ) -> None:
     reevaluation_mode = "exact_statevector" if include_statevector_data else "estimator_backend"
+    reevaluation_parameters = [float(value) for value in np.asarray(optimal_point, dtype=float)]
     max_evaluations = objective.max_function_evaluations
     if max_evaluations is not None and objective.evaluation_count >= max_evaluations:
         diagnostics.update(
@@ -485,6 +486,7 @@ def _update_independent_reevaluation(
                 "independent_final_energy": None,
                 "independent_reevaluation_status": "skipped_max_function_evaluations",
                 "independent_reevaluation_mode": reevaluation_mode,
+                "independent_reevaluation_parameters": reevaluation_parameters,
                 "independent_final_standard_error": None,
                 "independent_uncertainty_status": "skipped_max_function_evaluations",
             }
@@ -504,6 +506,7 @@ def _update_independent_reevaluation(
                 "independent_final_energy": independent_final_energy,
                 "independent_reevaluation_status": "completed",
                 "independent_reevaluation_mode": reevaluation_mode,
+                "independent_reevaluation_parameters": reevaluation_parameters,
                 "independent_reevaluation_delta": float(
                     abs(independent_final_energy - float(final_energy))
                 ),
@@ -521,6 +524,7 @@ def _update_independent_reevaluation(
                 "independent_final_energy": None,
                 "independent_reevaluation_status": "failed",
                 "independent_reevaluation_mode": reevaluation_mode,
+                "independent_reevaluation_parameters": reevaluation_parameters,
                 "independent_reevaluation_error": exc.__class__.__name__,
                 "independent_final_standard_error": None,
                 "independent_uncertainty_status": "failed",
@@ -561,6 +565,25 @@ def run_vqe(
 ) -> VQEResult:
     """Run VQE using scipy/SPSA optimizers and Qiskit V2 estimator PUBs."""
     resolved = resolve_algorithm_config(config, "vqe")
+    operator, num_qubits = _resolve_operator_and_width(hamiltonian)
+    if not resolved.get("ansatz_name") and not resolved.get("ansatz"):
+        sector_fields = (
+            "num_spatial_orbitals",
+            "num_electrons_alpha",
+            "num_electrons_beta",
+        )
+        sector_values = [getattr(hamiltonian, name, None) for name in sector_fields]
+        raw_num_qubits = getattr(hamiltonian, "num_qubits", None)
+        chemistry_sector_available = (
+            all(isinstance(value, int) and not isinstance(value, bool) for value in sector_values)
+            and isinstance(raw_num_qubits, int)
+            and not isinstance(raw_num_qubits, bool)
+            and raw_num_qubits == 2 * int(sector_values[0])
+        )
+        resolved = {
+            **resolved,
+            "ansatz_name": "NumberPreserving" if chemistry_sector_available else "EfficientSU2",
+        }
     vqe_config = resolve_vqe_config(resolved)
     optimizer_name, optimizer_selection_reason = select_vqe_optimizer_name(
         resolved,
@@ -573,7 +596,6 @@ def run_vqe(
         noise_profile=getattr(backend_context, "noise_profile", None),
     )
 
-    operator, num_qubits = _resolve_operator_and_width(hamiltonian)
     statevector_context = {**config, **resolved}
     include_statevector_data = _should_compute_statevector_data(backend, statevector_context)
     if not hasattr(backend, "run"):

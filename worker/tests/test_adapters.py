@@ -1035,6 +1035,27 @@ def test_vqe_energy_policy_describes_independent_noisy_reevaluation() -> None:
     assert "optimizer_diagnostics.independent_final_energy" in policy["candidate_energy_fields"]
 
 
+def test_vqe_energy_policy_describes_parameterless_sampled_observation() -> None:
+    normalized = normalize_result(
+        VQEResult(
+            algorithm="vqe",
+            primary_energy=-0.92,
+            primary_iterations=1,
+            converged=True,
+            optimal_parameters=[],
+            convergence_trace=[-0.92],
+            optimizer_diagnostics={
+                "reported_energy_source": "final_noisy_objective_observation",
+                "reported_energy_standard_error": 0.04,
+            },
+        )
+    )
+
+    policy = normalized["energy_policy"]
+    assert policy["primary_energy_source"] == "final_noisy_objective_observation"
+    assert "sole sampled objective evaluation" in policy["selection_rule"]
+
+
 def test_normalize_result_detects_scipy_function_evaluation_cap() -> None:
     normalized = normalize_result(
         VQEResult(
