@@ -259,17 +259,35 @@ def _vqe_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[
         "reported_energy_source",
         "best_observed_optimizer_evaluation",
     )
+    if source == "independent_final_reevaluation":
+        selection_rule = (
+            "Use the independent energy reevaluation at the optimizer's final parameter vector. "
+            "Keep its uncertainty and optimizer success as separate diagnostics."
+        )
+    elif source in {
+        "optimizer_final_noisy_observation",
+        "best_observed_noisy_optimizer_evaluation",
+    }:
+        selection_rule = (
+            "Use an observation at the optimizer's final parameter vector when an independent "
+            "reevaluation is unavailable. Do not select the minimum finite-shot observation as "
+            "an unbiased estimate. Keep optimizer success as a separate convergence signal."
+        )
+    else:
+        selection_rule = (
+            "Use the best observed VQE objective value for deterministic or exact objectives. "
+            "Keep optimizer success or SPSA stability as the convergence signal."
+        )
     return {
         **policy,
         "primary_energy_source": source,
-        "selection_rule": (
-            "Use the lowest observed VQE objective value for reporting while keeping "
-            "optimizer success or SPSA stability as the convergence signal."
-        ),
+        "selection_rule": selection_rule,
         "candidate_energy_fields": [
             "convergence_trace",
             "optimizer_diagnostics.best_observed_energy",
             "optimizer_diagnostics.final_energy",
+            "optimizer_diagnostics.independent_final_energy",
+            "optimizer_diagnostics.reported_energy",
         ],
     }
 

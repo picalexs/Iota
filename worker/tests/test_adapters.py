@@ -1012,6 +1012,29 @@ def test_normalize_result_for_vqe_dataclass() -> None:
     assert convergence["convergence_failure_reason"] == "energy_delta_threshold_unavailable"
 
 
+def test_vqe_energy_policy_describes_independent_noisy_reevaluation() -> None:
+    normalized = normalize_result(
+        VQEResult(
+            algorithm="vqe",
+            primary_energy=-1.2,
+            primary_iterations=1,
+            converged=False,
+            optimal_parameters=[],
+            convergence_trace=[],
+            optimizer_diagnostics={
+                "reported_energy_source": "independent_final_reevaluation",
+                "independent_final_energy": -1.2,
+                "reported_energy": -1.2,
+            },
+        )
+    )
+
+    policy = normalized["energy_policy"]
+    assert policy["primary_energy_source"] == "independent_final_reevaluation"
+    assert "independent energy reevaluation" in policy["selection_rule"]
+    assert "optimizer_diagnostics.independent_final_energy" in policy["candidate_energy_fields"]
+
+
 def test_normalize_result_detects_scipy_function_evaluation_cap() -> None:
     normalized = normalize_result(
         VQEResult(
