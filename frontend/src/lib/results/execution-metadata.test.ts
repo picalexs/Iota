@@ -138,6 +138,14 @@ describe("execution metadata helpers", () => {
             primitive_run_calls: 2,
           },
         },
+        benchmark_provenance: {
+          energy: {
+            reported_energy_source: "stabilized_projected_diagnostic",
+            reported_energy_is_valid: true,
+            projected_solve_is_diagnostic: true,
+            scientific_converged: false,
+          },
+        },
       },
       created_at: "2026-05-17T12:05:00Z",
     };
@@ -158,6 +166,10 @@ describe("execution metadata helpers", () => {
       ledger_version: 1,
       primitive_run_calls: 2,
     });
+    expect(metadata.reportedEnergySource).toBe("stabilized_projected_diagnostic");
+    expect(metadata.reportedEnergyIsValid).toBe(true);
+    expect(metadata.projectedSolveIsDiagnostic).toBe(true);
+    expect(metadata.scientificConverged).toBe(false);
     expect(metadata.ibmJobId).toBe("job-from-result");
     expect(metadata.optimizationLevel).toBe(3);
     expect(metadata.depth).toBe(42);
