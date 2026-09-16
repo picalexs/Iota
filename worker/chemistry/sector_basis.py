@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from math import comb
+from math import comb, isfinite
 from typing import Any
 
 import numpy as np
@@ -110,7 +110,11 @@ def state_from_bitstring_probabilities(
     state = np.zeros(target_dimension, dtype=complex)
     for entry in distribution:
         probability = entry.get("probability")
-        if not isinstance(probability, (int, float)) or float(probability) <= 0.0:
+        if (
+            not isinstance(probability, (int, float))
+            or not isfinite(float(probability))
+            or float(probability) <= 0.0
+        ):
             continue
         try:
             address = bitstring_to_address(entry.get("bitstring"), norb=norb, nelec=nelec)

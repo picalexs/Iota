@@ -106,7 +106,12 @@ def _run_sampler_attempt(
 
 def _is_control_flow_exception(exc: Exception) -> bool:
     """Preserve run-control signals instead of retrying sampler submissions."""
-    return exc.__class__.__name__ in {"_RunCancelled", "_RunPaused"}
+    return exc.__class__.__name__ in {
+        "RunCancelled",
+        "RunPaused",
+        "_RunCancelled",
+        "_RunPaused",
+    }
 
 
 def _ensure_measurements(circuit: Any, *, num_bits: int) -> Any:

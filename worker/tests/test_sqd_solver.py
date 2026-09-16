@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 from worker.chemistry.algorithms.sqd import sampling_execution as sqd_sampling_execution
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 from worker.chemistry.algorithms.sqd.workflow import (
     _aggregate_bitstring_frequencies,
     _build_hf_reference_circuit,
