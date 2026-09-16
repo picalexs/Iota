@@ -112,10 +112,13 @@ The branch path supports at most eight points. The worker rejects larger
 explicit values before it creates the estimator primitive. Dense and
 fixed-sector QFD keep the sixteen-point default.
 
-KQD exact evolution uses local matrix evolution. IBM Runtime and noisy Aer
-KQD paths use branch-estimator circuits and require `evolution_method="trotter"`.
-Guided form recommendations choose Trotter for those paths. Advanced form
-validation rejects exact evolution for them before run submission.
+KQD exact evolution uses local dense-matrix or fixed-sector matrix-free
+evolution. IBM Runtime and noisy Aer paths use branch-estimator circuits and
+require `evolution_method="trotter"`. Large ideal-Aer runs also use the branch
+estimator when the Hamiltonian cannot use the fixed-sector path. The worker
+rejects exact evolution before estimator creation on those paths. Guided form
+recommendations know the IBM and noisy-Aer paths. They cannot predict the
+large ideal-Aer path before the worker prepares the Hamiltonian.
 
 SKQD sample-union results record the same worker-observed sampler fields in
 `algorithm_metrics.work_ledger`. Exact local sample oracles record
@@ -133,11 +136,12 @@ its Hartree–Fock reference and records `seed_fallback_reason`.
 
 The result labels this path as
 `local_statevector_krylov_extension` and records the selected `reference_policy`.
-An IBM Runtime sampler used by the
-preceding SQD step does not make this local extension an IBM hardware
-calculation. The direct sample-union mode uses separate sampler circuits when
-the selected backend supports them. It uses an exact local statevector oracle
-when it has no sampler backend.
+An IBM Runtime sampler used by the preceding SQD step does not make this local
+extension an IBM hardware calculation. The direct sample-union mode uses
+sampler circuits when the selected backend supports them. Statevector and
+analysis-only local runs use an exact local statevector oracle. If Aer or IBM
+Runtime is selected but the worker has no sampler, the run fails. It does not
+switch to the local oracle.
 For sampler circuits, Krylov index `k` uses `k` fixed `time_step` intervals.
 The worker scales the Trotter repetition count with `k` so each interval keeps
 the configured step size. Circuit metadata records the applied repetition

@@ -183,6 +183,31 @@ def test_run_skqd_defaults_to_sample_union_selected_ci(
     assert result.converged is True
 
 
+@pytest.mark.parametrize(
+    "backend_context",
+    [
+        BackendExecutionContext(backend_target="ibm_runtime"),
+        BackendExecutionContext(backend_target="aer_simulator"),
+        BackendExecutionContext(
+            backend_target="aer_simulator",
+            noise_profile={"source": "backend_derived"},
+        ),
+    ],
+    ids=("ibm-runtime", "ideal-aer", "noisy-aer"),
+)
+def test_run_skqd_fails_closed_when_requested_sampler_is_missing(
+    backend_context: BackendExecutionContext,
+    mock_hamiltonian_bundle: object,
+) -> None:
+    with pytest.raises(RuntimeError, match="refusing to fall back"):
+        run_skqd(
+            hamiltonian=mock_hamiltonian_bundle,
+            backend=None,
+            config={"algorithm": "skqd"},
+            backend_context=backend_context,
+        )
+
+
 def test_run_skqd_aer_samples_each_krylov_circuit() -> None:
     hamiltonian = type(
         "SamplerHamiltonian",

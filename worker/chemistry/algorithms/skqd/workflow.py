@@ -481,6 +481,16 @@ def run_skqd(
     """Run direct SKQD sample-union mode or the explicit legacy extension."""
     resolved = resolve_algorithm_config(config, "skqd")
     skqd_config = resolve_skqd_config(resolved)
+    backend_target = getattr(backend_context, "backend_target", None)
+    if (
+        skqd_config.sampling_mode == "sample_union_exact"
+        and backend is None
+        and backend_target in {"aer_simulator", "ibm_runtime"}
+    ):
+        raise RuntimeError(
+            f"SKQD requires a sampler for the requested {backend_target} execution; "
+            "refusing to fall back to the exact local statevector oracle"
+        )
 
     t_start = time.monotonic()
     plan = _prepare_skqd_execution(hamiltonian)

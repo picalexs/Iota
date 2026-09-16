@@ -497,6 +497,56 @@ def test_run_kqd_large_ideal_aer_uses_sector_projection_without_dense_resolution
     assert result.matrix_element_summary["sector_dimension"] > 0
 
 
+def test_kqd_exact_ideal_aer_uses_sector_evolution_without_an_estimator() -> None:
+    class _Backend:
+        def create_estimator(self, _context: object) -> object:
+            raise AssertionError("eligible ideal Aer KQD must stay on the local sector path")
+
+    result = run_kqd_algorithm(
+        _Backend(),
+        {
+            "algorithm": "kqd",
+            "advanced_config": {
+                "algorithm": "kqd",
+                "krylov_dim": 2,
+                "time_step": 0.1,
+                "evolution_method": "exact",
+                "trotter_steps": 1,
+            },
+        },
+        _sector_hamiltonian(norb=7, n_alpha=2, n_beta=2),
+        None,
+        BackendExecutionContext(backend_target="aer_simulator"),
+    )
+
+    assert result.matrix_element_summary["matrix_element_strategy"] == "sector_matrix_free"
+    assert result.matrix_element_summary["implemented_evolution_method"] == "sector_expm_multiply"
+
+
+def test_kqd_exact_ideal_aer_rejects_branch_fallback_before_estimator_creation() -> None:
+    class _Backend:
+        def create_estimator(self, _context: object) -> object:
+            raise AssertionError("unsupported KQD must fail before estimator creation")
+
+    hamiltonian = _sector_hamiltonian(norb=7, n_alpha=2, n_beta=2)
+    hamiltonian.dense_operator_matrix = np.eye(1)
+
+    with pytest.raises(ValueError, match="supports evolution_method='trotter' only"):
+        run_kqd_algorithm(
+            _Backend(),
+            {
+                "algorithm": "kqd",
+                "advanced_config": {
+                    "algorithm": "kqd",
+                    "evolution_method": "exact",
+                },
+            },
+            hamiltonian,
+            None,
+            BackendExecutionContext(backend_target="aer_simulator"),
+        )
+
+
 def test_run_kqd_aer_state_propagation_matches_statevector() -> None:
     hamiltonian = _single_qubit_x_hamiltonian()
     config = {
