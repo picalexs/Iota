@@ -92,7 +92,7 @@ tracked separately before cross-algorithm benchmark comparisons.
 
 SKQD sample-union results record the same worker-observed sampler fields in
 `algorithm_metrics.work_ledger`. Exact local sample oracles record
-`local_statevector_sampling_runs` and returned rows instead. Do not compare
+`local_exact_sampling_runs` and returned rows instead. Do not compare
 these counts as provider shots. Use `sampling_source` and `execution_path` to
 separate exact local, Aer, and IBM Runtime evidence.
 

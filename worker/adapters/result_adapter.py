@@ -660,10 +660,14 @@ def _energy_consistency(
 
 
 def _skqd_algorithm_metrics(result: SKQDResult) -> dict[str, Any]:
+    diagnostics = result.krylov_extension_diagnostics
     metrics: dict[str, Any] = {
         "sqd_core": result.sqd_core,
-        "krylov_extension_diagnostics": result.krylov_extension_diagnostics,
+        "krylov_extension_diagnostics": diagnostics,
     }
+    work_ledger = diagnostics.get("work_ledger")
+    if isinstance(work_ledger, dict):
+        metrics["work_ledger"] = dict(work_ledger)
     if result.circuit_artifacts:
         metrics["circuit_artifacts"] = result.circuit_artifacts
     if result.circuit_artifact_policy:

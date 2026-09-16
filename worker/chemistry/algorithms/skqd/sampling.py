@@ -80,9 +80,9 @@ def sample_krylov_state_sources(
     work_ledger: dict[str, Any] = {
         "ledger_version": 1,
         "counting_scope": "worker_observed",
-        "local_statevector_sampling_runs": 0,
-        "local_statevector_requested_samples_total": 0,
-        "local_statevector_returned_sample_rows": 0,
+        "local_exact_sampling_runs": 0,
+        "local_exact_requested_samples_total": 0,
+        "local_exact_returned_raw_sample_rows": 0,
     }
     samples_by_state: list[SKQDKrylovSample] = []
     for krylov_index in range(num_states):
@@ -93,9 +93,9 @@ def sample_krylov_state_sources(
             num_samples=samples_per_state,
             rng=rng,
         )
-        work_ledger["local_statevector_sampling_runs"] += 1
-        work_ledger["local_statevector_requested_samples_total"] += samples_per_state
-        work_ledger["local_statevector_returned_sample_rows"] += int(samples.shape[0])
+        work_ledger["local_exact_sampling_runs"] += 1
+        work_ledger["local_exact_requested_samples_total"] += samples_per_state
+        work_ledger["local_exact_returned_raw_sample_rows"] += int(samples.shape[0])
         samples_by_state.append(
             SKQDKrylovSample(
                 krylov_index=krylov_index,
@@ -231,9 +231,9 @@ def sample_sector_krylov_states(
     work_ledger: dict[str, Any] = {
         "ledger_version": 1,
         "counting_scope": "worker_observed",
-        "local_statevector_sampling_runs": 0,
-        "local_statevector_requested_samples_total": 0,
-        "local_statevector_returned_sample_rows": 0,
+        "local_exact_sampling_runs": 0,
+        "local_exact_requested_samples_total": 0,
+        "local_exact_returned_raw_sample_rows": 0,
     }
     samples_by_state: list[SKQDKrylovSample] = []
     all_samples: list[np.ndarray] = []
@@ -259,9 +259,9 @@ def sample_sector_krylov_states(
             ],
             dtype=bool,
         )
-        work_ledger["local_statevector_sampling_runs"] += 1
-        work_ledger["local_statevector_requested_samples_total"] += samples_per_state
-        work_ledger["local_statevector_returned_sample_rows"] += int(samples.shape[0])
+        work_ledger["local_exact_sampling_runs"] += 1
+        work_ledger["local_exact_requested_samples_total"] += samples_per_state
+        work_ledger["local_exact_returned_raw_sample_rows"] += int(samples.shape[0])
         samples_by_state.append(
             SKQDKrylovSample(
                 krylov_index=krylov_index,
