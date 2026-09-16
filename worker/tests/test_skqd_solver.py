@@ -164,6 +164,8 @@ def test_run_skqd_defaults_to_sample_union_selected_ci(
     assert diagnostics["reference_descriptor"]["state_fingerprint"]
     assert diagnostics["sqd_core_status"] == "not_run"
     assert diagnostics["sqd_iterations"] == 0
+    assert diagnostics["extension_attempted"] is False
+    assert diagnostics["extension_status"] == "not_applicable"
     # The compact mock spans its full CI sector, so the sample-union path now
     # reports a genuine convergence verdict instead of a hardcoded False.
     assert diagnostics["selected_solution_converged"] is True

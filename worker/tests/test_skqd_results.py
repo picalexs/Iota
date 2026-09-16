@@ -90,6 +90,28 @@ def test_build_skqd_extension_diagnostics_records_sector_and_ritz_metadata() -> 
     assert diagnostics["max_ritz"] == -0.4
 
 
+def test_build_skqd_extension_diagnostics_labels_probability_seed_correctly() -> None:
+    extension = SimpleNamespace(
+        sqd_seed=object(),
+        seed_source="sqd_bitstring_probabilities",
+        basis_rank=1,
+        residual_diagnostics={},
+    )
+
+    diagnostics = build_skqd_extension_diagnostics(
+        plan=SimpleNamespace(operator_dimension=2, execution_mode="dense_matrix", sector_action=None),
+        extension=extension,
+        sqd_result=SimpleNamespace(primary_iterations=1, converged=False),
+        ritz_values=[],
+        krylov_extension_dim=2,
+        sampling_time_step=0.2,
+    )
+
+    assert diagnostics["seeded_from_sqd"] is True
+    assert diagnostics["seeded_from_sqd_occupancies"] is False
+    assert diagnostics["seed_source"] == "sqd_bitstring_probabilities"
+
+
 def test_solution_diagnostics_and_completion_payload_share_selection_metadata() -> None:
     diagnostics: dict[str, object] = {}
     add_skqd_solution_diagnostics(
