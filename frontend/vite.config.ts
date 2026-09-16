@@ -191,7 +191,8 @@ export default defineConfig(({ mode }) => {
       proxy: {
         "/api": {
           target: apiTargetUrl ?? "http://api:8000",
-          changeOrigin: true,
+          // Keep the browser host so the API trusted-host policy accepts local dev requests.
+          changeOrigin: false,
           configure: configureApiProxy,
         },
       },
