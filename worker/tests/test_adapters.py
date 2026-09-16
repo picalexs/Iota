@@ -239,6 +239,7 @@ def test_aer_estimator_records_and_applies_precision_without_sampler_option_leak
         }
     ]
     assert metadata["requested_shots"] == 1024
+    assert metadata["shots"] == 512
     assert metadata["effective_shots"] == 512
     assert metadata["requested_estimator_precision"] == 0.25
     assert metadata["effective_estimator_precision"] == 0.125
