@@ -17,19 +17,13 @@ from worker.chemistry.algorithms.skqd.seed import (
     seed_state_from_sqd_result,
     seed_state_from_sqd_result_with_source,
 )
-from worker.chemistry.types import SQDResult
+from worker.chemistry.sector_basis import state_from_sector_amplitudes
 
 
-def _result(package: dict[str, object]) -> SQDResult:
-    return SQDResult(
-        algorithm="sqd",
-        primary_energy=-1.0,
-        primary_iterations=1,
-        converged=True,
-        sci_energies=[-1.0],
-        configuration_recovery_trace=[],
-        spin_diagnostics={},
+def _result(package: dict[str, object], *, best_sci_state=None) -> SimpleNamespace:
+    return SimpleNamespace(
         sci_result_package=package,
+        best_sci_state=best_sci_state,
     )
 
 
@@ -99,124 +93,88 @@ def test_seed_state_from_sqd_bitstrings_skips_non_finite_probabilities(
     assert state is None
 
 
-def test_seed_state_from_sqd_result_prefers_bitstrings_then_occupancies() -> None:
-    bitstring_state, bitstring_source = seed_state_from_sqd_result_with_source(
-        _result(
-            {
-                "final_occupancies": [0.6, 0.4, 0.7, 0.3],
-                "nelec": [1, 1],
-                "final_bitstring_probabilities": [{"bitstring": "0101", "probability": 1.0}],
-            }
-        ),
-        target_size=16,
-    )
-    assert bitstring_source == "sqd_final_bitstring_probabilities"
-    assert bitstring_state is not None
-    assert int(np.argmax(np.abs(bitstring_state))) == 5
-
-    occupancy_state, occupancy_source = seed_state_from_sqd_result_with_source(
-        _result(
-            {
-                "final_occupancies": [0.9, 0.8, 0.7, 0.6],
-                "nelec": [1, 1],
-            }
-        ),
-        target_size=16,
-    )
-    assert occupancy_source == "sqd_final_occupancies"
-    assert occupancy_state is not None
-    assert int(np.argmax(np.abs(occupancy_state))) == 5
-    assert seed_state_from_sqd_result(_result({}), target_size=16) is None
-
-
-def test_seed_state_from_sqd_result_prefers_best_iteration_samples() -> None:
+def test_sqd_probabilities_and_occupancies_do_not_claim_to_be_coherent_states() -> None:
     package = {
-        "best_occupancies": [0.9, 0.1, 0.8, 0.2],
-        "final_occupancies": [0.1, 0.9, 0.2, 0.8],
+        "best_occupancies": [0.9, 0.1, 0.9, 0.1],
+        "final_occupancies": [0.1, 0.9, 0.1, 0.9],
         "nelec": [1, 1],
         "best_bitstring_probabilities": [{"bitstring": "0101", "probability": 1.0}],
         "final_bitstring_probabilities": [{"bitstring": "1010", "probability": 1.0}],
     }
 
-    state, source = seed_state_from_sqd_result_with_source(_result(package), target_size=16)
-
-    assert source == "sqd_best_bitstring_probabilities"
-    assert state is not None
-    assert int(np.argmax(np.abs(state))) == 5
-
-
-def test_seed_state_from_sqd_result_uses_final_samples_when_best_samples_are_missing() -> None:
-    state, source = seed_state_from_sqd_result_with_source(
-        _result(
-            {
-                "final_occupancies": [0.6, 0.4, 0.7, 0.3],
-                "nelec": [1, 1],
-                "final_bitstring_probabilities": [
-                    {"bitstring": "1010", "probability": 1.0}
-                ],
-            }
-        ),
-        target_size=16,
+    dense_state, dense_source = seed_state_from_sqd_result_with_source(
+        _result(package), target_size=16
+    )
+    sector_state, sector_source = sector_seed_state_from_sqd_result_with_source(
+        _result(package),
+        action=SimpleNamespace(norb=2, nelec=(1, 1), dimension=4),  # type: ignore[arg-type]
     )
 
-    assert source == "sqd_final_bitstring_probabilities"
-    assert state is not None
-    assert int(np.argmax(np.abs(state))) == 10
+    assert dense_state is None
+    assert sector_state is None
+    assert dense_source == "missing_sqd_selected_ci_state"
+    assert sector_source == "missing_sqd_selected_ci_state"
 
 
-def test_seed_state_from_sqd_result_prefers_best_occupancies() -> None:
-    state, source = seed_state_from_sqd_result_with_source(
-        _result(
-            {
-                "best_occupancies": [0.9, 0.1, 0.9, 0.1],
-                "final_occupancies": [0.1, 0.9, 0.1, 0.9],
-                "nelec": [1, 1],
-            }
-        ),
-        target_size=16,
+def test_selected_ci_seed_preserves_relative_phase_in_dense_and_sector_bases() -> None:
+    coefficient = 1 / np.sqrt(2)
+    selected_state = SimpleNamespace(
+        amplitudes=np.asarray([[coefficient, -1j * coefficient]], dtype=complex),
+        ci_strs_a=np.asarray([1]),
+        ci_strs_b=np.asarray([1, 2]),
+        norb=2,
+        nelec=(1, 1),
+    )
+    package = {"best_iteration": 2, "iterations": 3}
+    result = _result(package, best_sci_state=selected_state)
+
+    dense_state, dense_source = seed_state_from_sqd_result_with_source(
+        result, target_size=16
+    )
+    sector_state, sector_source = sector_seed_state_from_sqd_result_with_source(
+        result,
+        action=SimpleNamespace(norb=2, nelec=(1, 1), dimension=4),  # type: ignore[arg-type]
+    )
+    expected_sector_state = state_from_sector_amplitudes(
+        [
+            {"bitstring": "0101", "amplitude": [coefficient, 0.0]},
+            {"bitstring": "1001", "amplitude": [0.0, -coefficient]},
+        ],
+        norb=2,
+        nelec=(1, 1),
+        dimension=4,
     )
 
-    assert source == "sqd_best_occupancies"
-    assert state is not None
-    assert int(np.argmax(np.abs(state))) == 5
+    assert dense_source == sector_source == "sqd_best_selected_ci_coefficients"
+    assert dense_state is not None
+    assert dense_state[5] == pytest.approx(coefficient)
+    assert dense_state[9] == pytest.approx(-1j * coefficient)
+    assert sector_state is not None
+    assert np.allclose(sector_state, expected_sector_state)
 
 
-@pytest.mark.parametrize("occupancies", [[float("nan"), 0.4, 0.7, 0.3], [float("inf")] * 4])
-def test_seed_state_from_sqd_result_rejects_non_finite_occupancies(
-    occupancies: list[float],
-) -> None:
-    state, source = seed_state_from_sqd_result_with_source(
-        _result({"final_occupancies": occupancies, "nelec": [1, 1]}),
-        target_size=16,
+def test_equal_probabilities_with_opposite_phase_produce_distinct_coherent_seeds() -> None:
+    coefficient = 1 / np.sqrt(2)
+
+    def state_with_phase(phase: complex) -> SimpleNamespace:
+        return SimpleNamespace(
+            amplitudes=np.asarray([[coefficient, phase * coefficient]], dtype=complex),
+            ci_strs_a=np.asarray([1]),
+            ci_strs_b=np.asarray([1, 2]),
+            norb=2,
+            nelec=(1, 1),
+        )
+
+    positive, _ = seed_state_from_sqd_result_with_source(
+        _result({}, best_sci_state=state_with_phase(1.0)), target_size=16
+    )
+    negative, _ = seed_state_from_sqd_result_with_source(
+        _result({}, best_sci_state=state_with_phase(-1.0)), target_size=16
     )
 
-    assert state is None
-    assert source == "invalid_occupancies"
-
-
-@pytest.mark.parametrize(
-    ("package", "target_size", "source"),
-    [
-        ({"final_occupancies": [0.5, 0.5]}, 8, "dimension_mismatch"),
-        ({"final_occupancies": [0.5, 0.5, 0.5, 0.5]}, 16, "missing_electron_sector"),
-        (
-            {"final_occupancies": [0.5, 0.5, 0.5, 0.5], "nelec": [3, 0]},
-            16,
-            "invalid_electron_sector",
-        ),
-    ],
-)
-def test_seed_state_from_sqd_result_reports_unusable_seed_sources(
-    package: dict[str, object],
-    target_size: int,
-    source: str,
-) -> None:
-    state, actual_source = seed_state_from_sqd_result_with_source(
-        _result(package), target_size=target_size
-    )
-
-    assert state is None
-    assert actual_source == source
+    assert positive is not None and negative is not None
+    assert np.array_equal(np.abs(positive) ** 2, np.abs(negative) ** 2)
+    assert not np.allclose(positive, negative)
 
 
 def test_sector_seed_state_from_sqd_result_uses_sector_normalization() -> None:
@@ -225,41 +183,8 @@ def test_sector_seed_state_from_sqd_result_uses_sector_normalization() -> None:
         action=SimpleNamespace(norb=2, nelec=(1, 1), dimension=4),  # type: ignore[arg-type]
     )
 
-    assert source == "sqd_final_bitstring_probabilities"
-    assert state is not None
-    assert np.linalg.norm(state) == pytest.approx(1.0)
-
-
-def test_sector_seed_state_prefers_best_iteration_distribution() -> None:
-    action = SimpleNamespace(norb=2, nelec=(1, 1), dimension=4)
-    state, source = sector_seed_state_from_sqd_result_with_source(
-        _result(
-            {
-                "best_bitstring_probabilities": [
-                    {"bitstring": "0101", "probability": 1.0}
-                ],
-                "final_bitstring_probabilities": [
-                    {"bitstring": "1010", "probability": 1.0}
-                ],
-            }
-        ),
-        action=action,  # type: ignore[arg-type]
-    )
-    final_state, _ = sector_seed_state_from_sqd_result_with_source(
-        _result(
-            {
-                "final_bitstring_probabilities": [
-                    {"bitstring": "1010", "probability": 1.0}
-                ],
-            }
-        ),
-        action=action,  # type: ignore[arg-type]
-    )
-
-    assert source == "sqd_best_bitstring_probabilities"
-    assert state is not None
-    assert final_state is not None
-    assert not np.array_equal(state, final_state)
+    assert source == "missing_sqd_selected_ci_state"
+    assert state is None
 
 
 def test_skqd_solver_keeps_legacy_seed_aliases() -> None:
