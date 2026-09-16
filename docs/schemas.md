@@ -612,6 +612,11 @@ fingerprint, worker-observed work ledger, and reportable-energy status. Missing
 values remain `null`; this object does not provide provider billing totals or
 change benchmark scoring.
 
+The benchmark state and visible accuracy-versus-runtime CSV preserve the
+reported energy source, validity flag, diagnostic projected-solve flag, and
+scientific-convergence flag. These fields describe evidence quality. They do
+not remove rows or change the accuracy score.
+
 `run_results.raw_result` is stored in the DB but deliberately **not** exposed on
 `RunResultResponse`. Consumers that need the raw worker payload should pull it
 from `ExportBundle.run.config_json` or the `result` run event.

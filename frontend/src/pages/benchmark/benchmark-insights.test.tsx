@@ -1030,7 +1030,7 @@ describe("BenchmarkInsights", () => {
       '"runtime_minutes","abs_error_mha","energy_ha"',
     );
     await expect((blob as Blob).text()).resolves.toContain(
-      '"reported_energy_source","projected_solve_is_diagnostic","scientific_converged"',
+      '"reported_energy_source","reported_energy_is_valid","projected_solve_is_diagnostic","scientific_converged"',
     );
   });
 

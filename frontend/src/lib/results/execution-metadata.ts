@@ -25,6 +25,10 @@ export interface RunExecutionMetadata {
   effectiveShots?: number | null;
   requestedEstimatorPrecision?: number | null;
   effectiveEstimatorPrecision?: number | null;
+  reportedEnergySource?: string | null;
+  reportedEnergyIsValid?: boolean | null;
+  projectedSolveIsDiagnostic?: boolean | null;
+  scientificConverged?: boolean | null;
   noiseSource?: string | null;
   noiseFingerprint?: string | null;
   workLedger?: Record<string, unknown> | null;
@@ -267,12 +271,14 @@ function aggregateIbmRuntimeTimingFromEvents(events: RunEventResponse[]): IbmRun
 
 interface ExecutionMetadataSources {
   run: RunResponse;
+  result: RunResultResponse | null | undefined;
   metadata: Record<string, unknown>;
   backendOptions: BackendOptions | null;
   transpilation: Record<string, unknown> | null;
   execution: Record<string, unknown> | null;
   transpilationSummary: Record<string, unknown> | null;
   resultExecution: Record<string, unknown> | null;
+  resultEnergy: Record<string, unknown> | null;
   ibmSubmittedPayload: Record<string, unknown> | null;
   ibmStatusPayload: Record<string, unknown> | null;
 }
@@ -298,6 +304,7 @@ function getExecutionMetadataSources(
     resultMetrics?.benchmark_provenance,
     responseMetrics?.benchmark_provenance,
   );
+  const resultEnergy = pickNestedRecord(resultProvenance?.energy);
   const resultExecution = pickNestedRecord(
     resultPayload?.backend_execution,
     resultMetrics?.backend_execution,
@@ -319,12 +326,14 @@ function getExecutionMetadataSources(
 
   return {
     run,
+    result,
     metadata,
     backendOptions,
     transpilation,
     execution,
     transpilationSummary,
     resultExecution,
+    resultEnergy,
     ibmSubmittedPayload,
     ibmStatusPayload,
   };
@@ -374,6 +383,8 @@ function getExecutionCircuitShape({
 }
 
 function getExecutionScalarFields({
+  result,
+  resultEnergy,
   backendOptions,
   transpilation,
   execution,
@@ -390,6 +401,10 @@ function getExecutionScalarFields({
   | "effectiveShots"
   | "requestedEstimatorPrecision"
   | "effectiveEstimatorPrecision"
+  | "reportedEnergySource"
+  | "reportedEnergyIsValid"
+  | "projectedSolveIsDiagnostic"
+  | "scientificConverged"
   | "noiseSource"
   | "noiseFingerprint"
   | "optimizationLevel"
@@ -450,6 +465,13 @@ function getExecutionScalarFields({
       execution?.effective_estimator_precision,
       transpilation?.effective_estimator_precision,
     ),
+    reportedEnergySource: firstString(
+      resultEnergy?.reported_energy_source,
+      result?.reported_energy_source,
+    ),
+    reportedEnergyIsValid: firstBoolean(resultEnergy?.reported_energy_is_valid),
+    projectedSolveIsDiagnostic: firstBoolean(resultEnergy?.projected_solve_is_diagnostic),
+    scientificConverged: firstBoolean(resultEnergy?.scientific_converged, result?.converged),
     noiseSource: firstString(
       pickNestedRecord(resultExecution?.noise_summary)?.source,
       pickNestedRecord(execution?.noise_summary)?.source,
