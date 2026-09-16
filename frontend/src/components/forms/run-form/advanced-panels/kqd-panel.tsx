@@ -15,6 +15,7 @@ import {
   getRunFormError,
   isRunFormFieldTouched,
 } from "@/components/forms/run-form/run-form-context-helpers";
+import { kqdUsesKnownBranchEstimatorPath } from "@/lib/run-form-recommendations";
 
 interface KQDPanelProps {
   disabled?: boolean;
@@ -24,6 +25,9 @@ interface KQDPanelProps {
 export function KQDPanel({ disabled, onResetRecommended }: KQDPanelProps) {
   const form = useRunFormContext();
   const values = form.watch("advanced_kqd");
+  const backendTarget = form.watch("backend_target");
+  const hasNoiseProfile = form.watch("noise_profile") !== null;
+  const requiresBranchEstimator = kqdUsesKnownBranchEstimatorPath(backendTarget, hasNoiseProfile);
 
   return (
     <div className="space-y-4">
@@ -32,6 +36,9 @@ export function KQDPanel({ disabled, onResetRecommended }: KQDPanelProps) {
           <p className="text-sm font-semibold">Primary controls</p>
           <p className="text-xs text-muted-foreground">
             Tune the Krylov basis size, time evolution, and projected-solve tolerance.
+            {requiresBranchEstimator
+              ? " IBM Runtime and noisy Aer paths require Trotter circuit evolution."
+              : " Exact evolution uses a local matrix path."}
           </p>
         </div>
         {onResetRecommended ? (
@@ -156,7 +163,9 @@ export function KQDPanel({ disabled, onResetRecommended }: KQDPanelProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="trotter">trotter</SelectItem>
-              <SelectItem value="exact">exact</SelectItem>
+              <SelectItem value="exact" disabled={requiresBranchEstimator}>
+                exact
+              </SelectItem>
             </SelectContent>
           </Select>
         </FormField>

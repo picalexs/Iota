@@ -1,5 +1,6 @@
 import type {
   ActiveSpaceSchema,
+  BackendTarget,
   EasyGoal,
   EasyGoalPresetMetadata,
   RunAlgorithm,
@@ -8,6 +9,13 @@ import type {
 } from "@/types/run";
 
 type OptionalActiveSpace = ActiveSpaceSchema | null | undefined;
+
+export function kqdUsesKnownBranchEstimatorPath(
+  backendTarget: BackendTarget | null,
+  hasNoiseProfile: boolean,
+): boolean {
+  return backendTarget === "ibm_runtime" || (backendTarget === "aer_simulator" && hasNoiseProfile);
+}
 
 export type ChemicalAccuracyTargetOption = {
   goal: EasyGoal;
@@ -431,6 +439,7 @@ export function buildRecommendedAdvancedPatch(
   goal: EasyGoal,
   activeSpace: OptionalActiveSpace,
   metadata?: RecommendationMetadata | null,
+  requiresBranchEstimator = false,
 ): RecommendedAdvancedPatch {
   const electronSplit = splitElectrons(activeSpace);
 
@@ -455,8 +464,16 @@ export function buildRecommendedAdvancedPatch(
       patch = buildSkqdPatch(goal, electronSplit);
   }
 
-  return {
-    field: patch.field,
-    value: mergeServerRecommendation(patch.value, algorithm, goal, metadata),
-  } as RecommendedAdvancedPatch;
+  const value = mergeServerRecommendation(patch.value, algorithm, goal, metadata);
+  if (algorithm === "kqd" && requiresBranchEstimator) {
+    return {
+      field: patch.field,
+      value: {
+        ...(value as SimulationRunFormData["advanced_kqd"]),
+        evolution_method: "trotter",
+      },
+    };
+  }
+
+  return { field: patch.field, value } as RecommendedAdvancedPatch;
 }

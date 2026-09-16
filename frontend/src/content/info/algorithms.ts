@@ -204,7 +204,7 @@ export const ALGORITHM_INFO: Record<RunAlgorithm, InfoEntry> = {
       },
       {
         heading: "Workflow in practice",
-        body: "A run chooses the Krylov order through `krylov_dim`, chooses the evolution schedule through `time_step` and `evolution_method`, prepares the evolved states, estimates the projected matrix elements, and solves the generalized eigenproblem locally. In Quantum Studio, small statevector runs can build dense Krylov states directly, while larger statevector, Aer, and IBM paths switch to sector-based or estimator-based projected workflows before the final local solve.",
+        body: "A run chooses the Krylov order through `krylov_dim`, chooses the evolution schedule through `time_step` and `evolution_method`, prepares the evolved states, estimates the projected matrix elements, and solves the generalized eigenproblem locally. Exact evolution uses a local matrix path. IBM Runtime and noisy Aer estimator paths use Trotter circuits. Small statevector runs can build dense Krylov states directly, while larger statevector, Aer, and IBM paths switch to sector-based or estimator-based projected workflows before the final local solve.",
       },
       {
         heading: "Controls that change behavior",

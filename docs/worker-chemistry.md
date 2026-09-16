@@ -112,6 +112,11 @@ The branch path supports at most eight points. The worker rejects larger
 explicit values before it creates the estimator primitive. Dense and
 fixed-sector QFD keep the sixteen-point default.
 
+KQD exact evolution uses local matrix evolution. IBM Runtime and noisy Aer
+KQD paths use branch-estimator circuits and require `evolution_method="trotter"`.
+Guided form recommendations choose Trotter for those paths. Advanced form
+validation rejects exact evolution for them before run submission.
+
 SKQD sample-union results record the same worker-observed sampler fields in
 `algorithm_metrics.work_ledger`. Exact local sample oracles record
 `local_exact_sampling_runs` and returned rows instead. Do not compare
