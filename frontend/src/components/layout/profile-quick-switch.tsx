@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Check, ChevronDown, KeyRound, Plus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
-import { forceRefreshBackendCapabilities, setActiveBackendCapabilitiesProfile } from "@/api/backends";
+import {
+  forceRefreshBackendCapabilities,
+  setActiveBackendCapabilitiesProfile,
+} from "@/api/backends";
 import { activateIbmCredentialProfile, listIbmCredentialProfiles } from "@/api/profiles";
 import {
   SidebarMenuButton,
