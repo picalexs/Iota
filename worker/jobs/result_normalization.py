@@ -196,6 +196,14 @@ def normalize_result_for_persistence(
         raw_payload=raw_payload,
         algorithm_metrics=algorithm_metrics_raw,
     )
+    if isinstance(algorithm_metrics_raw, dict):
+        algorithm_metrics_raw["benchmark_provenance"] = _build_benchmark_provenance(
+            result=result,
+            metrics=algorithm_metrics_raw,
+            energy_provenance=provenance,
+            converged=converged,
+        )
+        raw_payload["algorithm_metrics"] = algorithm_metrics_raw
     energy = _persisted_energy(provenance)
 
     return (
@@ -400,4 +408,68 @@ def _extract_energy_provenance(
         "reference_energy": reference_energy,
         "reference_basis": reference_basis,
         "signed_error": signed_error,
+    }
+
+
+def _first_mapping(*values: Any) -> dict[str, Any]:
+    for value in values:
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def _benchmark_work_ledger(metrics: dict[str, Any]) -> dict[str, Any] | None:
+    matrix_summary = metrics.get("matrix_element_summary")
+    sci_package = metrics.get("sci_result_package")
+    optimizer_diagnostics = metrics.get("optimizer_diagnostics")
+    return next(
+        (
+            candidate
+            for candidate in (
+                metrics.get("work_ledger"),
+                _first_mapping(matrix_summary).get("work_ledger"),
+                _first_mapping(sci_package).get("work_ledger"),
+                _first_mapping(optimizer_diagnostics).get("work_ledger"),
+            )
+            if isinstance(candidate, dict)
+        ),
+        None,
+    )
+
+
+def _build_benchmark_provenance(
+    *,
+    result: dict[str, Any],
+    metrics: dict[str, Any],
+    energy_provenance: dict[str, Any],
+    converged: bool,
+) -> dict[str, Any]:
+    execution = _first_mapping(metrics.get("backend_execution"))
+    noise_summary = _first_mapping(execution.get("noise_summary"))
+    return {
+        "schema_version": 1,
+        "execution": {
+            "requested_target": result.get("backend_target")
+            or execution.get("backend_target"),
+            "actual_execution_target": execution.get("actual_execution_target"),
+            "actual_path_class": execution.get("actual_path_class"),
+            "backend_primitives_used": execution.get("backend_primitives_used"),
+            "primitive_family": execution.get("primitive_family"),
+            "requested_shots": execution.get("requested_shots"),
+            "effective_shots": execution.get("effective_shots"),
+            "requested_estimator_precision": execution.get("requested_estimator_precision"),
+            "effective_estimator_precision": execution.get("effective_estimator_precision"),
+            "noise_source": noise_summary.get("source"),
+            "noise_fingerprint": noise_summary.get("model_fingerprint_sha256"),
+        },
+        "work_ledger": _benchmark_work_ledger(metrics),
+        "energy": {
+            "reported_energy": energy_provenance.get("reported_energy"),
+            "reported_energy_is_valid": energy_provenance.get("reported_energy_is_valid"),
+            "reported_energy_source": energy_provenance.get("reported_energy_source"),
+            "projected_solve_is_diagnostic": bool(
+                energy_provenance.get("projected_solve_is_diagnostic", False)
+            ),
+            "scientific_converged": energy_provenance.get("scientific_converged", converged),
+        },
     }

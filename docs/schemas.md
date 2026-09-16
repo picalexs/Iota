@@ -601,6 +601,13 @@ All normalized worker results include `algorithm_metrics.energy_policy` and
 reported energy field, primary energy source, candidate energy fields, and that
 classical references are context only rather than replacement energies.
 
+Normalized algorithm metrics also include `benchmark_provenance` when metrics
+are available. This object records the requested and actual execution target,
+actual path class, primitive use, sampling controls, noise source and
+fingerprint, worker-observed work ledger, and reportable-energy status. Missing
+values remain `null`; this object does not provide provider billing totals or
+change benchmark scoring.
+
 `run_results.raw_result` is stored in the DB but deliberately **not** exposed on
 `RunResultResponse`. Consumers that need the raw worker payload should pull it
 from `ExportBundle.run.config_json` or the `result` run event.
