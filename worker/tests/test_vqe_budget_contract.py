@@ -117,6 +117,52 @@ def test_vqe_work_ledger_counts_objective_and_final_reevaluation_once(monkeypatc
     assert diagnostics["primitive_shots"] == 2 * 256
 
 
+@pytest.mark.parametrize(
+    ("backend_target", "estimator_precision", "expected_mode"),
+    [
+        ("statevector", 0.0, "exact_statevector"),
+        ("ibm_runtime", 0.25, "estimator_precision"),
+    ],
+)
+def test_vqe_does_not_claim_fixed_shots_for_exact_or_precision_paths(
+    monkeypatch,
+    backend_target: str,
+    estimator_precision: float,
+    expected_mode: str,
+) -> None:
+    backend = _Estimator()
+
+    def fake_minimize(objective, x0, method, options, bounds):
+        del method, options, bounds
+        energy = objective(np.asarray(x0, dtype=float))
+        return SimpleNamespace(
+            x=np.asarray(x0, dtype=float),
+            fun=energy,
+            success=True,
+            status=0,
+            message="converged",
+            nfev=1,
+            nit=1,
+        )
+
+    monkeypatch.setattr(vqe_solver, "minimize", fake_minimize)
+    result = run_vqe(
+        hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+        backend=backend,
+        config=_config(),
+        backend_context=BackendExecutionContext(
+            backend_target=backend_target,
+            shots=256,
+            estimator_precision=estimator_precision,
+        ),
+    )
+
+    ledger = result.optimizer_diagnostics["work_ledger"]
+    assert ledger["shot_budget_mode"] == expected_mode
+    assert ledger["shots_per_pub"] is None
+    assert ledger["primitive_shots"] is None
+
+
 def test_vqe_reports_effective_limiter_for_120_iteration_360_evaluation_split(
     monkeypatch,
 ) -> None:
