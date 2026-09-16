@@ -95,9 +95,9 @@ def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
         "energy": {
             "reported_energy": -1.2,
             "reported_energy_is_valid": True,
-            "reported_energy_source": "final_energy",
+            "reported_energy_source": "best_observed_energy",
             "projected_solve_is_diagnostic": False,
-            "scientific_converged": None,
+            "scientific_converged": False,
         },
     }
 
