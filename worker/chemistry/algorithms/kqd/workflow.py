@@ -400,7 +400,7 @@ def _solve_kqd_branch_path(
     stabilized = solve_stabilized_generalized_eigenproblem(
         projected_hamiltonian,
         estimate.overlap,
-        max_standard_error=estimate.summary.get("max_standard_error"),
+        max_standard_error=estimate.summary.get("max_overlap_standard_error"),
     )
     if stabilized.eigenvalues.size == 0:
         raise ValueError("KQD projected solve produced no Ritz values")

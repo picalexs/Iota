@@ -705,6 +705,40 @@ def test_run_qfd_rejects_empty_dense_spectrum(monkeypatch: pytest.MonkeyPatch) -
         )
 
 
+def test_original_qfd_records_requested_and_applied_grid_parameters() -> None:
+    result = qfd_solver.run_qfd(
+        hamiltonian=_single_qubit_x_hamiltonian(),
+        backend=None,
+        config={
+            "algorithm": "qfd",
+            "advanced_config": {
+                "algorithm": "qfd",
+                "qfd_variant": "qfd_original_symmetric",
+                "num_time_points": 3,
+                "max_time": 0.25,
+                "time_grid_type": "geometric",
+                "kappa": 3.0,
+            },
+        },
+    )
+
+    summary = result.matrix_element_summary
+    assert summary["requested_grid_parameters"] == {
+        "num_time_points": 3,
+        "max_time": 0.25,
+        "time_grid_type": "geometric",
+        "kappa": 3.0,
+    }
+    assert summary["applied_grid_parameters"] == {
+        "num_time_points": 3,
+        "max_time": None,
+        "time_grid_type": "symmetric_kappa",
+        "kappa": 3.0,
+    }
+    assert summary["inactive_requested_grid_fields"] == ["max_time", "time_grid_type"]
+    assert summary["time_grid_type"] == "symmetric_kappa"
+
+
 def test_run_qfd_small_noisy_aer_uses_estimator_matrix_elements(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

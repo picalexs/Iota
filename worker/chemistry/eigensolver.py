@@ -267,8 +267,10 @@ def solve_stabilized_generalized_eigenproblem(
     if isinstance(max_standard_error, (int, float)) and np.isfinite(float(max_standard_error)):
         threshold = max(threshold, 4.0 * float(max_standard_error))
         resolved_max_standard_error: float | None = float(max_standard_error)
+        uncertainty_cutoff_method = "four_times_max_overlap_entry_standard_error_heuristic"
     else:
         resolved_max_standard_error = None
+        uncertainty_cutoff_method = "regularization_and_condition_floor_only"
 
     retained_mask = psd_overlap_eigvals > threshold
     retained_eigvals = np.asarray(psd_overlap_eigvals[retained_mask], dtype=float)
@@ -304,6 +306,8 @@ def solve_stabilized_generalized_eigenproblem(
         else 0.0,
         "projected_overlap_max_eigenvalue": projected_overlap_max,
         "max_standard_error": resolved_max_standard_error,
+        "overlap_uncertainty_cutoff_method": uncertainty_cutoff_method,
+        "overlap_uncertainty_is_matrix_level_bound": False,
         "regularization": float(regularization),
         "condition_limit": float(_NOISY_PROJECTED_OVERLAP_CONDITION_LIMIT),
         # Keep the common keys aligned with the retained projected solve.

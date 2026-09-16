@@ -89,6 +89,10 @@ def test_stabilized_generalized_eigenproblem_truncates_noisy_small_overlap_modes
     assert result.diagnostics["stability_state"] == "stabilized"
     assert result.diagnostics["retained_rank"] == 1
     assert result.diagnostics["threshold"] == pytest.approx(1e-3)
+    assert result.diagnostics["overlap_uncertainty_cutoff_method"] == (
+        "four_times_max_overlap_entry_standard_error_heuristic"
+    )
+    assert result.diagnostics["overlap_uncertainty_is_matrix_level_bound"] is False
 
 
 def test_stabilized_generalized_eigenproblem_records_projected_ritz_residual() -> None:
