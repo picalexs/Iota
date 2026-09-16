@@ -38,6 +38,7 @@ class SQDRunState:
     best_observed_energy: float = float("inf")
     best_observed_iteration: int = 0
     best_observed_spin_sq: float = 0.0
+    best_sci_state: Any | None = None
     best_observed_occupancies: np.ndarray | None = None
     best_sampled_distribution: list[dict[str, Any]] = field(default_factory=list)
     best_sampling_stages: dict[str, list[dict[str, Any]]] = field(default_factory=dict)

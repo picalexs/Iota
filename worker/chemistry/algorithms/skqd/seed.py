@@ -8,98 +8,8 @@ from typing import Any
 import numpy as np
 
 from worker.chemistry.hamiltonian_action import HamiltonianAction
-from worker.chemistry.sector_basis import state_from_bitstring_probabilities
+from worker.chemistry.sector_basis import state_from_sector_amplitudes
 from worker.chemistry.types import SKQDResult
-
-
-def parse_bitstring_index(bitstring: object, *, num_qubits: int) -> int | None:
-    """Parse a display bitstring into the little-endian basis index."""
-    normalized = str(bitstring).replace(" ", "")
-    if len(normalized) != num_qubits or any(char not in {"0", "1"} for char in normalized):
-        return None
-
-    basis_index = 0
-    for qubit, char in enumerate(normalized[::-1]):
-        if char == "1":
-            basis_index |= 1 << qubit
-    return basis_index
-
-
-def matches_spin_sector(
-    basis_index: int,
-    *,
-    norb: int,
-    num_elec_a: int,
-    num_elec_b: int,
-) -> bool:
-    """Return whether a basis index has the requested alpha/beta electron counts."""
-    alpha_count = sum((basis_index >> orbital) & 1 for orbital in range(norb))
-    beta_count = sum((basis_index >> (norb + orbital)) & 1 for orbital in range(norb))
-    return alpha_count == num_elec_a and beta_count == num_elec_b
-
-
-def resolve_sqd_electron_sector(package: dict[str, Any]) -> tuple[int, int] | None:
-    """Resolve a valid-looking spin-resolved electron sector from an SQD package."""
-    raw_nelec = package.get("nelec")
-    if not isinstance(raw_nelec, list) or len(raw_nelec) != 2:
-        return None
-    resolved_nelec: list[int] = []
-    for value in raw_nelec:
-        if isinstance(value, bool):
-            return None
-        try:
-            numeric = float(value)
-        except (TypeError, ValueError, OverflowError):
-            return None
-        if not math.isfinite(numeric) or not numeric.is_integer():
-            return None
-        resolved_nelec.append(int(value))
-    return resolved_nelec[0], resolved_nelec[1]
-
-
-def seed_state_from_sqd_bitstrings(
-    package: dict[str, Any],
-    *,
-    target_size: int,
-    num_qubits: int,
-    norb: int,
-    num_elec_a: int,
-    num_elec_b: int,
-) -> np.ndarray | None:
-    """Build a sector-correct superposition from SQD-selected bitstring weights."""
-    raw_distribution = package.get("final_bitstring_probabilities")
-    if not isinstance(raw_distribution, list):
-        return None
-
-    state = np.zeros(target_size, dtype=complex)
-    for entry in raw_distribution:
-        if not isinstance(entry, dict):
-            continue
-        probability = entry.get("probability")
-        if isinstance(probability, bool) or not isinstance(probability, (int, float)):
-            continue
-        try:
-            resolved_probability = float(probability)
-        except (TypeError, ValueError, OverflowError):
-            continue
-        if not math.isfinite(resolved_probability) or resolved_probability <= 0.0:
-            continue
-        basis_index = parse_bitstring_index(entry.get("bitstring"), num_qubits=num_qubits)
-        if basis_index is None or basis_index >= target_size:
-            continue
-        if not matches_spin_sector(
-            basis_index,
-            norb=norb,
-            num_elec_a=num_elec_a,
-            num_elec_b=num_elec_b,
-        ):
-            continue
-        state[basis_index] += np.sqrt(resolved_probability)
-
-    norm = float(np.linalg.norm(state))
-    if np.isclose(norm, 0.0):
-        return None
-    return state / norm
 
 
 def seed_state_from_sqd_result_with_source(
@@ -107,63 +17,23 @@ def seed_state_from_sqd_result_with_source(
     *,
     target_size: int,
 ) -> tuple[np.ndarray | None, str]:
-    """Build a Hilbert-space seed state from SQD bitstrings or occupancies."""
-    package = getattr(sqd_result, "sci_result_package", None)
-    if not isinstance(package, dict):
-        return None, "unavailable"
-    raw_occupancies = package.get("final_occupancies")
-    if not isinstance(raw_occupancies, list) or not raw_occupancies:
-        return None, "unavailable"
-
-    try:
-        occupancies = np.asarray(raw_occupancies, dtype=float).reshape(-1)
-    except (TypeError, ValueError):
-        return None, "invalid_occupancies"
-    if not np.all(np.isfinite(occupancies)):
-        return None, "invalid_occupancies"
-    num_qubits = occupancies.size
-    if target_size != 2**num_qubits:
-        return None, "dimension_mismatch"
-
-    electron_sector = resolve_sqd_electron_sector(package)
-    if electron_sector is None:
-        return None, "missing_electron_sector"
-    num_elec_a, num_elec_b = electron_sector
-    norb = num_qubits // 2
-    if num_qubits != 2 * norb or num_elec_a < 0 or num_elec_b < 0:
-        return None, "invalid_electron_sector"
-    if num_elec_a > norb or num_elec_b > norb:
-        return None, "invalid_electron_sector"
-
-    bitstring_seed = seed_state_from_sqd_bitstrings(
-        package,
-        target_size=target_size,
-        num_qubits=num_qubits,
-        norb=norb,
-        num_elec_a=num_elec_a,
-        num_elec_b=num_elec_b,
-    )
-    if bitstring_seed is not None:
-        return bitstring_seed, "sqd_bitstring_probabilities"
-
-    alpha_occupancies = occupancies[:norb]
-    beta_occupancies = occupancies[norb:]
-    alpha_selected = (
-        np.argsort(alpha_occupancies)[-num_elec_a:] if num_elec_a else np.array([], dtype=int)
-    )
-    beta_selected = (
-        np.argsort(beta_occupancies)[-num_elec_b:] if num_elec_b else np.array([], dtype=int)
-    )
-
-    basis_index = 0
-    for qubit_idx in alpha_selected:
-        basis_index |= 1 << int(qubit_idx)
-    for orbital_idx in beta_selected:
-        basis_index |= 1 << int(norb + orbital_idx)
+    """Build a dense seed from the best coherent selected-CI state."""
+    entries, norb, nelec, source = _selected_ci_amplitude_entries(sqd_result)
+    if entries is None:
+        return None, source
+    if target_size != 1 << (2 * norb):
+        return None, "sqd_state_dimension_mismatch"
 
     state = np.zeros(target_size, dtype=complex)
-    state[basis_index] = 1.0
-    return state, "sqd_occupancies"
+    for entry in entries:
+        basis_index = int(str(entry["bitstring"]), 2)
+        raw_amplitude = entry["amplitude"]
+        amplitude = complex(float(raw_amplitude[0]), float(raw_amplitude[1]))
+        state[basis_index] += amplitude
+    norm = float(np.linalg.norm(state))
+    if not math.isfinite(norm) or np.isclose(norm, 0.0):
+        return None, "invalid_sqd_selected_ci_state"
+    return state / norm, "sqd_best_selected_ci_coefficients"
 
 
 def seed_state_from_sqd_result(
@@ -181,30 +51,92 @@ def sector_seed_state_from_sqd_result_with_source(
     *,
     action: HamiltonianAction,
 ) -> tuple[np.ndarray | None, str]:
-    """Build a fixed-sector seed state from SQD-selected bitstrings."""
-    package = getattr(sqd_result, "sci_result_package", None)
-    if not isinstance(package, dict):
-        return None, "unavailable"
-
-    distribution = package.get("final_bitstring_probabilities")
-    if isinstance(distribution, list):
-        state = state_from_bitstring_probabilities(
-            distribution,
-            norb=action.norb,
-            nelec=action.nelec,
+    """Build a fixed-sector seed from the best complex selected-CI coefficients."""
+    entries, norb, nelec, source = _selected_ci_amplitude_entries(sqd_result)
+    if entries is None:
+        return None, source
+    if norb != action.norb or nelec != action.nelec:
+        return None, "sqd_state_sector_mismatch"
+    if action.dimension != math.comb(norb, nelec[0]) * math.comb(norb, nelec[1]):
+        return None, "sqd_state_dimension_mismatch"
+    try:
+        state = state_from_sector_amplitudes(
+            entries,
+            norb=norb,
+            nelec=nelec,
             dimension=action.dimension,
         )
-        if state is not None:
-            return state, "sqd_bitstring_probabilities"
+    except (TypeError, ValueError):
+        return None, "invalid_sqd_selected_ci_state"
+    return state, "sqd_best_selected_ci_coefficients"
 
-    return None, "unavailable"
+
+def _selected_ci_amplitude_entries(
+    sqd_result: Any,
+) -> tuple[list[dict[str, Any]] | None, int, tuple[int, int], str]:
+    """Validate and map the best selected-CI vector to app bitstring order."""
+    selected_state = getattr(sqd_result, "best_sci_state", None)
+    if selected_state is None:
+        return None, 0, (0, 0), "missing_sqd_selected_ci_state"
+
+    raw_norb = getattr(selected_state, "norb", None)
+    raw_nelec = getattr(selected_state, "nelec", None)
+    if isinstance(raw_norb, bool) or not isinstance(raw_norb, (int, np.integer)):
+        return None, 0, (0, 0), "invalid_sqd_selected_ci_state"
+    norb = int(raw_norb)
+    if norb < 1 or not isinstance(raw_nelec, (tuple, list)) or len(raw_nelec) != 2:
+        return None, norb, (0, 0), "invalid_sqd_selected_ci_state"
+    if any(isinstance(value, bool) or not isinstance(value, (int, np.integer)) for value in raw_nelec):
+        return None, norb, (0, 0), "invalid_sqd_selected_ci_state"
+    nelec = int(raw_nelec[0]), int(raw_nelec[1])
+    if any(value < 0 or value > norb for value in nelec):
+        return None, norb, nelec, "invalid_sqd_selected_ci_state"
+
+    try:
+        amplitudes = np.asarray(getattr(selected_state, "amplitudes"), dtype=complex)
+        alpha_strings = np.asarray(getattr(selected_state, "ci_strs_a")).reshape(-1)
+        beta_strings = np.asarray(getattr(selected_state, "ci_strs_b")).reshape(-1)
+    except (AttributeError, TypeError, ValueError):
+        return None, norb, nelec, "invalid_sqd_selected_ci_state"
+    if (
+        amplitudes.shape != (alpha_strings.size, beta_strings.size)
+        or not np.all(np.isfinite(amplitudes))
+    ):
+        return None, norb, nelec, "invalid_sqd_selected_ci_state"
+
+    entries: list[dict[str, Any]] = []
+    determinant_limit = 1 << norb
+    for alpha_index, raw_alpha in enumerate(alpha_strings):
+        if isinstance(raw_alpha, (bool, np.bool_)) or not isinstance(
+            raw_alpha, (int, np.integer)
+        ):
+            return None, norb, nelec, "invalid_sqd_selected_ci_state"
+        alpha_mask = int(raw_alpha)
+        if alpha_mask < 0 or alpha_mask >= determinant_limit or alpha_mask.bit_count() != nelec[0]:
+            return None, norb, nelec, "invalid_sqd_selected_ci_state"
+        for beta_index, raw_beta in enumerate(beta_strings):
+            if isinstance(raw_beta, (bool, np.bool_)) or not isinstance(
+                raw_beta, (int, np.integer)
+            ):
+                return None, norb, nelec, "invalid_sqd_selected_ci_state"
+            beta_mask = int(raw_beta)
+            if beta_mask < 0 or beta_mask >= determinant_limit or beta_mask.bit_count() != nelec[1]:
+                return None, norb, nelec, "invalid_sqd_selected_ci_state"
+            amplitude = complex(amplitudes[alpha_index, beta_index])
+            if amplitude == 0.0:
+                continue
+            entries.append(
+                {
+                    "bitstring": f"{beta_mask:0{norb}b}{alpha_mask:0{norb}b}",
+                    "amplitude": [float(amplitude.real), float(amplitude.imag)],
+                }
+            )
+    if not entries:
+        return None, norb, nelec, "invalid_sqd_selected_ci_state"
+    return entries, norb, nelec, "sqd_best_selected_ci_coefficients"
 
 
 __all__ = [
-    "matches_spin_sector",
-    "parse_bitstring_index",
-    "resolve_sqd_electron_sector",
-    "seed_state_from_sqd_bitstrings",
     "seed_state_from_sqd_result",
     "seed_state_from_sqd_result_with_source",
     "sector_seed_state_from_sqd_result_with_source",

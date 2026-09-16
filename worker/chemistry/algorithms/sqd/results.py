@@ -337,4 +337,5 @@ def build_sqd_result(
         sci_result_package=sci_result_package,
         circuit_artifacts=circuit_artifacts,
         circuit_artifact_policy=circuit_artifact_policy,
+        best_sci_state=state.best_sci_state,
     )

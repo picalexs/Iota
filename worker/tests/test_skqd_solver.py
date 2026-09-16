@@ -349,6 +349,8 @@ def test_run_skqd_preserves_core_when_extension_fails(
     assert diagnostics["extension_status"] == "failed"
     assert diagnostics["extension_failure_reason"] == "RuntimeError: synthetic extension failure"
     assert diagnostics["extension_energy"] is None
+    assert diagnostics["algorithm_variant"] == "local_statevector_krylov_extension"
+    assert diagnostics["reference_policy"] == "unavailable"
     assert diagnostics["extension_improved_sqd"] is None
     assert diagnostics["extension_cost"]["wall_time_seconds"] >= 0.0
 

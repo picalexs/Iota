@@ -32,6 +32,7 @@ class SQDBatchOutcome:
     """Selected-CI solve outputs for one SQD recovery iteration."""
 
     energy_value: float
+    best_sci_state: Any | None
     selected_occupancies: tuple[np.ndarray, np.ndarray]
     last_spin_sq: float
     last_selected_ci_summary: dict[str, Any]
@@ -267,6 +268,7 @@ def run_selected_ci_batches(
     last_selected_ci_summary.update(last_carryover_summary)
     return SQDBatchOutcome(
         energy_value=energy_value,
+        best_sci_state=best_batch_state,
         selected_occupancies=average_occupancies,
         last_spin_sq=best_batch_spin_sq,
         last_selected_ci_summary=last_selected_ci_summary,

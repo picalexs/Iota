@@ -96,6 +96,22 @@ SKQD sample-union results record the same worker-observed sampler fields in
 these counts as provider shots. Use `sampling_source` and `execution_path` to
 separate exact local, Aer, and IBM Runtime evidence.
 
+The `legacy_statevector_extension` mode is a project-specific local Krylov
+extension, not the paper's sampled SKQD circuit path. It seeds the extension
+with the complex coefficients from the best selected-CI state. It does not
+rebuild a wavefunction from sampled probabilities or occupancies. The worker
+keeps this state in memory and does not add its coefficient matrix to the
+persisted result. If the state is unavailable or invalid, the extension uses
+its Hartree–Fock reference and records `seed_fallback_reason`.
+
+The result labels this path as
+`local_statevector_krylov_extension` and records the selected `reference_policy`.
+An IBM Runtime sampler used by the
+preceding SQD step does not make this local extension an IBM hardware
+calculation. The direct sample-union mode uses separate sampler circuits when
+the selected backend supports them. It uses an exact local statevector oracle
+when it has no sampler backend.
+
 VQE records `shot_budget_mode` as `fixed_shots`, `estimator_precision`, or
 `exact_expectation`. Statevector execution and Aer EstimatorV2 with zero
 precision use exact expectations. Precision-driven estimators report their

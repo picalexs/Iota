@@ -193,7 +193,8 @@ def emit_skqd_krylov_progress(
         "energy": energy,
         "total_iterations": total_iterations,
         "candidate_norm": candidate_norm,
-        "seeded_from_sqd_occupancies": seeded_from_sqd,
+        "seeded_from_sqd": seeded_from_sqd,
+        "seeded_from_sqd_occupancies": False,
     }
     if execution_mode is not None:
         payload["execution_mode"] = execution_mode

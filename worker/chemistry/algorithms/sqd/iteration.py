@@ -43,6 +43,7 @@ def update_best_observed_state(
     iteration: int,
     energy_value: float,
     last_spin_sq: float,
+    sci_state: Any | None,
     occupancy_vector: np.ndarray,
 ) -> None:
     """Capture the lowest-energy SQD iteration and its associated diagnostics."""
@@ -52,6 +53,7 @@ def update_best_observed_state(
     state.best_observed_energy = energy_value
     state.best_observed_iteration = iteration
     state.best_observed_spin_sq = last_spin_sq
+    state.best_sci_state = sci_state
     state.best_observed_occupancies = occupancy_vector.copy()
     state.best_sampled_distribution = list(state.last_sampled_distribution)
     state.best_sampling_stages = {
@@ -154,6 +156,7 @@ def execute_sqd_iteration(
         iteration=iteration,
         energy_value=batch_outcome.energy_value,
         last_spin_sq=state.last_spin_sq,
+        sci_state=batch_outcome.best_sci_state,
         occupancy_vector=occupancy_vector,
     )
     state.selected_fractions.append(sampling.postselection_weight)

@@ -85,7 +85,8 @@ def test_build_skqd_extension_diagnostics_records_sector_and_ritz_metadata() -> 
     )
 
     assert diagnostics["execution_mode"] == "sector_matrix_free"
-    assert diagnostics["algorithm_variant"] == "sqd_seeded_local_statevector_krylov"
+    assert diagnostics["algorithm_variant"] == "local_statevector_krylov_extension"
+    assert diagnostics["reference_policy"] == "hartree_fock_fallback"
     assert diagnostics["sector_dimension"] == 6.0
     assert diagnostics["min_ritz"] == -1.2
     assert diagnostics["max_ritz"] == -0.4
