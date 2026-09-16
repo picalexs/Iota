@@ -317,11 +317,14 @@ class TestOnJobSuccess:
         assert insert_result_params["iterations"] == 17
         assert insert_result_params["optimal_parameters"] == "[]"
         assert insert_result_params["converged"] is False
-        assert insert_result_params["algorithm_metrics"] == json.dumps({"samples_per_batch": 256})
+        persisted_metrics = json.loads(insert_result_params["algorithm_metrics"])
+        assert persisted_metrics["samples_per_batch"] == 256
+        assert persisted_metrics["benchmark_provenance"]["schema_version"] == 1
+        assert persisted_metrics["benchmark_provenance"]["energy"]["reported_energy"] == -1.221
 
         raw_result = json.loads(insert_result_params["raw_result"])
         assert raw_result["algorithm"] == "sqd"
-        assert raw_result["algorithm_metrics"] == {"samples_per_batch": 256}
+        assert raw_result["algorithm_metrics"] == persisted_metrics
         assert raw_result["primary_energy"] == -1.221
         assert raw_result["primary_iterations"] == 17
 
@@ -329,7 +332,7 @@ class TestOnJobSuccess:
         assert result_event_payload["algorithm"] == "sqd"
         assert result_event_payload["energy"] == -1.221
         assert result_event_payload["iterations"] == 17
-        assert result_event_payload["algorithm_metrics"] == {"samples_per_batch": 256}
+        assert result_event_payload["algorithm_metrics"] == persisted_metrics
 
     def test_persists_skqd_solution_provenance(self) -> None:
         job = make_job()
