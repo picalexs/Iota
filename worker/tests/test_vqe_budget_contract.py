@@ -117,6 +117,58 @@ def test_vqe_work_ledger_counts_objective_and_final_reevaluation_once(monkeypatc
     assert diagnostics["primitive_shots"] == 2 * 256
 
 
+def test_vqe_work_ledger_distinguishes_objective_failures_from_primitive_runs(
+    monkeypatch,
+) -> None:
+    backend = _Estimator()
+    evaluate_energy = vqe_solver._vqe_objective.evaluate_energy
+    evaluator_calls = 0
+
+    def fail_once_before_primitive(*, backend, ansatz, operator, parameter_values):
+        nonlocal evaluator_calls
+        evaluator_calls += 1
+        if evaluator_calls == 1:
+            raise RuntimeError("failed before primitive submission")
+        return evaluate_energy(
+            backend=backend,
+            ansatz=ansatz,
+            operator=operator,
+            parameter_values=parameter_values,
+        )
+
+    def fake_minimize(objective, x0, method, options, bounds):
+        del method, options, bounds
+        with pytest.raises(RuntimeError, match="before primitive submission"):
+            objective(np.asarray(x0, dtype=float))
+        energy = objective(np.asarray(x0, dtype=float))
+        return SimpleNamespace(
+            x=np.asarray(x0, dtype=float),
+            fun=energy,
+            success=True,
+            status=0,
+            message="converged",
+            nfev=2,
+            nit=1,
+        )
+
+    monkeypatch.setattr(vqe_solver, "minimize", fake_minimize)
+    monkeypatch.setattr(vqe_solver, "_evaluate_energy", fail_once_before_primitive)
+    result = run_vqe(
+        hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+        backend=backend,
+        config=_config(),
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime", shots=256),
+    )
+
+    ledger = result.optimizer_diagnostics["work_ledger"]
+    assert ledger["objective_evaluation_attempts"] == 2
+    assert ledger["objective_evaluation_failures"] == 1
+    assert ledger["primitive_run_attempts"] == 2
+    assert ledger["primitive_jobs"] == 2
+    assert ledger["primitive_pubs"] == 2
+    assert len(backend.calls) == 2
+
+
 @pytest.mark.parametrize(
     ("backend_target", "estimator_precision", "expected_mode"),
     [
