@@ -197,6 +197,14 @@ precision instead of a fixed shot count. VQE sets `shots_per_pub` and
 shots separate from observed effective shots. IBM Runtime metadata does not
 infer effective shots from the worker's configured shot value.
 
+`effective_optimizer_max_iterations` limits the initial VQE gradient-based run
+and all stationary-start retries. Each retry receives only the remaining
+iterations. `optimizer_iterations` and `optimizer_iterations_total` report the
+sum across attempts. `optimizer_iterations_by_attempt` reports each attempt,
+and `selected_optimizer_iterations` reports the selected start. The objective
+evaluation budget remains a separate limit. If an optimizer does not report
+its iteration count, the worker skips further retries and records the reason.
+
 VQE counts objective callbacks separately from backend `run()` calls. It counts
 `primitive_jobs` when the backend returns a job handle. It counts `primitive_pubs`
 for those returned handles. For fixed-shot runs, `primitive_shots` is a nominal

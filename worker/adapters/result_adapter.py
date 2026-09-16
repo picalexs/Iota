@@ -433,6 +433,12 @@ def _vqe_algorithm_metrics(result: VQEResult) -> dict[str, Any]:
             diagnostics.get("function_evaluations", len(result.convergence_trace)),
         ),
         "optimizer_iterations": diagnostics.get("optimizer_iterations"),
+        "optimizer_iterations_total": diagnostics.get("optimizer_iterations_total"),
+        "optimizer_iterations_by_attempt": diagnostics.get(
+            "optimizer_iterations_by_attempt"
+        ),
+        "selected_optimizer_iterations": diagnostics.get("selected_optimizer_iterations"),
+        "optimizer_iteration_budget": diagnostics.get("optimizer_iteration_budget"),
         "effective_max_iterations": diagnostics.get("effective_max_iterations"),
         "max_function_evaluations": diagnostics.get("max_function_evaluations"),
         "reported_iterations_unit": diagnostics.get("reported_iterations_unit"),
