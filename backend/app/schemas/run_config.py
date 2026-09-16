@@ -154,12 +154,45 @@ class CustomPresetNoiseProfile(BaseModel):
 
     source: Literal[NoiseModelSource.CUSTOM_PRESET]
     preset: CustomNoisePreset
-    strength: float | None = Field(None, ge=0.0, le=1.0, allow_inf_nan=False)
-    p01: float | None = Field(None, ge=0.0, le=1.0, allow_inf_nan=False)
-    p10: float | None = Field(None, ge=0.0, le=1.0, allow_inf_nan=False)
-    t1_us: float | None = Field(None, gt=0.0, allow_inf_nan=False)
-    t2_us: float | None = Field(None, gt=0.0, allow_inf_nan=False)
-    gate_time_us: float | None = Field(None, gt=0.0, allow_inf_nan=False)
+    strength: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        description="Gate strength for depolarizing CX noise.",
+    )
+    p01: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        description="Probability of reading 1 when the true value is 0.",
+    )
+    p10: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        description="Probability of reading 0 when the true value is 1.",
+    )
+    t1_us: float | None = Field(
+        None,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="T1 relaxation time in microseconds.",
+    )
+    t2_us: float | None = Field(
+        None,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="T2 relaxation time in microseconds.",
+    )
+    gate_time_us: float | None = Field(
+        None,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="Gate time in microseconds for thermal relaxation.",
+    )
 
     @model_validator(mode="after")
     def validate_preset_parameters(self) -> "CustomPresetNoiseProfile":
