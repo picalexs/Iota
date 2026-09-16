@@ -14,7 +14,11 @@ from worker.chemistry.algorithm_contracts import (
 )
 from worker.chemistry.algorithms.qse.workflow import run_qse
 from worker.chemistry.progress import ProgressCallback
-from worker.chemistry.projected_execution import QSEExecutionPolicy, resolve_qse_execution_policy
+from worker.chemistry.projected_execution import (
+    QSEExecutionPolicy,
+    resolve_qse_execution_policy,
+    validate_qse_reference_method,
+)
 from worker.chemistry.solver_utils import resolve_algorithm_config
 
 
@@ -28,6 +32,10 @@ def run_qse_algorithm(
     reference_method = str(config.get("reference_method", "vqe")).lower()
     execution_policy: QSEExecutionPolicy = resolve_qse_execution_policy(
         backend_context=backend_context,
+        reference_method=reference_method,
+    )
+    validate_qse_reference_method(
+        policy=execution_policy,
         reference_method=reference_method,
     )
     estimator = (

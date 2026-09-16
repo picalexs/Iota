@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 from app.models.enums import BackendTarget, RunAlgorithm, RunMode
 from app.schemas.run import RunCreate
+from app.schemas.run_responses import ValidationErrorCode
 from app.services.validation_service import (
     _MAX_KQD_KRYLOV_DIM,
     _MAX_KQD_TROTTER_STEPS,
@@ -619,6 +620,64 @@ class TestActiveSpaceGuardrails:
         assert result.valid
         assert not any(error.field == "backend_target" for error in result.errors)
         assert any("measured QSE" in warning for warning in result.warnings)
+
+    @pytest.mark.parametrize("reference_method", ["vqe", "provided_state", "provided_sector"])
+    @pytest.mark.parametrize(
+        "backend_target,noise_profile",
+        [
+            (BackendTarget.IBM_RUNTIME, None),
+            (
+                BackendTarget.AER_SIMULATOR,
+                {
+                    "source": "custom_preset",
+                    "preset": "depolarizing_cx",
+                    "strength": 0.01,
+                },
+            ),
+        ],
+    )
+    def test_measured_qse_rejects_non_hf_references(
+        self,
+        reference_method: str,
+        backend_target: BackendTarget,
+        noise_profile: dict[str, object] | None,
+    ) -> None:
+        payload = _run_create(
+            algorithm=RunAlgorithm.QSE,
+            backend_target=backend_target,
+            backend_options={"backend_name": "ibm_brisbane"}
+            if backend_target == BackendTarget.IBM_RUNTIME
+            else None,
+            noise_profile=noise_profile,
+            advanced_config={
+                "algorithm": RunAlgorithm.QSE,
+                "reference_method": reference_method,
+                "provided_state_vector": [1.0, 0.0]
+                if reference_method == "provided_state"
+                else None,
+                "provided_sector_amplitudes": [
+                    {"bitstring": "1100", "amplitude": 1.0}
+                ]
+                if reference_method == "provided_sector"
+                else None,
+                "excitation_level": "singles",
+                "max_subspace_dim": 4,
+            },
+        )
+
+        result = validate_run_request(
+            payload,
+            molecule_active_space_n_electrons=2,
+            molecule_active_space_n_orbitals=2,
+            ibm_credentials_available=True,
+        )
+
+        assert not result.valid
+        assert any(
+            error.field == "advanced_config.reference_method"
+            and error.code == ValidationErrorCode.UNSUPPORTED_OPTION
+            for error in result.errors
+        )
 
     def test_skqd_above_6_orbitals_remains_valid(self) -> None:
         result = validate_run_request(

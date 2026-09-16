@@ -9,6 +9,7 @@ import pytest
 from qiskit.quantum_info import Operator, SparsePauliOp, Statevector
 
 from worker.adapters.result_adapter import normalize_result
+from worker.chemistry.algorithms.qse.definition import run_qse_algorithm
 from worker.chemistry.algorithms.qse.excitations import apply_fermionic_excitation
 from worker.chemistry.algorithms.qse.measured import (
     _estimator_pub_chunk_size,
@@ -230,6 +231,51 @@ def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
         "stabilized_projected_diagnostic",
         "lowest_qse_projected_eigenvalue",
     }
+
+
+def test_measured_qse_rejects_non_hf_reference_before_estimator_run() -> None:
+    hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=4))
+    estimator = _MockEstimator(np.ones(16, dtype=complex) / 4.0)
+
+    with pytest.raises(ValueError, match="reference_method='hf' only"):
+        run_qse(
+            hamiltonian=hamiltonian,
+            backend=estimator,
+            config={
+                "algorithm": "qse",
+                "advanced_config": {
+                    "algorithm": "qse",
+                    "reference_method": "vqe",
+                    "excitation_level": "singles_doubles",
+                    "max_subspace_dim": 8,
+                },
+            },
+            backend_context=_noisy_ctx("aer_simulator"),
+        )
+
+    assert estimator.pub_count == 0
+
+
+def test_qse_dispatch_rejects_non_hf_reference_before_creating_estimator() -> None:
+    class _Backend:
+        def __init__(self) -> None:
+            self.create_estimator_calls = 0
+
+        def create_estimator(self, _backend_context: object) -> object:
+            self.create_estimator_calls += 1
+            raise AssertionError("measured QSE must reject before primitive creation")
+
+    backend = _Backend()
+    with pytest.raises(ValueError, match="reference_method='hf' only"):
+        run_qse_algorithm(
+            backend=backend,
+            config={"reference_method": "vqe"},
+            hamiltonian_bundle=object(),
+            progress_callback=None,
+            backend_context=_noisy_ctx("ibm_runtime"),
+        )
+
+    assert backend.create_estimator_calls == 0
 
 
 def test_measured_qse_rank_reduced_solve_is_reportable_diagnostic() -> None:

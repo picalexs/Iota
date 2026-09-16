@@ -35,6 +35,21 @@ class QSEExecutionPolicy(ExecutionPlan):
         return self.actual_path == "measured_matrix_elements"
 
 
+def validate_qse_reference_method(
+    *,
+    policy: QSEExecutionPolicy,
+    reference_method: str,
+) -> str:
+    """Reject QSE references that the selected measured path cannot prepare."""
+    normalized_reference = str(reference_method).strip().lower()
+    if policy.uses_measured_matrix_elements and normalized_reference != "hf":
+        raise ValueError(
+            "Measured QSE currently supports reference_method='hf' only; "
+            "use statevector or ideal Aer for non-HF references."
+        )
+    return normalized_reference
+
+
 
 @dataclass(frozen=True)
 class ProjectedExecutionResources:

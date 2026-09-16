@@ -67,6 +67,7 @@ from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_execution import (
     QSEExecutionPolicy,
     resolve_qse_execution_policy,
+    validate_qse_reference_method,
 )
 from worker.chemistry.projected_subspace import (
     projected_diagnostic_energy_is_reportable,
@@ -252,6 +253,10 @@ def run_qse(
     reference_method_requested = qse_config.reference_method
     qse_policy = execution_policy or resolve_qse_execution_policy(
         backend_context=backend_context,
+        reference_method=reference_method_requested,
+    )
+    validate_qse_reference_method(
+        policy=qse_policy,
         reference_method=reference_method_requested,
     )
     if qse_policy.uses_measured_matrix_elements:

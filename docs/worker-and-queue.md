@@ -203,7 +203,10 @@ behavior when Redis or the worker is absent.
     optimizer-native step counts remain in
     `algorithm_metrics.optimizer_iterations`;
   - QSE honors `reference_method` semantics (`hf`, `vqe`, `provided_state`, and
-    `provided_sector`), supports `provided_state_vector` for small dense
+    `provided_sector`) on local exact and sector paths. Measured QSE on noisy
+    Aer or IBM Runtime supports `reference_method="hf"` only because its
+    measured circuit prepares the Hartree-Fock reference state. QSE supports
+    `provided_state_vector` for small dense
     references and sparse `provided_sector_amplitudes` for determinant-sector
     references, accepts JSON-safe complex coefficients for both the full-state
     and determinant-sector reference inputs, carries VQE reference depth through

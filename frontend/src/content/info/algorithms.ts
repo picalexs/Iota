@@ -114,7 +114,7 @@ export const ALGORITHM_INFO: Record<RunAlgorithm, InfoEntry> = {
       },
       {
         heading: "Workflow in practice",
-        body: "A run first chooses `reference_method`: HF, an internal VQE reference, a full provided statevector, or provided determinant-sector amplitudes. It then chooses the operator pool through `excitation_level`, constructs the projected matrices, and solves the small generalized eigenproblem. Additional projected eigenvalues can approximate low-lying excited states, while the lowest projected eigenvalue becomes the main energy reported by the app.",
+        body: "A run first chooses `reference_method`: HF, an internal VQE reference, a full provided statevector, or provided determinant-sector amplitudes. Measured QSE on noisy Aer or IBM Runtime currently supports HF only because its circuit prepares the Hartree-Fock state. Use statevector or ideal Aer for non-HF references. The run then chooses the operator pool through `excitation_level`, constructs the projected matrices, and solves the small generalized eigenproblem. Additional projected eigenvalues can approximate low-lying excited states, while the lowest projected eigenvalue becomes the main energy reported by the app.",
       },
       {
         heading: "Controls that change behavior",

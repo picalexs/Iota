@@ -291,11 +291,15 @@ warm-start selection before optimization. When `initial_parameters` or
 `parameter_bounds` are provided, they must match the resolved ansatz parameter
 count; `parameter_bounds` also require `[lower, upper]` ordering for every
 entry. QSE advanced payloads use `reference_method="hf"`, `"vqe"`,
-`"provided_state"`, or `"provided_sector"`. The HF and provided-sector
-references use the fixed-particle-sector matrix-free path and are the supported
-larger-active-space QSE references. QSE `max_subspace_dim` is capped at 96. QFD
+`"provided_state"`, or `"provided_sector"`. On local runs above the dense
+active-space cap, HF and provided-sector references use the fixed-particle-sector
+matrix-free path. They are the supported larger-active-space QSE references.
+QSE `max_subspace_dim` is capped at 96. QFD
 advanced payloads include `trotter_steps` for Pauli-evolution circuit synthesis
 on Aer/IBM branch-estimator paths and Aer state-propagation paths.
+Measured QSE on noisy Aer or IBM Runtime supports `reference_method="hf"` only,
+because its measured circuit prepares the Hartree-Fock reference state. Use
+statevector or ideal Aer for non-HF QSE references.
 `provided_state_vector` is a list of `QSEReferenceScalar`, where each entry is
 either a real number or `{real, imag}`. `provided_sector_amplitudes` is a list
 of `{bitstring, amplitude}` determinant entries using the same scalar shape.
