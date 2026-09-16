@@ -289,7 +289,7 @@ def test_sample_bitstring_matrix_records_retry_work(monkeypatch) -> None:
             self.shots.append(kwargs["shots"])
             if len(self.shots) == 1:
                 raise RuntimeError("transient sampler failure")
-            return object()
+            return SimpleNamespace(result=lambda: object())
 
     monkeypatch.setattr(
         sqd_sampling_execution,
@@ -312,6 +312,7 @@ def test_sample_bitstring_matrix_records_retry_work(monkeypatch) -> None:
     assert sampler.shots == [8, 16]
     assert ledger == {
         "sampler_run_attempts": 2,
+        "sampler_successful_runs": 1,
         "sampler_retry_count": 1,
         "sampler_requested_shots_total": 24,
         "sampler_returned_raw_sample_rows": 2,
@@ -438,6 +439,8 @@ def test_run_sqd_does_not_converge_on_single_selected_configuration(monkeypatch)
     )
     assert result.sci_result_package["min_selected_configurations"] == 2
     assert result.sci_result_package["sampling_source"] == "provided_circuit"
+    assert result.sci_result_package["work_ledger"]["recovery_iterations"] == 2
+    assert result.sci_result_package["work_ledger"]["selected_ci_batch_solves"] == 2
     assert (
         result.sci_result_package["reference_descriptor"]["preparation_path"]
         == "provided_sampling_circuit"

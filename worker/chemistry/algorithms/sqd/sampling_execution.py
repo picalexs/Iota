@@ -142,6 +142,7 @@ def sample_bitstring_matrix(
     rng: np.random.Generator | None = None,
     sampling_circuit_factory: Callable[..., Any] | None = None,
     return_circuit: bool = False,
+    work_ledger: dict[str, int] | None = None,
 ) -> np.ndarray | tuple[np.ndarray, Any]:
     """Sample backend bitstrings from HF or a supplied preparation circuit."""
     if not hasattr(backend, "run"):
@@ -163,11 +164,20 @@ def sample_bitstring_matrix(
 
     last_error: Exception | None = None
     for multiplier in (1, 2, 4):
+        shots = max(total_samples * multiplier, 1)
+        if work_ledger is not None:
+            work_ledger["sampler_run_attempts"] = work_ledger.get("sampler_run_attempts", 0) + 1
+            work_ledger["sampler_retry_count"] = work_ledger.get("sampler_retry_count", 0) + (
+                1 if multiplier > 1 else 0
+            )
+            work_ledger["sampler_requested_shots_total"] = work_ledger.get(
+                "sampler_requested_shots_total", 0
+            ) + shots
         try:
             result = _run_sampler_attempt(
                 sampler,
                 circuit,
-                shots=max(total_samples * multiplier, 1),
+                shots=shots,
             )
         except Exception as exc:  # pragma: no cover - depends on backend primitive failures
             if _is_control_flow_exception(exc):
@@ -180,6 +190,13 @@ def sample_bitstring_matrix(
             continue
 
         matrix = bitstrings_to_matrix(bitstrings, num_bits=num_bits)
+        if work_ledger is not None:
+            work_ledger["sampler_successful_runs"] = work_ledger.get(
+                "sampler_successful_runs", 0
+            ) + 1
+            work_ledger["sampler_returned_raw_sample_rows"] = work_ledger.get(
+                "sampler_returned_raw_sample_rows", 0
+            ) + int(matrix.shape[0])
         return (matrix, circuit) if return_circuit else matrix
 
     if last_error is not None:
@@ -264,6 +281,7 @@ def run_sqd_sampling_iteration(
     progress_callback: ProgressCallback | None,
     sample_bitstrings: Callable[..., np.ndarray | tuple[np.ndarray, Any]],
     sampling_circuit_factory: Callable[..., Any] | None = None,
+    work_ledger: dict[str, int] | None = None,
 ) -> SQDIterationSampling:
     """Sample, solve raw valid rows, then recover only later invalid rows."""
     if progress_callback is not None:
@@ -294,6 +312,8 @@ def run_sqd_sampling_iteration(
     }
     if sampling_circuit_factory is not None:
         sample_kwargs["sampling_circuit_factory"] = sampling_circuit_factory
+    if work_ledger is not None:
+        sample_kwargs["work_ledger"] = work_ledger
     sampled_output = sample_bitstrings(backend, **sample_kwargs)
     if isinstance(sampled_output, tuple):
         raw_bitstring_matrix, sampled_circuit = sampled_output

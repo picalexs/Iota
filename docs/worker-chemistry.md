@@ -82,9 +82,11 @@ Every algorithm result must preserve these meanings:
 - primary energy and iteration units; and
 - convergence state and convergence reason.
 
-Branch-estimator KQD and QFD results also include a worker-observed
+Branch-estimator KQD and QFD results include a worker-observed
 `algorithm_metrics.matrix_element_summary.work_ledger`. It records primitive
-run calls, successful runs, PUB count, and observable slots. It does not claim
+run calls, successful runs, PUB count, and observable slots. SQD records its
+sampler and recovery work in
+`algorithm_metrics.sci_result_package.work_ledger`. These ledgers do not claim
 provider billing or hidden runtime retries. Other algorithm work ledgers are
 tracked separately before cross-algorithm benchmark comparisons.
 

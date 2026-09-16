@@ -56,6 +56,7 @@ class SQDRunState(Protocol):
     termination_reason: str | None
     previous_occupancies: np.ndarray | None
     last_carryover_summary: dict[str, Any]
+    work_ledger: dict[str, int]
 
 
 def serialize_sqd_circuit_preview(circuit: Any) -> dict[str, Any]:
@@ -212,6 +213,7 @@ def _build_sci_result_package(
         "symmetrize_spin": options.symmetrize_spin,
         "carryover_threshold": round(options.carryover_threshold, 8),
         "best_carryover": state.best_carryover_summary or state.last_carryover_summary,
+        "work_ledger": dict(state.work_ledger),
     }
     if state.last_sampled_circuit is not None:
         package["circuit_preview"] = serialize_sqd_circuit_preview(state.last_sampled_circuit)

@@ -94,7 +94,9 @@ def execute_sqd_iteration(
         avg_occupancies=state.avg_occupancies,
         progress_callback=progress_callback,
         sampling_circuit_factory=sampling_circuit_factory,
+        work_ledger=state.work_ledger,
     )
+    state.work_ledger["recovery_iterations"] += 1
     state.last_sampled_circuit = sampling.sampled_circuit
     if sampling.sampled_circuit is not None:
         state.sampled_circuits.append((iteration, sampling.sampled_circuit))
@@ -116,6 +118,7 @@ def execute_sqd_iteration(
         carryover_ci_strings=state.carryover_ci_strings,
         progress_callback=progress_callback,
     )
+    state.work_ledger["selected_ci_batch_solves"] += options.num_batches
     state.avg_occupancies = batch_outcome.selected_occupancies
     state.last_spin_sq = batch_outcome.last_spin_sq
     state.last_selected_ci_summary = batch_outcome.last_selected_ci_summary

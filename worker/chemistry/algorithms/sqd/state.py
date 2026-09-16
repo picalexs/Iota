@@ -60,6 +60,19 @@ class SQDRunState:
         )
     )
     last_carryover_summary: dict[str, Any] = field(default_factory=dict)
+    work_ledger: dict[str, int] = field(
+        default_factory=lambda: {
+            "ledger_version": 1,
+            "counting_scope": "worker_observed",
+            "sampler_run_attempts": 0,
+            "sampler_successful_runs": 0,
+            "sampler_retry_count": 0,
+            "sampler_requested_shots_total": 0,
+            "sampler_returned_raw_sample_rows": 0,
+            "recovery_iterations": 0,
+            "selected_ci_batch_solves": 0,
+        }
+    )
 
 
 def import_sqd_dependencies() -> SQDDependencies:
