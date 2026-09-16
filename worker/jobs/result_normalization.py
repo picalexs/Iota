@@ -249,14 +249,15 @@ def _projected_energy_is_reportable(
         return True
 
     matrix_summary = metrics.get("matrix_element_summary")
-    if not isinstance(matrix_summary, dict):
-        return True
-    branch_estimator = matrix_summary.get("matrix_element_strategy") == "branch_estimator"
+    branch_estimator = (
+        isinstance(matrix_summary, dict)
+        and matrix_summary.get("matrix_element_strategy") == "branch_estimator"
+    )
 
     diagnostics = _projected_stability_diagnostics(metrics)
-    if not isinstance(diagnostics, dict) or "stability_state" not in diagnostics:
-        return not branch_estimator
-    return projected_diagnostic_energy_is_reportable(diagnostics)
+    if isinstance(diagnostics, dict) and "stability_state" in diagnostics:
+        return projected_diagnostic_energy_is_reportable(diagnostics)
+    return not branch_estimator
 
 
 def _projected_stability_diagnostics(metrics: dict[str, Any]) -> Any:

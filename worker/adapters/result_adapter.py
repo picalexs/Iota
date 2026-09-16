@@ -156,17 +156,24 @@ def _projected_energy_is_diagnostic(result: AlgorithmResult) -> bool:
 
 
 def _skqd_energy_provenance(result: SKQDResult) -> dict[str, Any]:
-    selected_solution = result.krylov_extension_diagnostics.get("selected_solution")
-    reported_energy_source = _skqd_solution_provenance(selected_solution)
+    diagnostics = result.krylov_extension_diagnostics
+    selected_solution = diagnostics.get("selected_solution")
+    reported_energy_source = _skqd_solution_provenance(selected_solution, diagnostics)
     return _primary_energy_provenance(result, reported_energy_source)
 
 
-def _skqd_solution_provenance(selected_solution: Any) -> str:
+def _skqd_solution_provenance(selected_solution: Any, diagnostics: dict[str, Any]) -> str:
     """Describe the execution source of the selected SKQD energy."""
     if selected_solution == "sqd_core":
         return "selected_sqd_core_backend_sampler"
     if selected_solution == "krylov_extension":
         return "selected_krylov_extension_classical_exact"
+    if selected_solution == "skqd_sample_union":
+        sampling_source = diagnostics.get("sampling_source")
+        if sampling_source == "sampler_krylov_circuits":
+            return "selected_skqd_sample_union_sampler"
+        if sampling_source == "exact_statevector_oracle":
+            return "selected_skqd_sample_union_local_exact"
     return "selected_skqd_solution_unknown"
 
 
@@ -360,7 +367,10 @@ def _qse_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[
 def _skqd_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[str, Any]:
     assert isinstance(result, SKQDResult)
     selected_solution = result.krylov_extension_diagnostics.get("selected_solution")
-    selected_solution_provenance = _skqd_solution_provenance(selected_solution)
+    selected_solution_provenance = _skqd_solution_provenance(
+        selected_solution,
+        result.krylov_extension_diagnostics,
+    )
     selection_rule = (
         f"Use the selected SKQD solution path: {selected_solution}."
         if selected_solution
@@ -753,6 +763,31 @@ def _vqe_convergence_metadata(result: VQEResult) -> dict[str, Any]:
     diagnostics = result.optimizer_diagnostics
     delta = _finite_float(diagnostics.get("final_delta_energy"))
     threshold = _finite_float(diagnostics.get("convergence_threshold"))
+    reported_scientific_convergence = diagnostics.get("scientific_converged")
+    optimizer_success = diagnostics.get("optimizer_success", diagnostics.get("success"))
+    if isinstance(reported_scientific_convergence, bool):
+        failure_reason = diagnostics.get("convergence_failure_reason")
+        if reported_scientific_convergence and (
+            optimizer_success is False
+            or (result.converged is False and diagnostics.get("termination_reason") != "ansatz_has_no_parameters")
+        ):
+            reported_scientific_convergence = False
+        if not reported_scientific_convergence and not isinstance(failure_reason, str):
+            if optimizer_success is False or result.converged is False:
+                failure_reason = "optimizer_reported_failure"
+            elif diagnostics.get("numerical_stability") is False:
+                failure_reason = "numerical_instability"
+            elif delta is not None and threshold is not None and delta > threshold:
+                failure_reason = "energy_delta_exceeded"
+        return {
+            "scientific_converged": reported_scientific_convergence,
+            "convergence_criterion": diagnostics.get(
+                "convergence_criterion", "absolute_energy_delta"
+            ),
+            "convergence_value": delta,
+            "convergence_threshold": threshold,
+            "convergence_failure_reason": failure_reason,
+        }
     if diagnostics.get("termination_reason") == "ansatz_has_no_parameters":
         return {
             "scientific_converged": True,
@@ -760,12 +795,27 @@ def _vqe_convergence_metadata(result: VQEResult) -> dict[str, Any]:
             "convergence_value": 0.0,
             "convergence_threshold": 0.0,
         }
-    if delta is not None and threshold is not None:
+    if optimizer_success is False or result.converged is False:
         return {
-            "scientific_converged": delta <= threshold,
-            "convergence_criterion": "absolute_energy_delta",
+            "scientific_converged": False,
+            "convergence_criterion": "optimizer_success_and_absolute_energy_delta",
             "convergence_value": delta,
             "convergence_threshold": threshold,
+            "convergence_failure_reason": "optimizer_reported_failure",
+        }
+    if delta is not None and threshold is not None:
+        return {
+            "scientific_converged": bool(result.converged) and delta <= threshold,
+            "convergence_criterion": "optimizer_success_and_absolute_energy_delta",
+            "convergence_value": delta,
+            "convergence_threshold": threshold,
+            "convergence_failure_reason": (
+                None
+                if bool(result.converged) and delta <= threshold
+                else "optimizer_reported_failure"
+                if not result.converged
+                else "energy_delta_exceeded"
+            ),
         }
     return {
         "scientific_converged": None,
@@ -917,14 +967,18 @@ def _skqd_convergence_metadata(result: SKQDResult, metrics: dict[str, Any]) -> d
     if diagnostics.get("selected_solution") == "skqd_sample_union":
         verdict = diagnostics.get("convergence_verdict")
         verdict = verdict if isinstance(verdict, dict) else {}
-        scientific_converged = _boolean_or_none(
-            verdict.get("converged", result.converged)
-        )
+        complete_selected_ci_solve = verdict.get("complete_selected_ci_solve") is True
+        full_sector_recovered = verdict.get("full_sector_recovered") is True
+        scientific_converged = complete_selected_ci_solve and full_sector_recovered
+        convergence_failure_reason = None
+        if not full_sector_recovered:
+            convergence_failure_reason = "full_sector_recovery_not_established"
+        elif not complete_selected_ci_solve:
+            convergence_failure_reason = "complete_selected_ci_solve_not_established"
         metadata: dict[str, Any] = {
             "scientific_converged": scientific_converged,
-            "convergence_criterion": verdict.get(
-                "convergence_criterion",
-                "krylov_subspace_saturation_and_complete_selected_ci_solve",
+            "convergence_criterion": (
+                "full_ci_sector_recovery_and_complete_selected_ci_solve"
             ),
             "convergence_value": {
                 "subspace_saturated": verdict.get("subspace_saturated"),
@@ -938,11 +992,8 @@ def _skqd_convergence_metadata(result: SKQDResult, metrics: dict[str, Any]) -> d
                 "selected_ci_fraction": 1.0,
             },
         }
-        if scientific_converged is False:
-            metadata["convergence_failure_reason"] = (
-                verdict.get("convergence_status")
-                or "sampling_convergence_not_established"
-            )
+        if convergence_failure_reason is not None:
+            metadata["convergence_failure_reason"] = convergence_failure_reason
         return metadata
     if diagnostics.get("selected_solution") == "sqd_core":
         sqd_core = metrics.get("sqd_core")
@@ -1116,6 +1167,14 @@ def normalize_result(
         energy_provenance=energy_provenance,
         reference_record=reference_record,
     )
+    if (
+        isinstance(raw_result, SKQDResult)
+        and raw_result.krylov_extension_diagnostics.get("selected_solution")
+        == "skqd_sample_union"
+    ):
+        payload["converged"] = (
+            payload["algorithm_metrics"]["convergence"]["scientific_converged"] is True
+        )
 
     payload["raw_result"] = {
         "algorithm": raw_result.algorithm,

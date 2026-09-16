@@ -186,6 +186,27 @@ def test_normalize_rejects_invalid_local_qfd_energy() -> None:
     )
 
 
+def test_normalize_rejects_invalid_qfd_energy_without_matrix_summary() -> None:
+    normalized = normalize_result_for_persistence(
+        {
+            "algorithm": "qfd",
+            "energy": 0.0,
+            "primary_energy": 0.0,
+            "algorithm_metrics": {
+                "stability_summary": {"stability_state": "invalid", "retained_rank": 0},
+            },
+        }
+    )
+
+    assert normalized[0] == 0.0
+    assert normalized[-1]["reported_energy"] is None
+    assert normalized[-1]["reported_energy_is_valid"] is False
+    assert normalized[-1]["reported_energy_source"] == (
+        "unavailable_unstable_projected_solve"
+    )
+    assert normalized[-1]["reported_energy_invalid_reason"] == "unstable_projected_metric"
+
+
 def test_normalize_reports_stabilized_branch_energy_as_diagnostic() -> None:
     normalized = normalize_result_for_persistence(
         {

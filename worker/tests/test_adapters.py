@@ -1038,6 +1038,33 @@ def test_normalize_result_detects_scipy_function_evaluation_cap() -> None:
     assert convergence["convergence_failure_reason"] == "budget_exhausted"
 
 
+def test_vqe_normalization_does_not_overrule_optimizer_failure() -> None:
+    normalized = normalize_result(
+        VQEResult(
+            algorithm="vqe",
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=False,
+            optimal_parameters=[0.2],
+            convergence_trace=[-1.0, -1.0],
+            optimizer_diagnostics={
+                "termination_reason": "optimizer_failure",
+                "optimizer_success": False,
+                "success": False,
+                "numerical_stability": True,
+                "final_delta_energy": 0.0,
+                "convergence_threshold": 1e-8,
+            },
+        )
+    )
+
+    convergence = normalized["algorithm_metrics"]["convergence"]
+
+    assert convergence["optimizer_converged"] is False
+    assert convergence["scientific_converged"] is False
+    assert convergence["convergence_failure_reason"] == "optimizer_reported_failure"
+
+
 def test_normalize_result_preserves_zero_primary_energy() -> None:
     result = VQEResult(
         algorithm="vqe",
@@ -1400,14 +1427,25 @@ def test_normalize_result_for_qse_dataclass() -> None:
 
 
 @pytest.mark.parametrize(
-    ("selected_solution", "expected_provenance"),
+    ("selected_solution", "diagnostics", "expected_provenance"),
     [
-        ("sqd_core", "selected_sqd_core_backend_sampler"),
-        ("krylov_extension", "selected_krylov_extension_classical_exact"),
+        ("sqd_core", {}, "selected_sqd_core_backend_sampler"),
+        ("krylov_extension", {}, "selected_krylov_extension_classical_exact"),
+        (
+            "skqd_sample_union",
+            {"sampling_source": "sampler_krylov_circuits", "backend_target": "ibm_runtime"},
+            "selected_skqd_sample_union_sampler",
+        ),
+        (
+            "skqd_sample_union",
+            {"sampling_source": "exact_statevector_oracle"},
+            "selected_skqd_sample_union_local_exact",
+        ),
     ],
 )
 def test_normalize_result_describes_skqd_solution_provenance(
     selected_solution: str,
+    diagnostics: dict[str, object],
     expected_provenance: str,
 ) -> None:
     result = SKQDResult(
@@ -1416,7 +1454,7 @@ def test_normalize_result_describes_skqd_solution_provenance(
         primary_iterations=5,
         converged=True,
         sqd_core={"primary_energy": -0.7},
-        krylov_extension_diagnostics={"selected_solution": selected_solution},
+        krylov_extension_diagnostics={"selected_solution": selected_solution, **diagnostics},
     )
 
     normalized = normalize_result(result)
@@ -1535,23 +1573,45 @@ def test_normalize_result_classifies_skqd_selected_solution_convergence(
         assert convergence["convergence_value"] == diagnostics.get("relative_residual")
 
 
-def test_normalize_result_classifies_skqd_sample_union_convergence() -> None:
+@pytest.mark.parametrize(
+    (
+        "complete_selected_ci_solve",
+        "full_sector_recovered",
+        "verdict_converged",
+        "result_converged",
+        "expected_converged",
+        "expected_failure_reason",
+    ),
+    [
+        (True, False, True, True, False, "full_sector_recovery_not_established"),
+        (False, True, True, True, False, "complete_selected_ci_solve_not_established"),
+        (True, True, False, False, True, None),
+    ],
+)
+def test_normalize_result_derives_skqd_sample_union_convergence_from_requirements(
+    complete_selected_ci_solve: bool,
+    full_sector_recovered: bool,
+    verdict_converged: bool,
+    result_converged: bool,
+    expected_converged: bool,
+    expected_failure_reason: str | None,
+) -> None:
     result = SKQDResult(
         algorithm="skqd",
         primary_energy=-1.137,
         primary_iterations=4,
-        converged=True,
+        converged=result_converged,
         sqd_core={"converged": None},
         krylov_extension_diagnostics={
             "selected_solution": "skqd_sample_union",
             "convergence_status": "subspace_saturated",
             "convergence_verdict": {
-                "converged": True,
+                "converged": verdict_converged,
                 "convergence_status": "subspace_saturated",
                 "subspace_saturated": True,
-                "complete_selected_ci_solve": True,
-                "full_sector_recovered": False,
-                "selected_ci_fraction": 0.75,
+                "complete_selected_ci_solve": complete_selected_ci_solve,
+                "full_sector_recovered": full_sector_recovered,
+                "selected_ci_fraction": 1.0 if full_sector_recovered else 0.75,
                 "final_prefix_growth_delta": 0,
                 "convergence_criterion": (
                     "krylov_subspace_saturation_and_complete_selected_ci_solve"
@@ -1560,14 +1620,16 @@ def test_normalize_result_classifies_skqd_sample_union_convergence() -> None:
         },
     )
 
-    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+    normalized = normalize_result(result)
+    convergence = normalized["algorithm_metrics"]["convergence"]
 
-    assert convergence["scientific_converged"] is True
+    assert normalized["converged"] is expected_converged
+    assert convergence["scientific_converged"] is expected_converged
     assert convergence["convergence_criterion"] == (
-        "krylov_subspace_saturation_and_complete_selected_ci_solve"
+        "full_ci_sector_recovery_and_complete_selected_ci_solve"
     )
     assert convergence["convergence_value"]["subspace_saturated"] is True
-    assert convergence["convergence_failure_reason"] is None
+    assert convergence.get("convergence_failure_reason") == expected_failure_reason
 
 
 def test_normalize_result_reports_skqd_sample_union_not_converged() -> None:
@@ -1595,7 +1657,7 @@ def test_normalize_result_reports_skqd_sample_union_not_converged() -> None:
     convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
 
     assert convergence["scientific_converged"] is False
-    assert convergence["convergence_failure_reason"] == "sampling_convergence_not_established"
+    assert convergence["convergence_failure_reason"] == "full_sector_recovery_not_established"
 
 
 def test_normalize_result_classical_references_propagated() -> None:
