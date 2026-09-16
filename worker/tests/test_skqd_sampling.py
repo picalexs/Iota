@@ -106,6 +106,7 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
 ) -> None:
     calls: list[object] = []
     ledgers: list[dict[str, object]] = []
+    from qiskit.quantum_info import Operator
 
     def fake_sample_bitstring_matrix(backend, **kwargs):
         del backend
@@ -126,14 +127,14 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
         (),
         {
             "num_qubits": 1,
-            "pauli_hamiltonian": SparsePauliOp.from_list([("X", 1.0)]),
+            "pauli_hamiltonian": SparsePauliOp.from_list([("X", 1.0), ("Z", 0.7)]),
         },
     )()
     config = type(
         "SKQDConfig",
         (),
         {
-            "krylov_extension_dim": 2,
+            "krylov_extension_dim": 3,
             "sampling_time_step": 0.2,
             "samples_per_state": 3,
             "seed": 7,
@@ -148,21 +149,27 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
         backend_context=type("Context", (), {"backend_target": "aer_simulator"})(),
     )
 
-    assert len(calls) == 2
+    assert len(calls) == 3
     assert result.samples_by_state[0].time_point == pytest.approx(0.0)
     assert result.samples_by_state[1].time_point == pytest.approx(0.2)
-    assert result.merged_counts.tolist() == [3, 3]
+    assert result.samples_by_state[2].time_point == pytest.approx(0.4)
+    assert result.merged_counts.tolist() == [6, 3]
     assert metadata["sampling_mode"] == "sample_union_sampler"
     assert metadata["sampling_source"] == "sampler_krylov_circuits"
-    assert len(ledgers) == 2
+    assert len(ledgers) == 3
     assert ledgers[0] is ledgers[1]
     assert metadata["work_ledger"] is not ledgers[0]
     assert metadata["work_ledger"]["ledger_version"] == 1
-    assert metadata["work_ledger"]["sampler_run_attempts"] == 2
-    assert metadata["work_ledger"]["sampler_successful_runs"] == 2
-    assert metadata["work_ledger"]["sampler_requested_shots_total"] == 6
-    assert metadata["work_ledger"]["sampler_returned_raw_sample_rows"] == 6
+    assert metadata["work_ledger"]["sampler_run_attempts"] == 3
+    assert metadata["work_ledger"]["sampler_successful_runs"] == 3
+    assert metadata["work_ledger"]["sampler_requested_shots_total"] == 9
+    assert metadata["work_ledger"]["sampler_returned_raw_sample_rows"] == 9
     assert all(instruction.operation.name != "PauliEvolution" for instruction in calls[1].data)
+    one_step_unitary = Operator(calls[1]).data
+    two_step_unitary = Operator(calls[2]).data
+    assert two_step_unitary == pytest.approx(one_step_unitary @ one_step_unitary)
+    assert metadata["krylov_circuit_metadata"][1]["trotter_repetitions"] == 1
+    assert metadata["krylov_circuit_metadata"][2]["trotter_repetitions"] == 2
 
 
 @pytest.mark.parametrize(

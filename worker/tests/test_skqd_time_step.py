@@ -73,6 +73,28 @@ def test_estimate_action_spectral_width_matches_dense_sector() -> None:
     assert source == "exact_sector_spectrum"
 
 
+def test_large_action_spectral_width_uses_safe_pauli_bound() -> None:
+    diagonal = np.linspace(-100.0, 100.0, 5000)
+    action = SimpleNamespace(
+        dimension=diagonal.size,
+        matvec=lambda vector: diagonal * vector,
+    )
+    pauli = SparsePauliOp.from_list([("Z", 100.0)])
+
+    width, source = estimate_action_spectral_width(action, pauli_hamiltonian=pauli)
+
+    assert width == pytest.approx(200.0)
+    assert width >= diagonal[-1] - diagonal[0]
+    assert source == "pauli_coefficient_l1_bound"
+
+
+def test_large_action_without_safe_spectral_bound_fails_closed() -> None:
+    action = SimpleNamespace(dimension=5000, matvec=lambda vector: vector)
+
+    with pytest.raises(ValueError, match="conservative Pauli spectral bound"):
+        estimate_action_spectral_width(action)
+
+
 def test_resolve_sampling_time_step_applies_paper_scaling_when_auto() -> None:
     config = SimpleNamespace(
         sampling_time_step=None,

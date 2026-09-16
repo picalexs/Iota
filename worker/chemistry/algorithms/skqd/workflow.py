@@ -232,6 +232,7 @@ def _resolve_legacy_sampling_time_step(
     *,
     skqd_config: SKQDConfig,
     plan: _SKQDExecutionPlan,
+    hamiltonian: object,
 ) -> float:
     """Resolve the legacy Krylov extension time step, applying paper auto-scaling.
 
@@ -242,7 +243,10 @@ def _resolve_legacy_sampling_time_step(
     if explicit is not None:
         return float(explicit)
     if plan.sector_action is not None:
-        spectral_width, _source = estimate_action_spectral_width(plan.sector_action)
+        spectral_width, _source = estimate_action_spectral_width(
+            plan.sector_action,
+            pauli_hamiltonian=getattr(hamiltonian, "pauli_hamiltonian", None),
+        )
     elif plan.operator is not None:
         spectral_width, _source = estimate_dense_spectral_width(plan.operator)
     else:
@@ -503,7 +507,11 @@ def run_skqd(
         progress_callback=progress_callback,
         backend_context=backend_context,
     )
-    sampling_time_step = _resolve_legacy_sampling_time_step(skqd_config=skqd_config, plan=plan)
+    sampling_time_step = _resolve_legacy_sampling_time_step(
+        skqd_config=skqd_config,
+        plan=plan,
+        hamiltonian=hamiltonian,
+    )
     extension_failure_reason: str | None = None
     extension_started = time.monotonic()
     try:

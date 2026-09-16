@@ -75,7 +75,10 @@ def execute_sample_union_workflow(
     options = resolve_sqd_options(skqd_config.sqd_config, hamiltonian)
     rng = np.random.default_rng(skqd_config.seed)
     if plan.sector_action is not None:
-        spectral_width, spectral_source = estimate_action_spectral_width(plan.sector_action)
+        spectral_width, spectral_source = estimate_action_spectral_width(
+            plan.sector_action,
+            pauli_hamiltonian=getattr(hamiltonian, "pauli_hamiltonian", None),
+        )
         time_step, time_step_metadata = resolve_sampling_time_step(
             skqd_config,
             spectral_width=spectral_width,
@@ -230,19 +233,22 @@ def execute_sampler_sample_union_workflow(
     )
 
     trotter_order = int(getattr(skqd_config, "trotter_order", 2))
-    trotter_reps = int(skqd_config.trotter_steps)
+    trotter_steps_per_interval = int(skqd_config.trotter_steps)
     if trotter_order <= 1:
-        synthesis: Any = LieTrotter(reps=trotter_reps)
         synthesis_name = "lie_trotter_first_order"
     else:
-        synthesis = SuzukiTrotter(order=trotter_order, reps=trotter_reps)
         synthesis_name = f"suzuki_trotter_order_{trotter_order}"
 
-    def factory_for_time(time_point: float):
+    def factory_for_time(krylov_index: int, time_point: float):
         def build_circuit(**_kwargs: Any) -> QuantumCircuit:
             circuit = QuantumCircuit(num_qubits)
             prepare_hf_reference_bits(circuit, hamiltonian, num_qubits=num_qubits)
             if not np.isclose(time_point, 0.0):
+                repetitions = max(krylov_index, 1) * trotter_steps_per_interval
+                if trotter_order <= 1:
+                    synthesis: Any = LieTrotter(reps=repetitions)
+                else:
+                    synthesis = SuzukiTrotter(order=trotter_order, reps=repetitions)
                 circuit.append(
                     PauliEvolutionGate(
                         pauli_hamiltonian,
@@ -276,7 +282,7 @@ def execute_sampler_sample_union_workflow(
             num_bits=num_qubits,
             total_samples=skqd_config.samples_per_state,
             rng=np.random.default_rng(skqd_config.seed + krylov_index),
-            sampling_circuit_factory=factory_for_time(time_point),
+            sampling_circuit_factory=factory_for_time(krylov_index, time_point),
             return_circuit=True,
             work_ledger=work_ledger,
         )
@@ -296,6 +302,11 @@ def execute_sampler_sample_union_workflow(
                     int(_circuit.depth())
                     if callable(getattr(_circuit, "depth", None))
                     else None
+                ),
+                "trotter_repetitions": (
+                    max(krylov_index, 1) * trotter_steps_per_interval
+                    if not np.isclose(time_point, 0.0)
+                    else 0
                 ),
                 "operation_names": sorted(
                     {
@@ -338,8 +349,10 @@ def execute_sampler_sample_union_workflow(
         "samples_per_state": skqd_config.samples_per_state,
         "seed": skqd_config.seed,
         "trotter_steps": skqd_config.trotter_steps,
+        "trotter_steps_per_krylov_interval": trotter_steps_per_interval,
         "trotter_order": trotter_order,
         "trotter_synthesis": synthesis_name,
+        "trotter_step_policy": "fixed_delta_t",
         "time_step": sampling_time_step,
         "krylov_time_step_policy": time_step_metadata,
         "krylov_circuit_metadata": circuit_metadata,

@@ -127,6 +127,10 @@ preceding SQD step does not make this local extension an IBM hardware
 calculation. The direct sample-union mode uses separate sampler circuits when
 the selected backend supports them. It uses an exact local statevector oracle
 when it has no sampler backend.
+For sampler circuits, Krylov index `k` uses `k` fixed `time_step` intervals.
+The worker scales the Trotter repetition count with `k` so each interval keeps
+the configured step size. Circuit metadata records the applied repetition
+count.
 
 VQE records `shot_budget_mode` as `fixed_shots`, `estimator_precision`, or
 `exact_expectation`. Statevector execution and Aer EstimatorV2 with zero
