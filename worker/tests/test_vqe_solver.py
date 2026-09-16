@@ -588,6 +588,10 @@ def test_run_vqe_retries_stationary_zero_warm_start_for_gradient_optimizers(monk
     assert result.optimizer_diagnostics["warm_start_retry_attempted_indices"] == [1]
     assert result.optimizer_diagnostics["warm_start_retry_selected_index"] == 1
     assert result.optimizer_diagnostics["optimizer_iterations"] == 2
+    assert result.optimizer_diagnostics["work_ledger"]["warm_start_candidate_count"] == 2
+    assert result.optimizer_diagnostics["work_ledger"]["warm_start_retry_count"] == 1
+    assert result.optimizer_diagnostics["work_ledger"]["optimizer_start_count"] == 2
+    assert result.optimizer_diagnostics["work_ledger"]["initial_point_evaluations"] == 2
 
 
 def test_run_vqe_clips_explicit_initial_point_to_parameter_bounds(monkeypatch) -> None:
