@@ -106,8 +106,22 @@ does not prove scientific convergence. The worker records
 `scientific_converged` unknown when the projected system is stable and keeps
 top-level `converged` false because the full-space residual is unavailable. A
 stable projected energy can still be reported as an estimate. Dense and
-fixed-sector paths calculate a full-space residual and can apply their
-convergence threshold.
+fixed-sector paths calculate residuals against the full dense operator or the
+full matrix-free action within the selected particle sector. These residuals
+test the projected Ritz state against the corresponding full operator space.
+Measured QSE calculates only a projected generalized-eigenproblem residual. It
+does not establish convergence in the full operator space.
+
+QSE keeps the configured `regularization` value for compatibility, but its
+effect depends on the execution path. Measured QSE uses it as a floor for
+overlap-mode selection and for the raw diagnostic spectrum. The retained final
+metric is not shifted. Dense exact QSE uses it only for intermediate basis
+progress estimates. Fixed-sector QSE records it in overlap diagnostics but
+does not use it in the final energy solve. Result metadata keeps the requested
+value and reports `regularization_scope` and
+`final_metric_diagonal_shift` in `conditioning_summary`. Dense exact QSE uses
+it for intermediate basis-progress estimates. Fixed-sector QSE uses it for
+those estimates and overlap diagnostics. Neither path shifts the final metric.
 
 Measured QSE prepares a Hartree–Fock reference and builds directions
 `A_i |psi_ref>` from its fixed excitation pool. The dimension cap includes the

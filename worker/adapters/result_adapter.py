@@ -506,6 +506,16 @@ def _qse_algorithm_metrics(result: QSEResult) -> dict[str, Any]:
         "overlap_condition": result.overlap_condition,
         "conditioning_summary": conditioning_summary,
         "projected_solve_status": conditioning_summary.get("stability_state"),
+        "requested_regularization": conditioning_summary.get(
+            "requested_regularization", result.regularization
+        ),
+        "regularization_scope": conditioning_summary.get("regularization_scope"),
+        "final_metric_diagonal_shift": conditioning_summary.get(
+            "final_metric_diagonal_shift"
+        ),
+        "regularization_may_change_reported_energy": conditioning_summary.get(
+            "regularization_may_change_reported_energy"
+        ),
         "matrix_element_summary": matrix_element_summary,
         "excitation_level": result.excitation_level,
         "regularization": result.regularization,

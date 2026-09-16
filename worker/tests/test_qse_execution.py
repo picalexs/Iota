@@ -10,6 +10,7 @@ from worker.chemistry.algorithms.qse.execution import (
     execute_measured_qse,
     execute_sector_qse,
 )
+from worker.chemistry.eigensolver import solve_exact_generalized_eigensystem
 
 
 class _FakeAction:
@@ -71,11 +72,64 @@ def test_execute_dense_qse_composes_injected_numerical_steps() -> None:
     assert outcome.reference_state_energy == 1.0
     assert outcome.converged is True
     assert outcome.execution_mode == "dense_exact_emulation"
+    assert outcome.diagnostics["requested_regularization"] == pytest.approx(1e-8)
+    assert outcome.diagnostics["regularization_scope"] == (
+        "final_projected_metric_diagonal_shift"
+    )
+    assert outcome.diagnostics["final_metric_diagonal_shift"] == pytest.approx(1e-8)
+
+
+def test_execute_dense_qse_marks_exact_final_solve_as_unregularized() -> None:
+    operator = np.diag([1.0, -0.5]).astype(complex)
+    reference_state = np.array([1.0, 0.0], dtype=complex)
+
+    outcome = execute_dense_qse(
+        hamiltonian=object(),
+        backend=object(),
+        operator=operator,
+        resolved_config={"reference_method": "provided_state"},
+        excitation_level="singles",
+        target_rank=2,
+        overlap_threshold=1e-8,
+        regularization=1e-3,
+        residual_tolerance=1e-6,
+        progress_callback=None,
+        resolve_reference_state_fn=lambda **_kwargs: (
+            "provided_state",
+            reference_state,
+            [],
+        ),
+        build_excitation_basis_fn=lambda *_args, **_kwargs: [
+            reference_state,
+            np.array([0.0, 1.0], dtype=complex),
+        ],
+        build_overlap_matrix_fn=lambda _basis: np.eye(2, dtype=complex),
+        solve_generalized_eigenproblem_fn=lambda *_args, **_kwargs: pytest.fail(
+            "exact final solve must not use the regularized solver"
+        ),
+        projected_ritz_diagnostics_fn=lambda *_args, **_kwargs: pytest.fail(
+            "exact final solve computes its own residual"
+        ),
+        real_scalar_fn=lambda value, label: float(np.real(value)),
+        solve_generalized_eigensystem_fn=solve_exact_generalized_eigensystem,
+    )
+
+    assert outcome.diagnostics["regularization"] == pytest.approx(0.0)
+    assert outcome.diagnostics["requested_regularization"] == pytest.approx(1e-3)
+    assert outcome.diagnostics["regularization_scope"] == "basis_progress_estimates_only"
+    assert outcome.diagnostics["final_metric_diagonal_shift"] == pytest.approx(0.0)
+    assert outcome.diagnostics["regularization_may_change_reported_energy"] is False
 
 
 def test_execute_sector_qse_preserves_matrix_free_metadata() -> None:
     action = _FakeAction()
     reference_state = np.array([1.0, 0.0, 0.0], dtype=complex)
+    basis_regularization = []
+
+    def build_basis(state, received_action, **kwargs):
+        assert received_action is action
+        basis_regularization.append(kwargs["regularization"])
+        return [state, np.array([0.0, 1.0, 0.0], dtype=complex)]
 
     def solve_action_subspace(received_action, basis_matrix, **kwargs):
         assert received_action is action
@@ -107,10 +161,7 @@ def test_execute_sector_qse_preserves_matrix_free_metadata() -> None:
             reference_state,
             [{"role": "reference"}],
         ),
-        build_excitation_basis_fn=lambda state, received_action, **kwargs: [
-            state,
-            np.array([0.0, 1.0, 0.0], dtype=complex),
-        ],
+        build_excitation_basis_fn=build_basis,
         solve_action_subspace_fn=solve_action_subspace,
         real_scalar_fn=lambda value, label: float(np.real(value)),
     )
@@ -121,6 +172,13 @@ def test_execute_sector_qse_preserves_matrix_free_metadata() -> None:
     assert outcome.sector_dimension == action.dimension
     assert outcome.num_spatial_orbitals == action.norb
     assert outcome.reference_state_energy == 1.0
+    assert basis_regularization == [pytest.approx(1e-8)]
+    assert outcome.diagnostics["regularization"] == pytest.approx(0.0)
+    assert outcome.diagnostics["requested_regularization"] == pytest.approx(1e-8)
+    assert outcome.diagnostics["regularization_scope"] == (
+        "basis_progress_estimates_and_overlap_diagnostics"
+    )
+    assert outcome.diagnostics["regularization_may_change_reported_energy"] is False
 
 
 def test_execute_dense_qse_rejects_unstable_projection_even_with_small_residual() -> None:
@@ -185,7 +243,7 @@ def test_execute_measured_qse_uses_overlap_uncertainty_for_rank_cutoff() -> None
             },
         )
 
-    execute_measured_qse(
+    outcome = execute_measured_qse(
         hamiltonian=hamiltonian,
         estimator=object(),
         resolved_config={"reference_method": "hf"},
@@ -214,3 +272,9 @@ def test_execute_measured_qse_uses_overlap_uncertainty_for_rank_cutoff() -> None
     )
 
     assert observed_errors == pytest.approx([0.02])
+    assert outcome.diagnostics["requested_regularization"] == pytest.approx(1e-8)
+    assert outcome.diagnostics["regularization_scope"] == (
+        "raw_metric_spectrum_and_overlap_mode_cutoff_floor"
+    )
+    assert outcome.diagnostics["final_metric_diagonal_shift"] == pytest.approx(0.0)
+    assert outcome.diagnostics["regularization_may_change_reported_energy"] is True

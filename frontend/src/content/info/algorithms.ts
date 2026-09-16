@@ -118,11 +118,11 @@ export const ALGORITHM_INFO: Record<RunAlgorithm, InfoEntry> = {
       },
       {
         heading: "Controls that change behavior",
-        body: "The most important decisions are reference quality and basis size: `reference_method`, `excitation_level`, and `max_subspace_dim`. If the reference itself is built variationally, the VQE reference controls (`vqe_reference_ansatz_name`, `vqe_reference_optimizer_name`, `vqe_reference_max_iterations`, `vqe_reference_reps`) directly affect the QSE starting point. `regularization`, `overlap_threshold`, and `residual_tolerance` then control how aggressively the projected solve is stabilized.",
+        body: "The most important decisions are reference quality and basis size: `reference_method`, `excitation_level`, and `max_subspace_dim`. If the reference itself is built variationally, the VQE reference controls (`vqe_reference_ansatz_name`, `vqe_reference_optimizer_name`, `vqe_reference_max_iterations`, `vqe_reference_reps`) directly affect the QSE starting point. `regularization` has a path-specific role: measured QSE uses it as an overlap-mode cutoff floor, dense exact QSE uses it for intermediate progress estimates, and fixed-sector QSE records it only in overlap diagnostics. `overlap_threshold` prunes basis directions. `residual_tolerance` sets the residual convergence threshold.",
       },
       {
         heading: "Typical failure modes",
-        body: "QSE cannot rescue a reference that fundamentally misses the relevant physics. Large excitation pools also increase the O(m^2) projected-matrix workload and can create nearly linearly dependent basis states, which makes the overlap matrix ill-conditioned. Too much regularization can wash out real structure, while too much overlap pruning can throw away physically useful directions. Noise in the reference preparation or in projected matrix elements enters the generalized eigenproblem directly, where bad conditioning can amplify it.",
+        body: "QSE cannot rescue a reference that fundamentally misses the relevant physics. Large excitation pools also increase the O(m^2) projected-matrix workload and can create nearly linearly dependent basis states, which makes the overlap matrix ill-conditioned. In measured QSE, an overly high regularization cutoff can remove useful overlap modes. Too much overlap pruning can also remove useful directions. Noise in the reference preparation or in projected matrix elements enters the generalized eigenproblem directly, where bad conditioning can amplify it.",
       },
     ],
     blocks: [

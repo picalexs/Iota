@@ -24,6 +24,25 @@ ProjectedDiagnosticsBuilder = Callable[..., dict[str, float]]
 RealScalar = Callable[..., float]
 
 
+def _record_regularization_scope(
+    diagnostics: dict[str, Any],
+    *,
+    requested_regularization: float,
+    scope: str,
+    final_metric_diagonal_shift: float,
+    may_change_reported_energy: bool,
+) -> None:
+    """Record how the requested QSE regularization affects this execution path."""
+    diagnostics.update(
+        {
+            "requested_regularization": float(requested_regularization),
+            "regularization_scope": scope,
+            "final_metric_diagonal_shift": float(final_metric_diagonal_shift),
+            "regularization_may_change_reported_energy": may_change_reported_energy,
+        }
+    )
+
+
 @dataclass(frozen=True)
 class QSEExecutionOutcome:
     """Numerical output shared by dense and fixed-sector QSE paths."""
@@ -81,6 +100,14 @@ def execute_sector_qse(
         basis_matrix,
         residual_tolerance=residual_tolerance,
         regularization=regularization,
+    )
+    diagnostics["regularization"] = 0.0
+    _record_regularization_scope(
+        diagnostics,
+        requested_regularization=regularization,
+        scope="basis_progress_estimates_and_overlap_diagnostics",
+        final_metric_diagonal_shift=0.0,
+        may_change_reported_energy=False,
     )
     relative_residual = residual_diagnostics["relative_ritz_residual"]
     reference_energy = real_scalar_fn(
@@ -163,6 +190,8 @@ def execute_dense_qse(
             basis_matrix,
             residual_tolerance=residual_tolerance,
         )
+        final_metric_diagonal_shift = regularization
+        regularization_scope = "final_projected_metric_diagonal_shift"
     else:
         eigenvalues, eigenvectors, diagnostics = solve_generalized_eigensystem_fn(
             projected_hamiltonian,
@@ -204,6 +233,16 @@ def execute_dense_qse(
                 else float("nan")
             ),
         }
+        final_metric_diagonal_shift = 0.0
+        regularization_scope = "basis_progress_estimates_only"
+    diagnostics["regularization"] = float(final_metric_diagonal_shift)
+    _record_regularization_scope(
+        diagnostics,
+        requested_regularization=regularization,
+        scope=regularization_scope,
+        final_metric_diagonal_shift=final_metric_diagonal_shift,
+        may_change_reported_energy=final_metric_diagonal_shift > 0.0,
+    )
     relative_residual = residual_diagnostics["relative_ritz_residual"]
     reference_energy = real_scalar_fn(
         np.vdot(reference_state, operator @ reference_state),
@@ -332,6 +371,13 @@ def execute_measured_qse(
         "backend_target": getattr(backend_context, "backend_target", None),
         **estimate.summary,
     }
+    _record_regularization_scope(
+        diagnostics,
+        requested_regularization=regularization,
+        scope="raw_metric_spectrum_and_overlap_mode_cutoff_floor",
+        final_metric_diagonal_shift=0.0,
+        may_change_reported_energy=True,
+    )
     return QSEExecutionOutcome(
         eigenvalues=stabilized.eigenvalues,
         basis_rank=basis_rank,
