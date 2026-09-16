@@ -18,6 +18,7 @@ from worker.chemistry.algorithms.sqd.workflow import (
     _selected_ci_strings_from_bitstrings,
     _serialize_circuit_preview,
 )
+from worker.jobs.control_state import RunCancelled, RunPaused
 
 CONFIGURATION_RECOVERY_MODULE = "qiskit_addon_sqd.configuration_recovery"
 FERMION_MODULE = "qiskit_addon_sqd.fermion"
@@ -252,22 +253,20 @@ def test_sample_bitstring_matrix_uses_supplied_circuit_factory() -> None:
     assert any(instruction.operation.name == "measure" for instruction in circuit.data)
 
 
-def test_sample_bitstring_matrix_propagates_run_cancellation_without_retry() -> None:
-    class _RunCancelled(RuntimeError):
-        pass
-
-    class _CancellingSampler:
+@pytest.mark.parametrize("control_exception", [RunCancelled, RunPaused])
+def test_sample_bitstring_matrix_propagates_run_control_without_retry(control_exception) -> None:
+    class _ControllingSampler:
         def __init__(self) -> None:
             self.calls = 0
 
         def run(self, *args, **kwargs):
             del args, kwargs
             self.calls += 1
-            raise _RunCancelled("cancelled during sampler submission")
+            raise control_exception("run stopped during sampler submission")
 
-    sampler = _CancellingSampler()
+    sampler = _ControllingSampler()
 
-    with pytest.raises(_RunCancelled, match="cancelled during sampler submission"):
+    with pytest.raises(control_exception, match="run stopped during sampler submission"):
         _sample_bitstring_matrix(
             sampler,
             num_bits=4,
