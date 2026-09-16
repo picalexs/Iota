@@ -90,6 +90,12 @@ sampler and recovery work in
 provider billing or hidden runtime retries. Other algorithm work ledgers are
 tracked separately before cross-algorithm benchmark comparisons.
 
+SKQD sample-union results record the same worker-observed sampler fields in
+`algorithm_metrics.work_ledger`. Exact local sample oracles record
+`local_statevector_sampling_runs` and returned rows instead. Do not compare
+these counts as provider shots. Use `sampling_source` and `execution_path` to
+separate exact local, Aer, and IBM Runtime evidence.
+
 QFD grid metadata records `symmetric_kappa` for the original symmetric variant
 and `forward` for the chemistry-forward variant. The configured `max_time` and
 `time_grid_type` do not define the symmetric grid.

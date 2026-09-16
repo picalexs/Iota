@@ -260,6 +260,15 @@ def execute_sampler_sample_union_workflow(
 
     samples_by_state: list[SKQDKrylovSample] = []
     circuit_metadata: list[dict[str, Any]] = []
+    work_ledger: dict[str, Any] = {
+        "ledger_version": 1,
+        "counting_scope": "worker_observed",
+        "sampler_run_attempts": 0,
+        "sampler_successful_runs": 0,
+        "sampler_retry_count": 0,
+        "sampler_requested_shots_total": 0,
+        "sampler_returned_raw_sample_rows": 0,
+    }
     for krylov_index in range(skqd_config.krylov_extension_dim):
         time_point = float(krylov_index * sampling_time_step)
         samples, _circuit = sample_bitstring_matrix(
@@ -269,6 +278,7 @@ def execute_sampler_sample_union_workflow(
             rng=np.random.default_rng(skqd_config.seed + krylov_index),
             sampling_circuit_factory=factory_for_time(time_point),
             return_circuit=True,
+            work_ledger=work_ledger,
         )
         samples_by_state.append(
             SKQDKrylovSample(
@@ -313,7 +323,8 @@ def execute_sampler_sample_union_workflow(
         backend_target=getattr(backend_context, "backend_target", None),
         ansatz_name="hartree_fock",
     )
-    return merge_krylov_samples(samples_by_state), {
+    sample_union = merge_krylov_samples(samples_by_state, work_ledger=work_ledger)
+    return sample_union, {
         "algorithm_variant": "skqd_sample_union",
         "sampling_mode": "sample_union_sampler",
         "sampling_source": "sampler_krylov_circuits",
@@ -332,6 +343,7 @@ def execute_sampler_sample_union_workflow(
         "time_step": sampling_time_step,
         "krylov_time_step_policy": time_step_metadata,
         "krylov_circuit_metadata": circuit_metadata,
+        "work_ledger": dict(sample_union.work_ledger),
     }
 
 

@@ -41,6 +41,13 @@ def test_sample_krylov_state_sources_samples_every_index_and_keeps_provenance() 
         {"1": 4},
         {"2": 4},
     ]
+    assert result.work_ledger == {
+        "ledger_version": 1,
+        "counting_scope": "worker_observed",
+        "local_statevector_sampling_runs": 3,
+        "local_statevector_requested_samples_total": 12,
+        "local_statevector_returned_sample_rows": 12,
+    }
 
 
 def test_sample_exact_krylov_states_uses_time_evolved_probabilities() -> None:
@@ -98,9 +105,16 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[object] = []
+    ledgers: list[dict[str, object]] = []
 
     def fake_sample_bitstring_matrix(backend, **kwargs):
         del backend
+        ledger = kwargs["work_ledger"]
+        ledgers.append(ledger)
+        ledger["sampler_run_attempts"] += 1
+        ledger["sampler_successful_runs"] += 1
+        ledger["sampler_requested_shots_total"] += kwargs["total_samples"]
+        ledger["sampler_returned_raw_sample_rows"] += kwargs["total_samples"]
         circuit = kwargs["sampling_circuit_factory"]()
         calls.append(circuit)
         index = len(calls) - 1
@@ -140,6 +154,14 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
     assert result.merged_counts.tolist() == [3, 3]
     assert metadata["sampling_mode"] == "sample_union_sampler"
     assert metadata["sampling_source"] == "sampler_krylov_circuits"
+    assert len(ledgers) == 2
+    assert ledgers[0] is ledgers[1]
+    assert metadata["work_ledger"] is not ledgers[0]
+    assert metadata["work_ledger"]["ledger_version"] == 1
+    assert metadata["work_ledger"]["sampler_run_attempts"] == 2
+    assert metadata["work_ledger"]["sampler_successful_runs"] == 2
+    assert metadata["work_ledger"]["sampler_requested_shots_total"] == 6
+    assert metadata["work_ledger"]["sampler_returned_raw_sample_rows"] == 6
     assert all(instruction.operation.name != "PauliEvolution" for instruction in calls[1].data)
 
 

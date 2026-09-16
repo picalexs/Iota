@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -35,6 +35,7 @@ class SKQDSampleUnion:
     merged_probabilities: np.ndarray
     merged_counts: np.ndarray
     provenance: tuple[dict[str, Any], ...]
+    work_ledger: dict[str, Any] = field(default_factory=dict)
 
 
 def _statevector_to_bitstring_matrix(
@@ -76,6 +77,13 @@ def sample_krylov_state_sources(
     if num_qubits < 1:
         raise ValueError("SKQD num_qubits must be positive")
 
+    work_ledger: dict[str, Any] = {
+        "ledger_version": 1,
+        "counting_scope": "worker_observed",
+        "local_statevector_sampling_runs": 0,
+        "local_statevector_requested_samples_total": 0,
+        "local_statevector_returned_sample_rows": 0,
+    }
     samples_by_state: list[SKQDKrylovSample] = []
     for krylov_index in range(num_states):
         time_point = float(krylov_index * time_step)
@@ -85,6 +93,9 @@ def sample_krylov_state_sources(
             num_samples=samples_per_state,
             rng=rng,
         )
+        work_ledger["local_statevector_sampling_runs"] += 1
+        work_ledger["local_statevector_requested_samples_total"] += samples_per_state
+        work_ledger["local_statevector_returned_sample_rows"] += int(samples.shape[0])
         samples_by_state.append(
             SKQDKrylovSample(
                 krylov_index=krylov_index,
@@ -92,11 +103,13 @@ def sample_krylov_state_sources(
                 bitstring_matrix=samples,
             )
         )
-    return merge_krylov_samples(samples_by_state)
+    return merge_krylov_samples(samples_by_state, work_ledger=work_ledger)
 
 
 def merge_krylov_samples(
     samples_by_state: list[SKQDKrylovSample] | tuple[SKQDKrylovSample, ...],
+    *,
+    work_ledger: dict[str, Any] | None = None,
 ) -> SKQDSampleUnion:
     """Union shot-level samples while retaining their Krylov-state origin."""
     if not samples_by_state:
@@ -150,6 +163,7 @@ def merge_krylov_samples(
         merged_probabilities=merged_probabilities,
         merged_counts=counts,
         provenance=provenance,
+        work_ledger=dict(work_ledger or {}),
     )
 
 
@@ -214,6 +228,13 @@ def sample_sector_krylov_states(
         expected_size=action.dimension,
     )
 
+    work_ledger: dict[str, Any] = {
+        "ledger_version": 1,
+        "counting_scope": "worker_observed",
+        "local_statevector_sampling_runs": 0,
+        "local_statevector_requested_samples_total": 0,
+        "local_statevector_returned_sample_rows": 0,
+    }
     samples_by_state: list[SKQDKrylovSample] = []
     all_samples: list[np.ndarray] = []
     for krylov_index in range(num_states):
@@ -238,6 +259,9 @@ def sample_sector_krylov_states(
             ],
             dtype=bool,
         )
+        work_ledger["local_statevector_sampling_runs"] += 1
+        work_ledger["local_statevector_requested_samples_total"] += samples_per_state
+        work_ledger["local_statevector_returned_sample_rows"] += int(samples.shape[0])
         samples_by_state.append(
             SKQDKrylovSample(
                 krylov_index=krylov_index,
@@ -280,6 +304,7 @@ def sample_sector_krylov_states(
         merged_probabilities=merged_probabilities,
         merged_counts=counts,
         provenance=provenance,
+        work_ledger=work_ledger,
     )
 
 

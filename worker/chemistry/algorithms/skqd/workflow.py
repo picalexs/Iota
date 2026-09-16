@@ -421,6 +421,7 @@ def _run_skqd_sample_union(
             "hardware_sampling_capable": use_sampler_circuits,
             "backend_target": getattr(backend_context, "backend_target", None),
         },
+        "work_ledger": dict(sample_union.work_ledger),
         "sample_union": outcome.summary,
         "krylov_prefix_summaries": prefix_summaries,
         "sample_provenance": list(sample_union.provenance),
