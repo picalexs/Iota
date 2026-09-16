@@ -90,6 +90,10 @@ sampler and recovery work in
 provider billing or hidden runtime retries. Other algorithm work ledgers are
 tracked separately before cross-algorithm benchmark comparisons.
 
+QFD grid metadata records `symmetric_kappa` for the original symmetric variant
+and `forward` for the chemistry-forward variant. The configured `max_time` and
+`time_grid_type` do not define the symmetric grid.
+
 Do not infer actual execution from the requested backend label. A local Aer
 run is not IBM hardware evidence. A queued or planned run is not completed
 execution evidence.

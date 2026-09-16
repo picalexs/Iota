@@ -41,6 +41,9 @@ def qfd_grid_metadata(time_grid: np.ndarray, *, qfd_variant: str, kappa: float) 
     digest = hashlib.sha256(grid.tobytes()).hexdigest()
     return {
         "qfd_variant": qfd_variant,
+        "grid_convention": (
+            "symmetric_kappa" if qfd_variant == "qfd_original_symmetric" else "forward"
+        ),
         "kappa": float(kappa),
         "time_grid_values": [float(value) for value in grid],
         "time_grid_hash": digest,
