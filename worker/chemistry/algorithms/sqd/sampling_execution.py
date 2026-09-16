@@ -126,14 +126,32 @@ def _ensure_measurements(circuit: Any, *, num_bits: int) -> Any:
     if int(getattr(circuit, "num_clbits", 0)) == 0:
         measured = QuantumCircuit(num_bits, num_bits)
         measured.compose(circuit, qubits=range(num_bits), inplace=True)
-    elif int(circuit.num_clbits) < num_bits:
-        raise ValueError("SQD sampling circuit needs at least one classical bit per qubit")
+    elif int(circuit.num_clbits) != num_bits:
+        raise ValueError("SQD sampling circuit must have one classical bit per qubit")
     else:
         measured = circuit.copy()
 
-    has_measurement = any(instruction.operation.name == "measure" for instruction in measured.data)
-    if not has_measurement:
+    measurement_map = []
+    for instruction in measured.data:
+        if instruction.operation.name != "measure":
+            continue
+        if len(instruction.qubits) != 1 or len(instruction.clbits) != 1:
+            raise ValueError("SQD sampling circuit must measure each qubit exactly once")
+        measurement_map.append(
+            (
+                measured.find_bit(instruction.qubits[0]).index,
+                measured.find_bit(instruction.clbits[0]).index,
+            )
+        )
+
+    if not measurement_map:
         measured.measure(range(num_bits), range(num_bits))
+    else:
+        measured_qubits = [qubit for qubit, _ in measurement_map]
+        if len(measured_qubits) != num_bits or set(measured_qubits) != set(range(num_bits)):
+            raise ValueError("SQD sampling circuit must measure every qubit exactly once")
+        if any(qubit != clbit for qubit, clbit in measurement_map):
+            raise ValueError("SQD sampling circuit must map each qubit to the same-index classical bit")
     return measured
 
 

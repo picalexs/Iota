@@ -253,6 +253,42 @@ def test_sample_bitstring_matrix_uses_supplied_circuit_factory() -> None:
     assert any(instruction.operation.name == "measure" for instruction in circuit.data)
 
 
+@pytest.mark.parametrize("measurement_map", [((0, 0),), ((0, 0), (1, 1), (2, 3), (3, 2))])
+def test_sample_bitstring_matrix_rejects_incomplete_or_remapped_measurements(
+    measurement_map: tuple[tuple[int, int], ...],
+) -> None:
+    from qiskit import QuantumCircuit
+
+    class _Sampler:
+        calls = 0
+
+        def run(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            raise AssertionError("invalid measurement circuits must fail before submission")
+
+    def factory(*, num_bits: int, num_elec_a: int, num_elec_b: int, rng: object) -> QuantumCircuit:
+        del num_elec_a, num_elec_b, rng
+        circuit = QuantumCircuit(num_bits, num_bits)
+        circuit.x(3)
+        for qubit, clbit in measurement_map:
+            circuit.measure(qubit, clbit)
+        return circuit
+
+    sampler = _Sampler()
+    with pytest.raises(ValueError, match="measure every qubit|map each qubit"):
+        _sample_bitstring_matrix(
+            sampler,
+            num_bits=4,
+            total_samples=8,
+            num_elec_a=1,
+            num_elec_b=1,
+            sampling_circuit_factory=factory,
+        )
+
+    assert sampler.calls == 0
+
+
 @pytest.mark.parametrize("control_exception", [RunCancelled, RunPaused])
 def test_sample_bitstring_matrix_propagates_run_control_without_retry(control_exception) -> None:
     class _ControllingSampler:
