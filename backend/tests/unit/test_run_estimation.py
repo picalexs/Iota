@@ -245,7 +245,8 @@ def test_build_initial_estimate_for_persisted_run_reconstructs_easy_contract(
 
     assert estimate is not None
     assert estimate["algorithm"] == "kqd"
-    assert estimate["estimated_total_iterations"] == 44
+    assert estimate["estimated_total_iterations"] == 8
+    assert "estimated_matrix_element_pairs" not in estimate
     assert estimate["estimated_total_seconds"] is None
 
 

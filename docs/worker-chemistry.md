@@ -189,6 +189,12 @@ KQD `exact` mode uses exact matrix evolution, including for an Aer target.
 Branch-estimator KQD supports Trotter evolution only. The runner validates this
 setting before it creates an estimator primitive.
 
+KQD and QFD work estimates count matrix-pair and projected-solve units for IBM
+Runtime and noisy Aer. Ideal Aer uses the algorithm-native estimate for the
+normal chemistry path, which runs dense or fixed-sector evolution locally. A
+large ideal-Aer fallback can depend on the prepared Hamiltonian. The worker
+resolves that path after Hamiltonian preparation and uses it for live progress.
+
 VQE records `shot_budget_mode` as `fixed_shots`, `estimator_precision`, or
 `exact_expectation`. Statevector execution and Aer EstimatorV2 with zero
 precision use exact expectations. Precision-driven estimators report their
