@@ -523,13 +523,17 @@ Returned by `GET /api/runs/{id}/result`. Extends `BaseORMModel`.
 | `created_at`             | `datetime`      | Result creation timestamp                                              |
 
 For KQD/QFD, `algorithm_metrics` can include both the reported retained
-projected spectrum (`ritz_values` or `filter_eigenvalues`) and the raw noisy
-projected spectrum (`raw_ritz_values` or `raw_filter_eigenvalues`), plus a
-`stability_summary` object with overlap-threshold diagnostics and
-`selected_level_index` for the retained level used as the canonical energy. On
-noisy Aer/IBM branch-estimator KQD/QFD paths, a stabilized retained solve can
-still produce the canonical `energy` while leaving `converged=false`; only a
-fully stable retained overlap solve is treated as converged on that path.
+projected spectrum (`ritz_values` or `filter_eigenvalues`) and the
+pre-stabilization projected spectrum (`raw_ritz_values` or
+`raw_filter_eigenvalues`). On noisy branch-estimator paths, the latter is
+computed by the regularized generalized solve before overlap-mode projection.
+The `stability_summary.raw_spectrum_definition` field identifies this as
+`regularized_unfiltered_generalized_spectrum`; it is not an unregularized
+generalized spectrum. The same summary includes overlap-threshold diagnostics
+and `selected_level_index` for the retained level used as the canonical
+energy. A stabilized retained solve can still produce the canonical `energy`
+while leaving `converged=false`; only a fully stable retained overlap solve is
+treated as converged on that path.
 
 When present, `algorithm_metrics.circuit_artifacts` is a list of typed
 quantum-circuit artifacts:

@@ -285,6 +285,7 @@ def solve_stabilized_generalized_eigenproblem(
 
     diagnostics: dict[str, Any] = {
         "stability_state": "invalid",
+        "raw_spectrum_definition": "regularized_unfiltered_generalized_spectrum",
         "psd_projected": psd_projected,
         "threshold": float(threshold),
         "raw_projected_rank": int(overlap_eigvals.size),
