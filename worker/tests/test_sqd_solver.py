@@ -456,6 +456,8 @@ def test_run_sqd_reports_best_observed_energy_not_last_iteration(monkeypatch) ->
 
     sampled = np.array([[False, True, False, True]], dtype=bool)
     energies = iter([-1.0, -1.2, -1.1])
+    selected_states = [SimpleNamespace(state_index=index) for index in range(3)]
+    states = iter(selected_states)
 
     monkeypatch.setattr(
         sqd_solver,
@@ -477,7 +479,7 @@ def test_run_sqd_reports_best_observed_energy_not_last_iteration(monkeypatch) ->
         del args, kwargs
         energy = next(energies)
         occupancies = (np.array([0.9, 0.1]), np.array([0.8, 0.2]))
-        return energy, None, occupancies, 0.0
+        return energy, next(states), occupancies, 0.0
 
     monkeypatch.setattr(fermion, "solve_fermion", fake_solve_fermion)
 
@@ -511,6 +513,7 @@ def test_run_sqd_reports_best_observed_energy_not_last_iteration(monkeypatch) ->
     assert result.sci_result_package["best_iteration"] == 2
     assert result.sci_result_package["reported_energy_source"] == "best_observed_sqd_iteration"
     assert result.configuration_recovery_trace[-1]["best_iteration"] == 2
+    assert result.best_sci_state is selected_states[1]
 
 
 def test_run_sqd_passes_invalid_frequency_probabilities_to_recovery(monkeypatch) -> None:
@@ -786,6 +789,8 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
         ]
     )
     batch_energies = iter([-1.2, -0.8])
+    selected_states = [SimpleNamespace(batch_index=index) for index in range(2)]
+    states = iter(selected_states)
 
     monkeypatch.setattr(
         sqd_solver,
@@ -805,7 +810,7 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
             ),
             solve_fermion=lambda *args, **kwargs: (
                 next(batch_energies),
-                None,
+                next(states),
                 next(batch_occupancies),
                 0.0,
             ),
@@ -849,6 +854,7 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
     assert result.sci_result_package["selected_ci"]["selected_ci_regime"] == "partial_sector"
     assert result.sci_result_package["selected_ci"]["selected_determinant_count"] == 1
     assert result.configuration_recovery_trace[-1]["selected_ci_dimension"] == 1
+    assert result.best_sci_state is selected_states[0]
 
 
 def test_run_sqd_carries_over_high_weight_ci_strings(monkeypatch) -> None:
