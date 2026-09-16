@@ -181,6 +181,19 @@ describe("ProfileQuickSwitch", () => {
     );
   });
 
+  it("keeps an unavailable optional profile service inline without a toast", async () => {
+    vi.mocked(listIbmCredentialProfiles).mockRejectedValueOnce(
+      new Error("Profile service unavailable"),
+    );
+
+    renderSwitchWithRouter();
+
+    expect(
+      await screen.findByRole("link", { name: "Open IBM profile settings" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("IBM Profiles Unavailable")).not.toBeInTheDocument();
+  });
+
   it("activates a selected profile and refreshes backend capabilities", async () => {
     const user = userEvent.setup();
     localStorage.setItem(
@@ -308,7 +321,7 @@ describe("ProfileQuickSwitch", () => {
     ).toBeInTheDocument();
 
     act(() => {
-      notifyIbmCredentialProfilesChanged();
+      notifyIbmCredentialProfilesChanged({ profilesChanged: true });
     });
 
     await waitFor(() => {

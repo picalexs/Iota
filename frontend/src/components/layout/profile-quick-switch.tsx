@@ -76,6 +76,7 @@ export function ProfileQuickSwitch() {
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState(false);
   const [open, setOpen] = useState(false);
   const [recentProfileIds, setRecentProfileIds] = useLocalStorage<string[]>(
     SIDEBAR_RECENT_PROFILE_STORAGE_KEY,
@@ -101,14 +102,14 @@ export function ProfileQuickSwitch() {
   const refreshProfiles = useCallback(async () => {
     try {
       const response = await listIbmCredentialProfiles();
+      setProfileLoadError(false);
       setProfiles(response.profiles);
       setActiveProfileId(response.active_profile_id);
       setRecentProfileIds((current) => rememberRecentProfile(current, response.active_profile_id));
-    } catch (error) {
-      showErrorToast(error, {
-        title: "IBM Profiles Unavailable",
-        fallbackDescription: "Failed to load IBM credential profiles.",
-      });
+    } catch {
+      setProfileLoadError(true);
+      setProfiles([]);
+      setActiveProfileId(null);
     } finally {
       setLoading(false);
     }
@@ -120,7 +121,10 @@ export function ProfileQuickSwitch() {
 
   useEffect(() => {
     return subscribeToIbmCredentialProfilesChanged((detail) => {
-      if (detail.backendCapabilitiesRefresh === "started") {
+      if (detail.profilesChanged !== true) {
+        if (detail.activeProfileId !== undefined) {
+          setActiveProfileId(detail.activeProfileId ?? null);
+        }
         return;
       }
       setLoading(true);
@@ -197,6 +201,23 @@ export function ProfileQuickSwitch() {
             <Spinner />
             <span>Loading profiles</span>
           </button>
+        </SidebarMenuSubButton>
+      </SidebarMenuSubItem>
+    );
+  } else if (profileLoadError) {
+    profileMenuContent = (
+      <SidebarMenuSubItem>
+        <SidebarMenuSubButton asChild>
+          <Link
+            to="/settings"
+            onClick={() => setOpen(false)}
+            onFocus={() => preloadPageModule("/settings")}
+            onPointerEnter={() => preloadPageModule("/settings")}
+            aria-label="Open IBM profile settings"
+          >
+            <KeyRound className="size-4" />
+            <span>Profiles unavailable</span>
+          </Link>
         </SidebarMenuSubButton>
       </SidebarMenuSubItem>
     );
