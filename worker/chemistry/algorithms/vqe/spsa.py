@@ -2,11 +2,30 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
 
 _MIN_STABLE_ENERGY_POINTS = 5
+
+
+def _spsa_float_option(
+    options: dict[str, Any],
+    name: str,
+    *,
+    default: float,
+    allow_zero: bool = False,
+) -> float:
+    """Resolve one finite SPSA option with its protocol-specific lower bound."""
+    try:
+        value = float(options.get(name, default))
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"SPSA {name} must be finite") from exc
+    if not math.isfinite(value) or (value < 0.0 if allow_zero else value <= 0.0):
+        bound = "non-negative" if allow_zero else "positive"
+        raise ValueError(f"SPSA {name} must be finite and {bound}")
+    return value
 
 
 def is_delta_converged(
@@ -37,10 +56,15 @@ def run_spsa(
 ) -> tuple[np.ndarray, int, bool, dict[str, Any]]:
     """Run a lightweight SPSA loop against the objective callback."""
     spsa_options = dict(options or {})
-    learning_rate = float(spsa_options.get("learning_rate", 0.1))
-    perturbation = float(spsa_options.get("perturbation", 0.05))
+    learning_rate = _spsa_float_option(spsa_options, "learning_rate", default=0.1)
+    perturbation = _spsa_float_option(spsa_options, "perturbation", default=0.05)
     blocking = bool(spsa_options.get("blocking", False))
-    allowed_increase = float(spsa_options.get("allowed_increase", 0.0))
+    allowed_increase = _spsa_float_option(
+        spsa_options,
+        "allowed_increase",
+        default=0.0,
+        allow_zero=True,
+    )
 
     rng = np.random.default_rng(seed)
     theta = initial_point.copy()

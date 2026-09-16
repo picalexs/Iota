@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
@@ -40,13 +41,20 @@ def matches_spin_sector(
 def resolve_sqd_electron_sector(package: dict[str, Any]) -> tuple[int, int] | None:
     """Resolve a valid-looking spin-resolved electron sector from an SQD package."""
     raw_nelec = package.get("nelec")
-    if (
-        not isinstance(raw_nelec, list)
-        or len(raw_nelec) != 2
-        or not all(isinstance(value, (int, float)) for value in raw_nelec)
-    ):
+    if not isinstance(raw_nelec, list) or len(raw_nelec) != 2:
         return None
-    return int(raw_nelec[0]), int(raw_nelec[1])
+    resolved_nelec: list[int] = []
+    for value in raw_nelec:
+        if isinstance(value, bool):
+            return None
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if not math.isfinite(numeric) or not numeric.is_integer():
+            return None
+        resolved_nelec.append(int(value))
+    return resolved_nelec[0], resolved_nelec[1]
 
 
 def seed_state_from_sqd_bitstrings(
@@ -68,7 +76,13 @@ def seed_state_from_sqd_bitstrings(
         if not isinstance(entry, dict):
             continue
         probability = entry.get("probability")
-        if not isinstance(probability, (int, float)) or float(probability) <= 0.0:
+        if isinstance(probability, bool) or not isinstance(probability, (int, float)):
+            continue
+        try:
+            resolved_probability = float(probability)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not math.isfinite(resolved_probability) or resolved_probability <= 0.0:
             continue
         basis_index = parse_bitstring_index(entry.get("bitstring"), num_qubits=num_qubits)
         if basis_index is None or basis_index >= target_size:
@@ -80,7 +94,7 @@ def seed_state_from_sqd_bitstrings(
             num_elec_b=num_elec_b,
         ):
             continue
-        state[basis_index] += np.sqrt(float(probability))
+        state[basis_index] += np.sqrt(resolved_probability)
 
     norm = float(np.linalg.norm(state))
     if np.isclose(norm, 0.0):
@@ -101,7 +115,12 @@ def seed_state_from_sqd_result_with_source(
     if not isinstance(raw_occupancies, list) or not raw_occupancies:
         return None, "unavailable"
 
-    occupancies = np.asarray(raw_occupancies, dtype=float).reshape(-1)
+    try:
+        occupancies = np.asarray(raw_occupancies, dtype=float).reshape(-1)
+    except (TypeError, ValueError):
+        return None, "invalid_occupancies"
+    if not np.all(np.isfinite(occupancies)):
+        return None, "invalid_occupancies"
     num_qubits = occupancies.size
     if target_size != 2**num_qubits:
         return None, "dimension_mismatch"

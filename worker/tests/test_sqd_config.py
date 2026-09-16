@@ -92,3 +92,25 @@ def test_resolve_sqd_options_rejects_asymmetric_symmetrized_limits() -> None:
             },
             _hamiltonian(),
         )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("spin_sq_target", float("nan")),
+        ("spin_sq_target", -1.0),
+        ("energy_tol", float("inf")),
+        ("energy_tol", -1.0),
+        ("occupancies_tol", float("nan")),
+        ("carryover_threshold", -float("inf")),
+    ],
+)
+def test_resolve_sqd_options_rejects_non_finite_tolerances(
+    field: str,
+    value: float,
+) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        sqd_config.resolve_sqd_options(
+            {"algorithm": "sqd", field: value},
+            _hamiltonian(),
+        )

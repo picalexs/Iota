@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from worker.chemistry.solver_utils import bounded_int
+from worker.chemistry.solver_utils import bounded_int, positive_float
 
 _MAX_NUMPY_SEED = 2**32 - 1
 _ANALYSIS_ONLY_SAMPLING_MODE = "sample_union_exact"
@@ -80,9 +80,15 @@ def resolve_skqd_config(resolved: Mapping[str, Any]) -> SKQDConfig:
     # The SKQD convergence analysis fixes Delta t = pi / Delta E_{N-1}. Honor an
     # explicit user time step; otherwise defer to the spectral-width auto-scale
     # resolved against the Hamiltonian at execution time.
-    raw_time_step = resolved.get("time_step") or resolved.get("krylov_time_step")
+    raw_time_step = resolved.get("time_step")
+    if raw_time_step is None:
+        raw_time_step = resolved.get("krylov_time_step")
     if raw_time_step is not None:
-        sampling_time_step: float | None = float(raw_time_step)
+        sampling_time_step: float | None = positive_float(
+            raw_time_step,
+            default=1.0,
+            name="SKQD time_step",
+        )
         time_step_policy = "explicit_user_time_step"
     else:
         sampling_time_step = None
@@ -94,7 +100,11 @@ def resolve_skqd_config(resolved: Mapping[str, Any]) -> SKQDConfig:
             low=1,
             high=32,
         ),
-        residual_tolerance=float(resolved.get("residual_tolerance") or 1e-6),
+        residual_tolerance=positive_float(
+            resolved.get("residual_tolerance"),
+            default=1e-6,
+            name="SKQD residual_tolerance",
+        ),
         sampling_time_step=sampling_time_step,
         time_step_policy=time_step_policy,
         sampling_mode=sampling_mode,

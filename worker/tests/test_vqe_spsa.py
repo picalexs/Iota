@@ -1,6 +1,7 @@
 """Direct tests for the VQE SPSA optimization seam."""
 
 import numpy as np
+import pytest
 
 from worker.chemistry.algorithms.vqe.spsa import is_delta_converged, run_spsa
 
@@ -50,3 +51,28 @@ def test_run_spsa_stops_after_five_stable_accepted_energies() -> None:
     assert iterations == 4
     assert converged
     assert diagnostics["accepted_steps"] == 4
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"learning_rate": 0.0},
+        {"learning_rate": float("nan")},
+        {"perturbation": 0.0},
+        {"perturbation": float("inf")},
+        {"allowed_increase": -1.0},
+        {"allowed_increase": float("nan")},
+    ],
+)
+def test_run_spsa_rejects_invalid_numeric_options(options: dict[str, float]) -> None:
+    with pytest.raises(ValueError, match="SPSA"):
+        run_spsa(
+            objective=lambda _point: 1.0,
+            initial_point=np.array([0.0]),
+            max_iterations=1,
+            options=options,
+            threshold=1e-12,
+            seed=3,
+            convergence_trace=[],
+            parameter_bounds=None,
+        )

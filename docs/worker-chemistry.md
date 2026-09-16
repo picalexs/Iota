@@ -107,6 +107,10 @@ Use statevector or local Aer fixtures for algorithm tests. Do not submit an
 IBM Runtime job as a test. Mark tests that use noisy Aer as local diagnostic
 tests.
 
+Worker configuration resolvers reject non-finite numeric values. They also
+reject invalid SPSA step settings and malformed SKQD electron-sector or seed
+data before the solver uses them.
+
 ## Current transition
 
 The algorithm packages own the workflow entry points, kernels, configuration

@@ -49,6 +49,10 @@ def test_resolve_sqd_electron_sector_accepts_numeric_pair_only() -> None:
     assert resolve_sqd_electron_sector({"nelec": [1, 2.0]}) == (1, 2)
     assert resolve_sqd_electron_sector({"nelec": [1]}) is None
     assert resolve_sqd_electron_sector({"nelec": "1,2"}) is None
+    assert resolve_sqd_electron_sector({"nelec": [1.5, 2]}) is None
+    assert resolve_sqd_electron_sector({"nelec": [float("nan"), 2]}) is None
+    assert resolve_sqd_electron_sector({"nelec": [10**1000, 2]}) is None
+    assert resolve_sqd_electron_sector({"nelec": [True, 2]}) is None
 
 
 def test_seed_state_from_sqd_bitstrings_filters_invalid_and_wrong_sector_rows() -> None:
@@ -73,6 +77,26 @@ def test_seed_state_from_sqd_bitstrings_filters_invalid_and_wrong_sector_rows() 
     assert abs(state[5]) ** 2 == pytest.approx(0.25)
     assert abs(state[10]) ** 2 == pytest.approx(0.75)
     assert state[15] == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize("probability", [float("nan"), float("inf")])
+def test_seed_state_from_sqd_bitstrings_skips_non_finite_probabilities(
+    probability: float,
+) -> None:
+    state = seed_state_from_sqd_bitstrings(
+        {
+            "final_bitstring_probabilities": [
+                {"bitstring": "0101", "probability": probability},
+            ]
+        },
+        target_size=16,
+        num_qubits=4,
+        norb=2,
+        num_elec_a=1,
+        num_elec_b=1,
+    )
+
+    assert state is None
 
 
 def test_seed_state_from_sqd_result_prefers_bitstrings_then_occupancies() -> None:
@@ -103,6 +127,19 @@ def test_seed_state_from_sqd_result_prefers_bitstrings_then_occupancies() -> Non
     assert occupancy_state is not None
     assert int(np.argmax(np.abs(occupancy_state))) == 5
     assert seed_state_from_sqd_result(_result({}), target_size=16) is None
+
+
+@pytest.mark.parametrize("occupancies", [[float("nan"), 0.4, 0.7, 0.3], [float("inf")] * 4])
+def test_seed_state_from_sqd_result_rejects_non_finite_occupancies(
+    occupancies: list[float],
+) -> None:
+    state, source = seed_state_from_sqd_result_with_source(
+        _result({"final_occupancies": occupancies, "nelec": [1, 1]}),
+        target_size=16,
+    )
+
+    assert state is None
+    assert source == "invalid_occupancies"
 
 
 @pytest.mark.parametrize(
