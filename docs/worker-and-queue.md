@@ -260,7 +260,9 @@ behavior when Redis or the worker is absent.
     cumulative work separately as `overall_iterations`, so the worker does not
     double-count the preceding SQD phase; the advanced contract's `time_step`
     sets the seeded evolution schedule used to generate the Krylov extension and
-    is echoed in diagnostics;
+    is echoed in diagnostics; sample-union `subspace_saturated` is diagnostic
+    only, and SKQD reports scientific convergence only after full selected-CI
+    sector recovery;
   - `worker/chemistry/algorithms/skqd/extension.py` owns dense and fixed-sector
     Krylov extension construction and progress payloads;
     `worker/chemistry/algorithms/skqd/execution.py` owns SQD-seed resolution
