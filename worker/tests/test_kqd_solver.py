@@ -520,6 +520,28 @@ def test_run_kqd_aer_state_propagation_matches_statevector() -> None:
     assert aer_result.orthogonality_metrics["basis_rank"] == pytest.approx(2.0)
 
 
+def test_run_kqd_local_trotter_reports_the_implemented_evolution() -> None:
+    result = run_kqd(
+        hamiltonian=_single_qubit_x_hamiltonian(),
+        backend=None,
+        config={
+            "algorithm": "kqd",
+            "advanced_config": {
+                "algorithm": "kqd",
+                "krylov_dim": 2,
+                "time_step": 0.1,
+                "evolution_method": "trotter",
+                "trotter_steps": 1,
+            },
+        },
+    )
+
+    assert result.matrix_element_summary["requested_evolution_method"] == "trotter"
+    assert result.matrix_element_summary["implemented_evolution_method"] == (
+        "dense_matrix_trotter"
+    )
+
+
 def test_run_kqd_small_noisy_aer_uses_estimator_matrix_elements(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
