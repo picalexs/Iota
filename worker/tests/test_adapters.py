@@ -664,12 +664,13 @@ def test_ibm_adapter_uses_estimator_precision_only_for_estimator() -> None:
     )
 
     adapter.create_estimator(context)
-    adapter.create_sampler(context)
+    sampler = adapter.create_sampler(context)
 
     assert estimator_calls == [
         {"mode": backend, "options": {"default_precision": 0.125}}
     ]
     assert sampler_calls == [{"mode": backend, "options": {"default_shots": 512}}]
+    assert sampler.allow_sampler_submission_retries is False
 
 
 def test_ibm_adapter_records_named_backend_mismatch_as_fallback() -> None:

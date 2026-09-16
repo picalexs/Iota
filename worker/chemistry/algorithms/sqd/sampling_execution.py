@@ -99,9 +99,8 @@ def _run_sampler_attempt(
     *,
     shots: int,
 ) -> Any:
-    """Execute one sampler attempt and return the primitive result object."""
-    job = sampler.run([(circuit,)], shots=shots)
-    return job.result()
+    """Submit one sampler attempt and return its job without waiting for results."""
+    return sampler.run([(circuit,)], shots=shots)
 
 
 def _is_control_flow_exception(exc: Exception) -> bool:
@@ -192,7 +191,11 @@ def sample_bitstring_matrix(
         circuit = _ensure_measurements(circuit, num_bits=num_bits)
 
     last_error: Exception | None = None
-    for multiplier in (1, 2, 4):
+    allow_submission_retries = (
+        getattr(sampler, "allow_sampler_submission_retries", True) is not False
+    )
+    multipliers = (1, 2, 4) if allow_submission_retries else (1,)
+    for multiplier in multipliers:
         shots = max(total_samples * multiplier, 1)
         if work_ledger is not None:
             work_ledger["sampler_run_attempts"] = work_ledger.get("sampler_run_attempts", 0) + 1
@@ -203,7 +206,7 @@ def sample_bitstring_matrix(
                 "sampler_requested_shots_total", 0
             ) + shots
         try:
-            result = _run_sampler_attempt(
+            job = _run_sampler_attempt(
                 sampler,
                 circuit,
                 shots=shots,
@@ -211,12 +214,17 @@ def sample_bitstring_matrix(
         except Exception as exc:  # pragma: no cover - depends on backend primitive failures
             if _is_control_flow_exception(exc):
                 raise
+            if not allow_submission_retries:
+                raise
             last_error = exc
             continue
 
+        # A job object means submission succeeded. Do not submit a duplicate if
+        # result retrieval fails or times out.
+        result = job.result()
         bitstrings = extract_sampler_bitstrings(result)
         if bitstrings is None:
-            continue
+            raise RuntimeError("SQD sampler returned no measurement bitstrings")
 
         matrix = bitstrings_to_matrix(bitstrings, num_bits=num_bits)
         if work_ledger is not None:

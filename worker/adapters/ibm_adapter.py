@@ -134,6 +134,7 @@ class IBMAdapter(BackendAdapter):
                 kwargs,
                 context=resolved,
             ),
+            allow_sampler_submission_retries=False,
         )
 
     def run_vqe(self, *, hamiltonian: object, config: dict) -> object:

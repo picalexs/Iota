@@ -90,6 +90,14 @@ sampler and recovery work in
 provider billing or hidden runtime retries. Other algorithm work ledgers are
 tracked separately before cross-algorithm benchmark comparisons.
 
+SQD retries failed sampler submissions only for adapters that allow local
+retries. It uses at most three attempts with requested shot counts of `s`,
+`2s`, and `4s`. IBM Runtime disables submission retries because a timeout can
+leave the remote submission state unknown. After any sampler returns a job,
+SQD retrieves that job's result once and does not submit a replacement if
+result retrieval fails. The work ledger counts each worker attempt and its
+requested shots. It does not claim that IBM accepted or billed those shots.
+
 Branch-estimator KQD and QFD measure projected Hamiltonian and overlap
 matrices. Their residual is the residual of that measured generalized
 eigenproblem. It is not a full-space Ritz residual. A small projected residual

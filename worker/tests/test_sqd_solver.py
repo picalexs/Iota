@@ -354,6 +354,95 @@ def test_sample_bitstring_matrix_records_retry_work(monkeypatch) -> None:
     }
 
 
+def test_sample_bitstring_matrix_does_not_retry_runtime_result_failure() -> None:
+    class _RuntimeJob:
+        def result(self):
+            raise TimeoutError("runtime result timed out")
+
+    class _RuntimeSampler:
+        allow_sampler_submission_retries = False
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            return _RuntimeJob()
+
+    sampler = _RuntimeSampler()
+    ledger: dict[str, int] = {}
+
+    with pytest.raises(TimeoutError, match="runtime result timed out"):
+        _sample_bitstring_matrix(
+            sampler,
+            num_bits=4,
+            total_samples=8,
+            work_ledger=ledger,
+        )
+
+    assert sampler.calls == 1
+    assert ledger["sampler_run_attempts"] == 1
+    assert ledger["sampler_retry_count"] == 0
+    assert ledger["sampler_requested_shots_total"] == 8
+    assert ledger.get("sampler_successful_runs", 0) == 0
+    assert ledger.get("sampler_returned_raw_sample_rows", 0) == 0
+
+
+def test_sample_bitstring_matrix_does_not_resubmit_unreadable_job_result(monkeypatch) -> None:
+    class _Job:
+        def result(self):
+            return object()
+
+    class _Sampler:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            return _Job()
+
+    monkeypatch.setattr(sqd_sampling_execution, "extract_sampler_bitstrings", lambda _: None)
+    sampler = _Sampler()
+
+    with pytest.raises(RuntimeError, match="returned no measurement bitstrings"):
+        _sample_bitstring_matrix(sampler, num_bits=4, total_samples=8)
+
+    assert sampler.calls == 1
+
+
+def test_sample_bitstring_matrix_does_not_retry_runtime_submission_failure() -> None:
+    class _RuntimeSampler:
+        allow_sampler_submission_retries = False
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            raise TimeoutError("runtime submission outcome is unknown")
+
+    sampler = _RuntimeSampler()
+    ledger: dict[str, int] = {}
+
+    with pytest.raises(TimeoutError, match="runtime submission outcome is unknown"):
+        _sample_bitstring_matrix(
+            sampler,
+            num_bits=4,
+            total_samples=8,
+            work_ledger=ledger,
+        )
+
+    assert sampler.calls == 1
+    assert ledger["sampler_run_attempts"] == 1
+    assert ledger["sampler_retry_count"] == 0
+    assert ledger["sampler_requested_shots_total"] == 8
+    assert ledger.get("sampler_successful_runs", 0) == 0
+    assert ledger.get("sampler_returned_raw_sample_rows", 0) == 0
+
+
 def test_open_shell_selected_ci_strings_preserve_alpha_on_right_half() -> None:
     """The right bitstring half maps to alpha determinants for open-shell SQD."""
     bitstrings = np.array(
