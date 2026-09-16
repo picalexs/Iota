@@ -9,6 +9,7 @@ import pytest
 from qiskit.quantum_info import Operator, SparsePauliOp, Statevector
 
 from worker.adapters.result_adapter import normalize_result
+from worker.chemistry.algorithms.qse import measured as qse_measured
 from worker.chemistry.algorithms.qse.definition import run_qse_algorithm
 from worker.chemistry.algorithms.qse.excitations import apply_fermionic_excitation
 from worker.chemistry.algorithms.qse.measured import (
@@ -199,6 +200,55 @@ def test_measured_qse_assembles_hermitian_matrices_with_identity_reference() -> 
     assert float(np.real(projected[0, 0])) == pytest.approx(exact_energy, abs=1e-9)
     assert estimate.summary["matrix_element_strategy"] == "branch_estimator"
     assert estimate.summary["max_standard_error"] == 0.0
+
+
+def test_measured_qse_separates_hamiltonian_and_overlap_uncertainty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=27))
+    captured_plans = []
+    original_build_plans = qse_measured._build_pair_measurement_plans
+
+    def build_plans(**kwargs):
+        plans = original_build_plans(**kwargs)
+        captured_plans[:] = plans
+        return plans
+
+    class _SplitUncertaintyEstimator:
+        def __init__(self) -> None:
+            self.next_plan = 0
+
+        def run(self, pubs):
+            results = []
+            for _circuit, observables in pubs:
+                plan = captured_plans[self.next_plan]
+                h_count = plan.h_component_count
+                self.next_plan += 1
+                results.append(
+                    _PubResult(
+                        [0.0] * len(observables),
+                        [5.0] * h_count + [0.01] * (len(observables) - h_count),
+                    )
+                )
+            return _Job(results)
+
+    monkeypatch.setattr(qse_measured, "_build_pair_measurement_plans", build_plans)
+    events: list[dict[str, object]] = []
+    estimate = estimate_measured_qse_matrices(
+        hamiltonian=hamiltonian,
+        estimator=_SplitUncertaintyEstimator(),
+        excitation_level="singles_doubles",
+        max_dimension=8,
+        backend_context=None,
+        progress_callback=events.append,
+    )
+
+    assert estimate.summary["max_hamiltonian_standard_error"] == pytest.approx(5.0)
+    assert estimate.summary["max_overlap_standard_error"] == pytest.approx(0.01)
+    assert estimate.summary["max_standard_error"] == pytest.approx(5.0)
+    matrix_events = [event for event in events if "matrix_element_pair" in event]
+    assert matrix_events[-1]["max_hamiltonian_standard_error"] == pytest.approx(5.0)
+    assert matrix_events[-1]["max_overlap_standard_error"] == pytest.approx(0.01)
 
 
 def test_measured_qse_dimension_cap_counts_independent_hf_excitation_states() -> None:

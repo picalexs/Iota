@@ -134,7 +134,7 @@ def build_qse_result(
             "matrix_element_strategy": "branch_estimator",
             "measured_matrix_element_construction": diagnostics.get(
                 "measured_matrix_element_construction",
-                "da_case_nonorthogonal_eigensolver",
+                "fixed_pool_qse_nonorthogonal_eigensolver",
             ),
             "projected_dimension": basis_rank,
             "projected_matrix_element_count": 2 * basis_rank**2,
@@ -142,7 +142,15 @@ def build_qse_result(
                 "jordan_wigner_fermionic_excitation_operators"
             ),
             "backend_target": diagnostics.get("backend_target"),
+            "max_hamiltonian_standard_error": diagnostics.get(
+                "max_hamiltonian_standard_error"
+            ),
+            "max_overlap_standard_error": diagnostics.get("max_overlap_standard_error"),
             "max_standard_error": diagnostics.get("max_standard_error"),
+            "standard_error_units": diagnostics.get("standard_error_units"),
+            "max_standard_error_compatibility": diagnostics.get(
+                "max_standard_error_compatibility"
+            ),
         }
     else:
         matrix_element_summary = {

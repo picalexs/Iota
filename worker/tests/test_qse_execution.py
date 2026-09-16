@@ -1,8 +1,15 @@
 """Unit tests for the QSE execution-path boundary."""
 
-import numpy as np
+from types import SimpleNamespace
 
-from worker.chemistry.algorithms.qse.execution import execute_dense_qse, execute_sector_qse
+import numpy as np
+import pytest
+
+from worker.chemistry.algorithms.qse.execution import (
+    execute_dense_qse,
+    execute_measured_qse,
+    execute_sector_qse,
+)
 
 
 class _FakeAction:
@@ -157,3 +164,53 @@ def test_execute_dense_qse_rejects_unstable_projection_even_with_small_residual(
     )
 
     assert outcome.converged is False
+
+
+def test_execute_measured_qse_uses_overlap_uncertainty_for_rank_cutoff() -> None:
+    observed_errors: list[float | None] = []
+    hamiltonian = SimpleNamespace(num_electrons_alpha=1, num_electrons_beta=1)
+
+    def solve_stabilized(_projected, _overlap, **kwargs):
+        observed_errors.append(kwargs.get("max_standard_error"))
+        return SimpleNamespace(
+            eigenvalues=np.array([-1.0]),
+            diagnostics={
+                "stability_state": "stable",
+                "dropped_rank": 0,
+                "overlap_condition": 1.0,
+                "overlap_min_eigenvalue": 1.0,
+                "retained_rank": 1,
+                "projected_ritz_residual_norm": 0.0,
+                "relative_projected_ritz_residual": 0.0,
+            },
+        )
+
+    execute_measured_qse(
+        hamiltonian=hamiltonian,
+        estimator=object(),
+        resolved_config={"reference_method": "hf"},
+        excitation_level="singles",
+        target_rank=1,
+        regularization=1e-8,
+        residual_tolerance=1e-6,
+        progress_callback=None,
+        backend_context=SimpleNamespace(backend_target="ibm_runtime"),
+        estimate_matrices_fn=lambda **_kwargs: SimpleNamespace(
+            projected_hamiltonian=np.array([[-1.0]], dtype=complex),
+            overlap=np.array([[1.0]], dtype=complex),
+            summary={
+                "max_hamiltonian_standard_error": 5.0,
+                "max_overlap_standard_error": 0.02,
+                "max_standard_error": 5.0,
+            },
+        ),
+        solve_stabilized_fn=solve_stabilized,
+        diagnostic_reportable_fn=lambda _diagnostics: True,
+        build_reference_descriptor_fn=lambda **_kwargs: {"reference_source": "hf"},
+        build_hf_reference_state_fn=lambda *_args, **_kwargs: (
+            np.array([1.0, 0.0], dtype=complex),
+            "hartree_fock",
+        ),
+    )
+
+    assert observed_errors == pytest.approx([0.02])

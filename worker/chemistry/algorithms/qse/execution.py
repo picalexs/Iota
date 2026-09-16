@@ -273,7 +273,7 @@ def execute_measured_qse(
         projected_hamiltonian,
         overlap,
         regularization=regularization,
-        max_standard_error=estimate.summary.get("max_standard_error"),
+        max_standard_error=estimate.summary.get("max_overlap_standard_error"),
     )
     if stabilized.eigenvalues.size == 0:
         raise ValueError("Measured QSE projected solve produced no eigenvalues")
@@ -326,7 +326,7 @@ def execute_measured_qse(
         "matrix_element_source": "measured_pauli_expectations",
         "matrix_element_strategy": "branch_estimator",
         "measured_matrix_element_construction": (
-            "da_case_nonorthogonal_eigensolver"
+            "fixed_pool_qse_nonorthogonal_eigensolver"
         ),
         "reference_descriptor": reference_descriptor,
         "backend_target": getattr(backend_context, "backend_target", None),

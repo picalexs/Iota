@@ -1,8 +1,7 @@
-"""Measured-matrix-element QSE assembly for noisy and hardware targets.
+"""Measured fixed-pool QSE matrix assembly for noisy and hardware targets.
 
-Implements the DA-CASE / nonorthogonal-eigensolver projected matrices
-(arXiv:2608.08739, Eqs. 2-3) directly from Pauli expectation values measured on
-one reference state ``|psi>`` through the backend Estimator:
+Builds nonorthogonal projected matrices directly from Pauli expectation values
+measured on one reference state ``|psi>`` through the backend Estimator:
 
     S_ij = <psi| A_i^dagger A_j |psi>
     H_ij = <psi| A_i^dagger H A_j |psi>
@@ -13,8 +12,10 @@ path (``worker.chemistry.algorithms.qse.excitations``). ``A_0`` is the
 identity, so the reference state is the first basis vector and ``S_00`` is a
 structural identity.
 
-Only the projected H/S matrices are assembled here; the stabilized generalized
-eigensolver and its diagnostic reportability gate are reused unchanged.
+This path uses a fixed fermionic excitation pool. It does not implement the
+adaptive global Pauli-bank procedure in DA-CASE. Only the projected H/S matrices
+are assembled here; the stabilized generalized eigensolver and its diagnostic
+reportability gate are reused unchanged.
 """
 
 from __future__ import annotations
@@ -37,6 +38,16 @@ _MAX_MEASURED_QSE_DIM = 8
 _ESTIMATOR_PUB_CHUNK_SIZE = 4
 _AER_ESTIMATOR_PUB_CHUNK_SIZE = 2
 _NOISY_AER_ESTIMATOR_PUB_CHUNK_SIZE = 4
+_STANDARD_ERROR_UNITS = {
+    "max_hamiltonian_standard_error": "hamiltonian_energy_units",
+    "max_overlap_standard_error": "dimensionless",
+    "max_standard_error": "mixed_hamiltonian_energy_and_dimensionless_overlap",
+}
+_STANDARD_ERROR_COMPATIBILITY = {
+    "definition": "legacy_max_across_hamiltonian_and_overlap_entries",
+    "units": "mixed_hamiltonian_energy_and_dimensionless_overlap",
+    "deprecated": True,
+}
 
 
 @dataclass(frozen=True)
@@ -435,6 +446,9 @@ def _emit_pair_progress(
     h_value: complex,
     dimension: int,
     estimator_pub_chunk: list[int],
+    max_hamiltonian_standard_error: float | None,
+    max_overlap_standard_error: float | None,
+    max_standard_error: float | None,
 ) -> None:
     if progress_callback is None:
         return
@@ -453,6 +467,11 @@ def _emit_pair_progress(
             "matrix_element_strategy": "branch_estimator",
             "basis_dimension": dimension,
             "estimator_pub_chunk": estimator_pub_chunk,
+            "max_hamiltonian_standard_error": max_hamiltonian_standard_error,
+            "max_overlap_standard_error": max_overlap_standard_error,
+            "max_standard_error": max_standard_error,
+            "standard_error_units": _STANDARD_ERROR_UNITS.copy(),
+            "max_standard_error_compatibility": _STANDARD_ERROR_COMPATIBILITY.copy(),
         }
     )
 
@@ -526,6 +545,8 @@ def estimate_measured_qse_matrices(
     overlap = np.zeros((dimension, dimension), dtype=complex)
     # ``None`` means the primitive did not report uncertainty; it must not be
     # treated as zero by the stabilized solver.
+    max_hamiltonian_standard_error: float | None = None
+    max_overlap_standard_error: float | None = None
     max_standard_error: float | None = None
     chunk_size = _estimator_pub_chunk_size(backend_context)
 
@@ -560,13 +581,22 @@ def estimate_measured_qse_matrices(
                 projected[col, row] = np.conjugate(h_value)
                 overlap[col, row] = np.conjugate(s_value)
             if stds.size:
-                candidate_error = float(np.max(np.abs(stds)))
-                if np.isfinite(candidate_error):
-                    max_standard_error = (
-                        candidate_error
-                        if max_standard_error is None
-                        else max(max_standard_error, candidate_error)
+                if stds.size != expected_count:
+                    raise ValueError(
+                        "Measured QSE PUB did not return all observable standard errors"
                     )
+                h_error = _finite_max_standard_error(stds[:h_count])
+                s_error = _finite_max_standard_error(stds[h_count:expected_count])
+                max_hamiltonian_standard_error = _update_standard_error_max(
+                    max_hamiltonian_standard_error, h_error
+                )
+                max_overlap_standard_error = _update_standard_error_max(
+                    max_overlap_standard_error, s_error
+                )
+                max_standard_error = _update_standard_error_max(
+                    max_standard_error,
+                    _update_standard_error_max(h_error, s_error),
+                )
             completed = index + 1
             _emit_pair_progress(
                 progress_callback=progress_callback,
@@ -577,6 +607,9 @@ def estimate_measured_qse_matrices(
                 h_value=h_value,
                 dimension=dimension,
                 estimator_pub_chunk=estimator_pub_chunk,
+                max_hamiltonian_standard_error=max_hamiltonian_standard_error,
+                max_overlap_standard_error=max_overlap_standard_error,
+                max_standard_error=max_standard_error,
             )
 
     projected = _hermitian_symmetrized(projected)
@@ -588,7 +621,7 @@ def estimate_measured_qse_matrices(
 
     summary = {
         "matrix_element_strategy": "branch_estimator",
-        "measured_matrix_element_construction": "da_case_nonorthogonal_eigensolver",
+        "measured_matrix_element_construction": "fixed_pool_qse_nonorthogonal_eigensolver",
         "primitive": "EstimatorV2",
         "estimator_pub_count": len(pubs),
         "estimator_pub_chunk_size": chunk_size,
@@ -598,7 +631,11 @@ def estimate_measured_qse_matrices(
         "projected_matrix_element_count": 2 * dimension**2,
         "basis_cap_policy": "nonzero_independent_reference_actions",
         "pauli_terms": len(pauli_hamiltonian),
+        "max_hamiltonian_standard_error": max_hamiltonian_standard_error,
+        "max_overlap_standard_error": max_overlap_standard_error,
         "max_standard_error": max_standard_error,
+        "standard_error_units": _STANDARD_ERROR_UNITS.copy(),
+        "max_standard_error_compatibility": _STANDARD_ERROR_COMPATIBILITY.copy(),
         "hermitian_symmetrized": True,
         "reference_overlap_normalized": True,
         "basis_construction_rule": "jordan_wigner_fermionic_excitation_operators",
@@ -606,6 +643,23 @@ def estimate_measured_qse_matrices(
         "backend_target": getattr(backend_context, "backend_target", None),
     }
     return MeasuredQSEMatrixElements(projected, overlap, summary)
+
+
+def _finite_max_standard_error(values: np.ndarray) -> float | None:
+    """Return the maximum finite absolute standard error, if present."""
+    candidates = np.abs(np.asarray(values, dtype=float))
+    finite = candidates[np.isfinite(candidates)]
+    return float(np.max(finite)) if finite.size else None
+
+
+def _update_standard_error_max(
+    current: float | None,
+    candidate: float | None,
+) -> float | None:
+    """Merge a standard-error maximum without treating missing data as zero."""
+    if candidate is None:
+        return current
+    return candidate if current is None else max(current, candidate)
 
 
 def measured_qse_dimension_limit() -> int:
