@@ -691,6 +691,31 @@ def run_vqe(
             parameter_values=parameter_values,
         )
 
+    backend_target = getattr(backend_context, "backend_target", None)
+    backend_precision = getattr(backend_context, "estimator_precision", None)
+    precision_driven = (
+        isinstance(backend_precision, (int, float)) and float(backend_precision) > 0.0
+    )
+    exact_expectation = backend_target == "statevector" or (
+        backend_target == "aer_simulator"
+        and isinstance(backend_precision, (int, float))
+        and float(backend_precision) == 0.0
+    )
+    objective_shots = (
+        None
+        if exact_expectation or precision_driven
+        else (
+            int(getattr(backend_context, "shots"))
+            if isinstance(getattr(backend_context, "shots", None), (int, float))
+            and not isinstance(getattr(backend_context, "shots", None), bool)
+            else None
+        )
+    )
+    objective_precision = (
+        float(backend_precision)
+        if precision_driven and backend_target != "statevector"
+        else None
+    )
     objective_state = VQEObjectiveState(
         energy_evaluator=evaluate_energy,
         progress_callback=progress_callback,
@@ -701,12 +726,8 @@ def run_vqe(
         max_function_evaluations=optimizer.max_function_evaluations,
         parameter_count=ansatz.num_parameters,
         num_qubits=num_qubits,
-        shots=(
-            int(getattr(backend_context, "shots"))
-            if isinstance(getattr(backend_context, "shots", None), (int, float))
-            and not isinstance(getattr(backend_context, "shots", None), bool)
-            else None
-        ),
+        shots=objective_shots,
+        estimator_precision=objective_precision,
     )
 
     parameter_bounds = resolve_parameter_bounds(

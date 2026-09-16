@@ -26,6 +26,9 @@ def _objective_observation_diagnostics(
     objective_state: Any,
     *,
     initial_point_evaluations: int = 0,
+    initial_point_candidates: int | None = None,
+    warm_start_retry_count: int = 0,
+    optimizer_start_count: int | None = None,
 ) -> dict[str, Any]:
     """Build the VQE work and uncertainty ledger from objective state."""
     trace = list(getattr(objective_state, "convergence_trace", []) or [])
@@ -51,7 +54,19 @@ def _objective_observation_diagnostics(
     )
     primitive_submissions = objective_evaluation_attempts + final_reevaluation_evaluations
     shots = getattr(objective_state, "shots", None)
-    total_shots = primitive_submissions * int(shots) if shots is not None else None
+    estimator_precision = getattr(objective_state, "estimator_precision", None)
+    if isinstance(estimator_precision, (int, float)) and float(estimator_precision) > 0.0:
+        shot_budget_mode = "estimator_precision"
+        shots_per_pub = None
+        total_shots = None
+    elif shots is not None:
+        shot_budget_mode = "fixed_shots"
+        shots_per_pub = int(shots)
+        total_shots = primitive_submissions * shots_per_pub
+    else:
+        shot_budget_mode = "exact_expectation"
+        shots_per_pub = None
+        total_shots = None
     available_uncertainties = sum(value is not None for value in standard_error_trace)
     if available_uncertainties == objective_evaluations and objective_evaluations:
         uncertainty_status = "available"
@@ -87,7 +102,24 @@ def _objective_observation_diagnostics(
         "primitive_run_attempts": primitive_submissions,
         "primitive_pubs": primitive_submissions,
         "primitive_jobs": primitive_submissions,
-        "shots_per_pub": int(shots) if shots is not None else None,
+        "warm_start_candidate_count": (
+            max(0, int(initial_point_candidates))
+            if initial_point_candidates is not None
+            else 0
+        ),
+        "warm_start_retry_count": max(0, int(warm_start_retry_count)),
+        "optimizer_start_count": (
+            max(0, int(optimizer_start_count))
+            if optimizer_start_count is not None
+            else 0
+        ),
+        "shot_budget_mode": shot_budget_mode,
+        "estimator_precision_per_pub": (
+            float(estimator_precision)
+            if isinstance(estimator_precision, (int, float)) and estimator_precision > 0.0
+            else None
+        ),
+        "shots_per_pub": shots_per_pub,
         "primitive_shots": total_shots,
         "wall_time_seconds": wall_time_seconds,
         "optimizer_wall_time_seconds": optimizer_wall_time_seconds,
@@ -104,7 +136,13 @@ def _objective_observation_diagnostics(
         "primitive_run_attempts": primitive_submissions,
         "primitive_pubs": primitive_submissions,
         "primitive_jobs": primitive_submissions,
-        "shots_per_pub": int(shots) if shots is not None else None,
+        "shot_budget_mode": shot_budget_mode,
+        "estimator_precision_per_pub": (
+            float(estimator_precision)
+            if isinstance(estimator_precision, (int, float)) and estimator_precision > 0.0
+            else None
+        ),
+        "shots_per_pub": shots_per_pub,
         "primitive_shots": total_shots,
         "wall_time_seconds": wall_time_seconds,
         "optimizer_wall_time_seconds": optimizer_wall_time_seconds,
@@ -295,6 +333,10 @@ def build_parameterless_vqe_result(
         _objective_observation_diagnostics(
             objective,
             initial_point_evaluations=0,
+            initial_point_candidates=int(
+                initial_point_diagnostics.get("initial_point_candidates", 0) or 0
+            ),
+            optimizer_start_count=0,
         )
     )
     _update_vqe_truth_diagnostics(diagnostics, objective_state=objective, converged=True)
@@ -375,6 +417,10 @@ def build_vqe_initial_point_limit_result(
                     initial_point_diagnostics.get("initial_point_selection_evaluations", 0)
                     or 0
                 ),
+                initial_point_candidates=int(
+                    initial_point_diagnostics.get("initial_point_candidates", 0) or 0
+                ),
+                optimizer_start_count=0,
             )
         )
         _update_vqe_truth_diagnostics(
@@ -470,6 +516,12 @@ def build_vqe_result(
             initial_point_evaluations=int(
                 optimizer_diagnostics.get("initial_point_selection_evaluations", 0) or 0
             ),
+            initial_point_candidates=int(
+                optimizer_diagnostics.get("initial_point_candidates", 0) or 0
+            ),
+            warm_start_retry_count=int(optimizer_diagnostics.get("warm_start_retry_count", 0) or 0),
+            optimizer_start_count=1
+            + int(optimizer_diagnostics.get("warm_start_retry_count", 0) or 0),
         )
     )
 

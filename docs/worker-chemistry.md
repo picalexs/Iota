@@ -96,6 +96,14 @@ SKQD sample-union results record the same worker-observed sampler fields in
 these counts as provider shots. Use `sampling_source` and `execution_path` to
 separate exact local, Aer, and IBM Runtime evidence.
 
+VQE records `shot_budget_mode` as `fixed_shots`, `estimator_precision`, or
+`exact_expectation`. Statevector execution and Aer EstimatorV2 with zero
+precision use exact expectations. Precision-driven estimators report their
+precision instead of a fixed shot count. VQE sets `shots_per_pub` and
+`primitive_shots` to `null` for both paths. Adapter metadata keeps requested
+shots separate from observed effective shots. IBM Runtime metadata does not
+infer effective shots from the worker's configured shot value.
+
 QFD grid metadata records `symmetric_kappa` for the original symmetric variant
 and `forward` for the chemistry-forward variant. The configured `max_time` and
 `time_grid_type` do not define the symmetric grid.

@@ -30,6 +30,7 @@ class VQEObjectiveState:
     parameter_count: int
     num_qubits: int
     shots: int | None = None
+    estimator_precision: float | None = None
     convergence_trace: list[float] = field(default_factory=list)
     standard_error_trace: list[float | None] = field(default_factory=list)
     evaluation_count: int = 0

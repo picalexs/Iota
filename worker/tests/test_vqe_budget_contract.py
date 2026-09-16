@@ -104,7 +104,7 @@ def test_vqe_work_ledger_counts_objective_and_final_reevaluation_once(monkeypatc
         hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
         backend=backend,
         config=_config(),
-        backend_context=BackendExecutionContext(backend_target="aer_simulator", shots=256),
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime", shots=256),
     )
 
     diagnostics = result.optimizer_diagnostics
