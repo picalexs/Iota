@@ -111,6 +111,8 @@ def test_run_skqd_uses_shared_config_and_emits_canonical_progress(
     assert skqd_events[-1]["stage"] == "completed"
     assert skqd_events[-1]["iteration"] == result.krylov_extension_diagnostics["basis_rank"]
     assert skqd_events[-1]["overall_iterations"] == result.primary_iterations
+    assert skqd_events[-1]["seeded_from_sqd"] is False
+    assert skqd_events[-1]["seeded_from_sqd_occupancies"] is False
     metrics = normalize_result(result)["algorithm_metrics"]
     assert metrics["circuit_artifact_policy"]["name"] == "all_or_windowed_sqd_iterations"
     assert len(metrics["circuit_artifacts"]) == 1
@@ -351,7 +353,7 @@ def test_run_skqd_preserves_core_when_extension_fails(
     assert diagnostics["extension_cost"]["wall_time_seconds"] >= 0.0
 
 
-def test_seed_state_from_sqd_result_preserves_electron_count() -> None:
+def test_seed_state_from_sqd_result_does_not_infer_state_from_occupancies() -> None:
     sqd_result = SQDResult(
         algorithm="sqd",
         primary_energy=-1.0,
@@ -368,13 +370,10 @@ def test_seed_state_from_sqd_result_preserves_electron_count() -> None:
 
     state = _seed_state_from_sqd_result(sqd_result, target_size=2**8)
 
-    assert state is not None
-    basis_index = int(np.argmax(np.abs(state)))
-    occupied_qubits = [qubit for qubit in range(8) if basis_index & (1 << qubit)]
-    assert occupied_qubits == [0, 1, 4, 5]
+    assert state is None
 
 
-def test_seed_state_from_sqd_result_uses_sector_correct_bitstring_probabilities() -> None:
+def test_seed_state_from_sqd_result_does_not_infer_phase_from_probabilities() -> None:
     sqd_result = SQDResult(
         algorithm="sqd",
         primary_energy=-1.0,
@@ -396,10 +395,7 @@ def test_seed_state_from_sqd_result_uses_sector_correct_bitstring_probabilities(
 
     state = _seed_state_from_sqd_result(sqd_result, target_size=2**4)
 
-    assert state is not None
-    assert state[15] == pytest.approx(0.0)
-    assert abs(state[5]) ** 2 == pytest.approx(0.25)
-    assert abs(state[10]) ** 2 == pytest.approx(0.75)
+    assert state is None
 
 
 def test_krylov_extension_reports_energy_from_orthonormal_basis() -> None:

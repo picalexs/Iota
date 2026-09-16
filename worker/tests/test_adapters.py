@@ -1786,6 +1786,25 @@ def test_normalize_result_describes_sqd_best_observed_energy_policy() -> None:
     )
 
 
+def test_normalize_result_does_not_persist_internal_sqd_coefficients() -> None:
+    result = SQDResult(
+        algorithm="sqd",
+        primary_energy=-1.2,
+        primary_iterations=1,
+        converged=True,
+        sci_energies=[-1.2],
+        configuration_recovery_trace=[],
+        spin_diagnostics={},
+        best_sci_state=object(),
+    )
+
+    normalized = normalize_result(result)
+
+    assert "best_sci_state" not in normalized
+    assert "best_sci_state" not in normalized["raw_result"]
+    assert "best_sci_state" not in normalized["algorithm_metrics"]
+
+
 def test_normalize_result_classical_references_absent_when_no_metadata() -> None:
     result = VQEResult(
         algorithm="vqe",

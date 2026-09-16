@@ -85,15 +85,16 @@ def test_build_skqd_extension_diagnostics_records_sector_and_ritz_metadata() -> 
     )
 
     assert diagnostics["execution_mode"] == "sector_matrix_free"
+    assert diagnostics["algorithm_variant"] == "sqd_seeded_local_statevector_krylov"
     assert diagnostics["sector_dimension"] == 6.0
     assert diagnostics["min_ritz"] == -1.2
     assert diagnostics["max_ritz"] == -0.4
 
 
-def test_build_skqd_extension_diagnostics_labels_probability_seed_correctly() -> None:
+def test_build_skqd_extension_diagnostics_labels_selected_ci_seed_correctly() -> None:
     extension = SimpleNamespace(
         sqd_seed=object(),
-        seed_source="sqd_bitstring_probabilities",
+        seed_source="sqd_best_selected_ci_coefficients",
         basis_rank=1,
         residual_diagnostics={},
     )
@@ -109,7 +110,64 @@ def test_build_skqd_extension_diagnostics_labels_probability_seed_correctly() ->
 
     assert diagnostics["seeded_from_sqd"] is True
     assert diagnostics["seeded_from_sqd_occupancies"] is False
-    assert diagnostics["seed_source"] == "sqd_bitstring_probabilities"
+    assert diagnostics["seed_source"] == "sqd_best_selected_ci_coefficients"
+
+
+def test_build_skqd_extension_diagnostics_records_seed_iteration() -> None:
+    extension = SimpleNamespace(
+        sqd_seed=object(),
+        seed_source="sqd_best_selected_ci_coefficients",
+        basis_rank=1,
+        residual_diagnostics={},
+    )
+    sqd_result = SimpleNamespace(
+        primary_iterations=3,
+        converged=True,
+        sci_result_package={"best_iteration": 2, "iterations": 3},
+    )
+
+    diagnostics = build_skqd_extension_diagnostics(
+        plan=SimpleNamespace(operator_dimension=2, execution_mode="dense_matrix", sector_action=None),
+        extension=extension,
+        sqd_result=sqd_result,
+        ritz_values=[],
+        krylov_extension_dim=2,
+        sampling_time_step=0.2,
+    )
+
+    assert diagnostics["seed_source"] == "sqd_best_selected_ci_coefficients"
+    assert diagnostics["sqd_seed_iteration"] == 2.0
+
+
+def test_build_skqd_extension_diagnostics_records_seed_fallback_reason() -> None:
+    extension = SimpleNamespace(
+        sqd_seed=None,
+        seed_source="hf_sector_reference",
+        seed_fallback_reason="missing_sqd_selected_ci_state",
+        basis_rank=1,
+        residual_diagnostics={},
+    )
+    sqd_result = SimpleNamespace(
+        primary_iterations=1,
+        converged=True,
+        sci_result_package={},
+    )
+
+    diagnostics = build_skqd_extension_diagnostics(
+        plan=SimpleNamespace(
+            operator_dimension=2, execution_mode="sector_operator", sector_action=None
+        ),
+        extension=extension,
+        sqd_result=sqd_result,
+        ritz_values=[],
+        krylov_extension_dim=2,
+        sampling_time_step=0.2,
+    )
+
+    assert diagnostics["seed_source"] == "hf_sector_reference"
+    assert diagnostics["seed_fallback_reason"] == "missing_sqd_selected_ci_state"
+    assert diagnostics["algorithm_variant"] == "local_statevector_krylov_extension"
+    assert diagnostics["reference_policy"] == "hartree_fock_fallback"
 
 
 def test_solution_diagnostics_and_completion_payload_share_selection_metadata() -> None:

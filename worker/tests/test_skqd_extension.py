@@ -3,7 +3,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from worker.chemistry.algorithms.skqd.extension import build_krylov_extension
+from worker.chemistry.algorithms.skqd.extension import (
+    build_krylov_extension,
+    emit_skqd_krylov_progress,
+)
 
 
 def test_dense_krylov_extension_builds_projected_solution() -> None:
@@ -26,3 +29,20 @@ def test_dense_krylov_extension_builds_projected_solution() -> None:
     assert ground_state is not None
     assert abs(ground_state[0]) == pytest.approx(1.0)
     assert abs(ground_state[1]) == pytest.approx(0.0)
+
+
+def test_krylov_progress_distinguishes_sqd_seed_from_occupancy_seed() -> None:
+    events = []
+
+    emit_skqd_krylov_progress(
+        progress_callback=events.append,
+        iteration=1,
+        completed_iterations=1,
+        energy=-1.0,
+        total_iterations=2,
+        candidate_norm=1.0,
+        seeded_from_sqd=True,
+    )
+
+    assert events[0]["seeded_from_sqd"] is True
+    assert events[0]["seeded_from_sqd_occupancies"] is False

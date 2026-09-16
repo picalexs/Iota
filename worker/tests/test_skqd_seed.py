@@ -9,15 +9,11 @@ import pytest
 
 from worker.chemistry.algorithms.skqd import workflow as skqd_solver
 from worker.chemistry.algorithms.skqd.seed import (
-    matches_spin_sector,
-    parse_bitstring_index,
-    resolve_sqd_electron_sector,
     sector_seed_state_from_sqd_result_with_source,
-    seed_state_from_sqd_bitstrings,
     seed_state_from_sqd_result,
     seed_state_from_sqd_result_with_source,
 )
-from worker.chemistry.sector_basis import state_from_sector_amplitudes
+from worker.chemistry.sector_basis import bitstring_to_address, state_from_sector_amplitudes
 
 
 def _result(package: dict[str, object], *, best_sci_state=None) -> SimpleNamespace:
@@ -25,72 +21,6 @@ def _result(package: dict[str, object], *, best_sci_state=None) -> SimpleNamespa
         sci_result_package=package,
         best_sci_state=best_sci_state,
     )
-
-
-def test_parse_bitstring_index_uses_little_endian_basis_indices() -> None:
-    assert parse_bitstring_index("10 1", num_qubits=3) == 5
-    assert parse_bitstring_index("102", num_qubits=3) is None
-    assert parse_bitstring_index("01", num_qubits=3) is None
-
-
-def test_matches_spin_sector_counts_alpha_and_beta_halves() -> None:
-    assert matches_spin_sector(0b0101, norb=2, num_elec_a=1, num_elec_b=1) is True
-    assert matches_spin_sector(0b0111, norb=2, num_elec_a=2, num_elec_b=1) is True
-    assert matches_spin_sector(0b0001, norb=2, num_elec_a=1, num_elec_b=1) is False
-
-
-def test_resolve_sqd_electron_sector_accepts_numeric_pair_only() -> None:
-    assert resolve_sqd_electron_sector({"nelec": [1, 2.0]}) == (1, 2)
-    assert resolve_sqd_electron_sector({"nelec": [1]}) is None
-    assert resolve_sqd_electron_sector({"nelec": "1,2"}) is None
-    assert resolve_sqd_electron_sector({"nelec": [1.5, 2]}) is None
-    assert resolve_sqd_electron_sector({"nelec": [float("nan"), 2]}) is None
-    assert resolve_sqd_electron_sector({"nelec": [10**1000, 2]}) is None
-    assert resolve_sqd_electron_sector({"nelec": [True, 2]}) is None
-
-
-def test_seed_state_from_sqd_bitstrings_filters_invalid_and_wrong_sector_rows() -> None:
-    state = seed_state_from_sqd_bitstrings(
-        {
-            "final_bitstring_probabilities": [
-                {"bitstring": "1111", "probability": 0.9},
-                {"bitstring": "0101", "probability": 0.25},
-                {"bitstring": "1010", "probability": 0.75},
-                {"bitstring": "0000", "probability": 4.0},
-            ]
-        },
-        target_size=16,
-        num_qubits=4,
-        norb=2,
-        num_elec_a=1,
-        num_elec_b=1,
-    )
-
-    assert state is not None
-    assert np.linalg.norm(state) == pytest.approx(1.0)
-    assert abs(state[5]) ** 2 == pytest.approx(0.25)
-    assert abs(state[10]) ** 2 == pytest.approx(0.75)
-    assert state[15] == pytest.approx(0.0)
-
-
-@pytest.mark.parametrize("probability", [float("nan"), float("inf")])
-def test_seed_state_from_sqd_bitstrings_skips_non_finite_probabilities(
-    probability: float,
-) -> None:
-    state = seed_state_from_sqd_bitstrings(
-        {
-            "final_bitstring_probabilities": [
-                {"bitstring": "0101", "probability": probability},
-            ]
-        },
-        target_size=16,
-        num_qubits=4,
-        norb=2,
-        num_elec_a=1,
-        num_elec_b=1,
-    )
-
-    assert state is None
 
 
 def test_sqd_probabilities_and_occupancies_do_not_claim_to_be_coherent_states() -> None:
@@ -151,6 +81,9 @@ def test_selected_ci_seed_preserves_relative_phase_in_dense_and_sector_bases() -
     assert dense_state[9] == pytest.approx(-1j * coefficient)
     assert sector_state is not None
     assert np.allclose(sector_state, expected_sector_state)
+    for bitstring in ("0101", "1001"):
+        sector_address = bitstring_to_address(bitstring, norb=2, nelec=(1, 1))
+        assert dense_state[int(bitstring, 2)] == pytest.approx(sector_state[sector_address])
 
 
 def test_equal_probabilities_with_opposite_phase_produce_distinct_coherent_seeds() -> None:
@@ -175,6 +108,27 @@ def test_equal_probabilities_with_opposite_phase_produce_distinct_coherent_seeds
     assert positive is not None and negative is not None
     assert np.array_equal(np.abs(positive) ** 2, np.abs(negative) ** 2)
     assert not np.allclose(positive, negative)
+    coupling_hamiltonian = np.zeros((16, 16), dtype=complex)
+    coupling_hamiltonian[5, 9] = coupling_hamiltonian[9, 5] = 1.0
+    assert np.vdot(positive, coupling_hamiltonian @ positive).real == pytest.approx(1.0)
+    assert np.vdot(negative, coupling_hamiltonian @ negative).real == pytest.approx(-1.0)
+
+
+def test_selected_ci_seed_rejects_non_integer_determinant_masks() -> None:
+    selected_state = SimpleNamespace(
+        amplitudes=np.asarray([[1.0]], dtype=complex),
+        ci_strs_a=np.asarray([1.5]),
+        ci_strs_b=np.asarray([1]),
+        norb=2,
+        nelec=(1, 1),
+    )
+
+    state, source = seed_state_from_sqd_result_with_source(
+        _result({}, best_sci_state=selected_state), target_size=16
+    )
+
+    assert state is None
+    assert source == "invalid_sqd_selected_ci_state"
 
 
 def test_sector_seed_state_from_sqd_result_uses_sector_normalization() -> None:
@@ -188,10 +142,6 @@ def test_sector_seed_state_from_sqd_result_uses_sector_normalization() -> None:
 
 
 def test_skqd_solver_keeps_legacy_seed_aliases() -> None:
-    assert skqd_solver._parse_bitstring_index is parse_bitstring_index
-    assert skqd_solver._matches_spin_sector is matches_spin_sector
-    assert skqd_solver._resolve_sqd_electron_sector is resolve_sqd_electron_sector
-    assert skqd_solver._seed_state_from_sqd_bitstrings is seed_state_from_sqd_bitstrings
     assert skqd_solver._seed_state_from_sqd_result is seed_state_from_sqd_result
     assert (
         skqd_solver._seed_state_from_sqd_result_with_source
