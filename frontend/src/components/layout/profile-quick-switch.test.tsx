@@ -9,7 +9,10 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 
-import { forceRefreshBackendCapabilities, setActiveBackendCapabilitiesProfile } from "@/api/backends";
+import {
+  forceRefreshBackendCapabilities,
+  setActiveBackendCapabilitiesProfile,
+} from "@/api/backends";
 import { activateIbmCredentialProfile, listIbmCredentialProfiles } from "@/api/profiles";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { notifyIbmCredentialProfilesChanged } from "@/lib/ibm-profile-events";
@@ -182,11 +185,13 @@ describe("ProfileQuickSwitch", () => {
   });
 
   it("keeps an unavailable optional profile service inline without a toast", async () => {
+    const user = userEvent.setup();
     vi.mocked(listIbmCredentialProfiles).mockRejectedValueOnce(
       new Error("Profile service unavailable"),
     );
 
     renderSwitchWithRouter();
+    await user.click(await screen.findByRole("button", { name: /IBM profiles/i }));
 
     expect(
       await screen.findByRole("link", { name: "Open IBM profile settings" }),
