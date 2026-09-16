@@ -52,7 +52,12 @@ def _objective_observation_diagnostics(
         0,
         int(getattr(objective_state, "final_reevaluation_count", 0) or 0),
     )
-    primitive_submissions = objective_evaluation_attempts + final_reevaluation_evaluations
+    primitive_work = getattr(objective_state, "primitive_work", None)
+    primitive_run_attempts = max(0, int(getattr(primitive_work, "run_attempts", 0) or 0))
+    primitive_pub_attempts = max(0, int(getattr(primitive_work, "pub_attempts", 0) or 0))
+    primitive_jobs = max(0, int(getattr(primitive_work, "jobs_returned", 0) or 0))
+    primitive_pubs = max(0, int(getattr(primitive_work, "pubs_returned", 0) or 0))
+    primitive_run_failures = max(0, int(getattr(primitive_work, "run_failures", 0) or 0))
     shots = getattr(objective_state, "shots", None)
     estimator_precision = getattr(objective_state, "estimator_precision", None)
     if isinstance(estimator_precision, (int, float)) and float(estimator_precision) > 0.0:
@@ -62,7 +67,7 @@ def _objective_observation_diagnostics(
     elif shots is not None:
         shot_budget_mode = "fixed_shots"
         shots_per_pub = int(shots)
-        total_shots = primitive_submissions * shots_per_pub
+        total_shots = primitive_pubs * shots_per_pub
     else:
         shot_budget_mode = "exact_expectation"
         shots_per_pub = None
@@ -99,9 +104,11 @@ def _objective_observation_diagnostics(
         "objective_evaluation_attempts": objective_evaluation_attempts,
         "objective_evaluation_failures": objective_evaluation_failures,
         "final_reevaluation_evaluations": final_reevaluation_evaluations,
-        "primitive_run_attempts": primitive_submissions,
-        "primitive_pubs": primitive_submissions,
-        "primitive_jobs": primitive_submissions,
+        "primitive_run_attempts": primitive_run_attempts,
+        "primitive_pub_attempts": primitive_pub_attempts,
+        "primitive_run_failures": primitive_run_failures,
+        "primitive_pubs": primitive_pubs,
+        "primitive_jobs": primitive_jobs,
         "warm_start_candidate_count": (
             max(0, int(initial_point_candidates))
             if initial_point_candidates is not None
@@ -121,6 +128,9 @@ def _objective_observation_diagnostics(
         ),
         "shots_per_pub": shots_per_pub,
         "primitive_shots": total_shots,
+        "primitive_shot_count_basis": (
+            "configured_shots_per_returned_pub" if total_shots is not None else None
+        ),
         "wall_time_seconds": wall_time_seconds,
         "optimizer_wall_time_seconds": optimizer_wall_time_seconds,
     }
@@ -133,9 +143,11 @@ def _objective_observation_diagnostics(
         "objective_evaluation_attempts": objective_evaluation_attempts,
         "objective_evaluation_failures": objective_evaluation_failures,
         "final_reevaluation_evaluations": final_reevaluation_evaluations,
-        "primitive_run_attempts": primitive_submissions,
-        "primitive_pubs": primitive_submissions,
-        "primitive_jobs": primitive_submissions,
+        "primitive_run_attempts": primitive_run_attempts,
+        "primitive_pub_attempts": primitive_pub_attempts,
+        "primitive_run_failures": primitive_run_failures,
+        "primitive_pubs": primitive_pubs,
+        "primitive_jobs": primitive_jobs,
         "shot_budget_mode": shot_budget_mode,
         "estimator_precision_per_pub": (
             float(estimator_precision)
@@ -144,6 +156,9 @@ def _objective_observation_diagnostics(
         ),
         "shots_per_pub": shots_per_pub,
         "primitive_shots": total_shots,
+        "primitive_shot_count_basis": (
+            "configured_shots_per_returned_pub" if total_shots is not None else None
+        ),
         "wall_time_seconds": wall_time_seconds,
         "optimizer_wall_time_seconds": optimizer_wall_time_seconds,
         "work_ledger": work_ledger,

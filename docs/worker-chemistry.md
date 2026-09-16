@@ -104,6 +104,12 @@ precision instead of a fixed shot count. VQE sets `shots_per_pub` and
 shots separate from observed effective shots. IBM Runtime metadata does not
 infer effective shots from the worker's configured shot value.
 
+VQE counts objective callbacks separately from backend `run()` calls. It counts
+`primitive_jobs` when the backend returns a job handle. It counts `primitive_pubs`
+for those returned handles. For fixed-shot runs, `primitive_shots` is a nominal
+estimate from configured shots per returned PUB. It is not a provider-reported
+physical shot total. Check `primitive_shot_count_basis` before comparing totals.
+
 QFD grid metadata records `symmetric_kappa` for the original symmetric variant
 and `forward` for the chemistry-forward variant. The configured `max_time` and
 `time_grid_type` do not define the symmetric grid.

@@ -60,6 +60,8 @@ from worker.chemistry.algorithms.vqe.state_data import (
 from worker.chemistry.algorithms.vqe.telemetry import (
     FunctionEvaluationLimitReached,
     VQEObjectiveState,
+    VQEObservedPrimitive,
+    VQEPrimitiveWork,
 )
 from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.optimizer_registry import build_optimizer
@@ -578,6 +580,8 @@ def run_vqe(
         raise ValueError(
             "VQE backend must provide a run() method compatible with estimator primitives"
         )
+    primitive_work = VQEPrimitiveWork()
+    observed_backend = VQEObservedPrimitive(backend, primitive_work)
 
     ansatz = build_ansatz(
         ansatz_name=vqe_config.ansatz_name,
@@ -679,13 +683,13 @@ def run_vqe(
         # obtains uncertainty from this same primitive submission.
         if _evaluate_energy is not _vqe_objective.evaluate_energy:
             return _evaluate_energy(
-                backend=backend,
+                backend=observed_backend,
                 ansatz=ansatz,
                 operator=operator,
                 parameter_values=parameter_values,
             )
         return _evaluate_energy_with_uncertainty(
-            backend=backend,
+            backend=observed_backend,
             ansatz=ansatz,
             operator=operator,
             parameter_values=parameter_values,
@@ -728,6 +732,7 @@ def run_vqe(
         num_qubits=num_qubits,
         shots=objective_shots,
         estimator_precision=objective_precision,
+        primitive_work=primitive_work,
     )
 
     parameter_bounds = resolve_parameter_bounds(
@@ -820,7 +825,7 @@ def run_vqe(
     _update_independent_reevaluation(
         diagnostics=optimizer_diagnostics,
         objective=objective_state,
-        backend=backend,
+        backend=observed_backend,
         ansatz=ansatz,
         operator=operator,
         optimal_point=optimal_point,

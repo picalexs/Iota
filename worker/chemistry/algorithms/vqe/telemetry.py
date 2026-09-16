@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
@@ -14,6 +15,44 @@ from worker.chemistry.progress import ProgressCallback
 
 class FunctionEvaluationLimitReached(RuntimeError):
     """Raised when VQE objective calls reach the configured cap."""
+
+
+@dataclass
+class VQEPrimitiveWork:
+    """Count worker calls and job handles returned by the estimator primitive."""
+
+    run_attempts: int = 0
+    pub_attempts: int = 0
+    jobs_returned: int = 0
+    pubs_returned: int = 0
+    run_failures: int = 0
+
+
+class VQEObservedPrimitive:
+    """Observe VQE run calls without treating objective callbacks as jobs."""
+
+    def __init__(self, primitive: Any, work: VQEPrimitiveWork) -> None:
+        self._primitive = primitive
+        self._work = work
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._primitive, name)
+
+    def run(self, *args: Any, **kwargs: Any) -> Any:
+        self._work.run_attempts += 1
+        pubs = kwargs.get("pubs", args[0] if args else None)
+        pub_count = len(pubs) if isinstance(pubs, (list, tuple)) else None
+        if pub_count is not None:
+            self._work.pub_attempts += pub_count
+        try:
+            job = self._primitive.run(*args, **kwargs)
+        except Exception:
+            self._work.run_failures += 1
+            raise
+        self._work.jobs_returned += 1
+        if pub_count is not None:
+            self._work.pubs_returned += pub_count
+        return job
 
 
 @dataclass
@@ -31,6 +70,7 @@ class VQEObjectiveState:
     num_qubits: int
     shots: int | None = None
     estimator_precision: float | None = None
+    primitive_work: VQEPrimitiveWork = field(default_factory=VQEPrimitiveWork)
     convergence_trace: list[float] = field(default_factory=list)
     standard_error_trace: list[float | None] = field(default_factory=list)
     evaluation_count: int = 0
