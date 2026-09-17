@@ -124,7 +124,7 @@ def state_from_bitstring_probabilities(
             state[address] += np.sqrt(float(probability))
 
     norm = float(np.linalg.norm(state))
-    if np.isclose(norm, 0.0):
+    if not np.isfinite(norm) or norm == 0.0:
         return None
     return state / norm
 
@@ -168,7 +168,7 @@ def state_from_sector_amplitudes(
         state[address] += _parse_amplitude(entry.get("amplitude"))
 
     norm = float(np.linalg.norm(state))
-    if np.isclose(norm, 0.0):
+    if not np.isfinite(norm) or norm == 0.0:
         raise ValueError("provided_sector amplitudes have zero norm")
     return state / norm
 

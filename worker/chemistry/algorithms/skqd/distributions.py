@@ -53,7 +53,7 @@ def time_evolved_bitstring_distribution(
     """Aggregate computational-basis probabilities from exact evolved states."""
     seed = np.asarray(seed_state, dtype=complex).reshape(-1)
     seed_norm = float(np.linalg.norm(seed))
-    if np.isclose(seed_norm, 0.0) or num_steps < 1:
+    if not np.isfinite(seed_norm) or seed_norm == 0.0 or num_steps < 1:
         return []
     seed = seed / seed_norm
 

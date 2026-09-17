@@ -65,7 +65,7 @@ def exact_time_evolution_state_from_spectrum(
     phases = np.exp(-1j * np.asarray(eigenvalues, dtype=float) * time_step)
     evolved = eigenvectors @ (phases * state_projection)
     norm = np.linalg.norm(evolved)
-    if np.isclose(norm, 0.0):
+    if norm == 0.0:
         return evolved
     return evolved / norm
 
@@ -108,7 +108,7 @@ def trotterized_time_evolution_state(
         evolved = _exponentiate_hermitian(residual, step_time) @ evolved
 
     norm = np.linalg.norm(evolved)
-    if np.isclose(norm, 0.0):
+    if norm == 0.0:
         return evolved
     return evolved / norm
 
@@ -191,7 +191,7 @@ def aer_pauli_time_evolution_state(
 def _normalized_state(state: np.ndarray) -> np.ndarray:
     state_array = np.asarray(state, dtype=complex)
     norm = float(np.linalg.norm(state_array))
-    if np.isclose(norm, 0.0):
+    if norm == 0.0:
         return state_array
     return state_array / norm
 

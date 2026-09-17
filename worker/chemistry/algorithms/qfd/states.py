@@ -50,7 +50,7 @@ def build_sector_qfd_states(
             )
         )
         norm = float(np.linalg.norm(state))
-        if np.isclose(norm, 0.0):
+        if not np.isfinite(norm) or norm == 0.0:
             continue
         states.append(state / norm)
 

@@ -31,7 +31,7 @@ def seed_state_from_sqd_result_with_source(
         amplitude = complex(float(raw_amplitude[0]), float(raw_amplitude[1]))
         state[basis_index] += amplitude
     norm = float(np.linalg.norm(state))
-    if not math.isfinite(norm) or np.isclose(norm, 0.0):
+    if not math.isfinite(norm) or norm == 0.0:
         return None, "invalid_sqd_selected_ci_state"
     return state / norm, "sqd_best_selected_ci_coefficients"
 

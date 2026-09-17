@@ -102,7 +102,7 @@ def build_krylov_extension(
     if raw_eigenvectors.size:
         ground_state = orthonormal_basis @ raw_eigenvectors[:, order[0]]
         ground_norm = float(np.linalg.norm(ground_state))
-        if not np.isclose(ground_norm, 0.0):
+        if np.isfinite(ground_norm) and ground_norm != 0.0:
             ground_state = ground_state / ground_norm
     residual_diagnostics = projected_ritz_diagnostics_fn(
         operator,

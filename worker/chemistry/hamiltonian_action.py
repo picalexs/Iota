@@ -48,7 +48,7 @@ class HamiltonianAction:
         """Return the real expectation value <v|H|v>/<v|v>."""
         candidate = np.asarray(vector, dtype=complex).reshape(-1)
         norm_sq = float(np.vdot(candidate, candidate).real)
-        if np.isclose(norm_sq, 0.0):
+        if not np.isfinite(norm_sq) or norm_sq == 0.0:
             raise ValueError("cannot evaluate expectation of a zero vector")
         value = np.vdot(candidate, self.matvec(candidate)) / norm_sq
         return float(np.real_if_close(value))

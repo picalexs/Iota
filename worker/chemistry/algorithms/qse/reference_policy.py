@@ -176,7 +176,7 @@ def _build_vqe_reference_state_and_artifacts(
     state = Statevector.from_instruction(ansatz.assign_parameters(optimal_parameters.tolist())).data
     state = np.asarray(state, dtype=complex)
     norm = float(np.linalg.norm(state))
-    if np.isclose(norm, 0.0):
+    if not np.isfinite(norm) or norm == 0.0:
         raise ValueError("QSE VQE reference solve produced a zero-norm state")
     reference_artifact = next(
         (artifact for artifact in vqe_result.circuit_artifacts if artifact.get("role") == "final"),
@@ -295,7 +295,7 @@ def resolve_reference_state(
     if reference_method == "hf":
         reference_state = build_hf_reference_state_fn(hamiltonian, fallback_dim=vector_size)
         norm = float(np.linalg.norm(reference_state))
-        if np.isclose(norm, 0.0):
+        if not np.isfinite(norm) or norm == 0.0:
             raise ValueError("QSE HF reference state has zero norm")
         return reference_method, reference_state / norm, hf_reference_artifacts_fn(hamiltonian)
 
@@ -350,7 +350,7 @@ def resolve_sector_reference_state(
     if reference_method == "hf":
         reference_state = hartree_fock_sector_state_fn(action.norb, action.nelec)
         norm = float(np.linalg.norm(reference_state))
-        if np.isclose(norm, 0.0):
+        if not np.isfinite(norm) or norm == 0.0:
             raise ValueError("QSE HF sector reference state has zero norm")
         return reference_method, reference_state / norm, hf_reference_artifacts_fn(hamiltonian)
 

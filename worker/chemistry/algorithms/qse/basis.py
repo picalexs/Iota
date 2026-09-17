@@ -109,8 +109,10 @@ def accept_basis_candidate(
     if orthonormal_basis and residual_norm <= overlap_threshold:
         return None
 
+    if not np.isfinite(residual_norm):
+        return None
     basis.append(normalized)
-    if np.isclose(residual_norm, 0.0):
+    if residual_norm == 0.0:
         orthonormal_basis.append(normalized)
         return 0.0
 

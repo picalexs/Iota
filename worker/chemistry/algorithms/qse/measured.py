@@ -179,7 +179,7 @@ def _build_measured_excitation_pool(
     if reference.ndim != 1 or reference.size != 2**num_qubits:
         raise ValueError("Measured QSE reference_state size must match num_qubits")
     reference_norm = float(np.linalg.norm(reference))
-    if not np.isfinite(reference_norm) or reference_norm <= 1e-12:
+    if not np.isfinite(reference_norm) or reference_norm == 0.0:
         raise ValueError("Measured QSE reference_state must have a finite non-zero norm")
     reference = reference / reference_norm
 
@@ -209,7 +209,7 @@ def _build_measured_excitation_pool(
             num_qubits=num_qubits,
         )
         candidate_norm = float(np.linalg.norm(candidate))
-        if not np.isfinite(candidate_norm) or candidate_norm <= 1e-12:
+        if not np.isfinite(candidate_norm) or candidate_norm == 0.0:
             continue
 
         residual = candidate / candidate_norm

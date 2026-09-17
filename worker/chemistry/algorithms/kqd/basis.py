@@ -248,7 +248,7 @@ def build_krylov_basis(
             backend_context=backend_context,
         )
         norm = float(np.linalg.norm(vector))
-        if np.isclose(norm, 0.0):
+        if not np.isfinite(norm) or norm == 0.0:
             continue
 
         basis.append(vector / norm)
@@ -316,7 +316,7 @@ def build_sector_krylov_basis(
                 trotter_steps=trotter_steps,
             )
         norm = float(np.linalg.norm(vector))
-        if np.isclose(norm, 0.0):
+        if not np.isfinite(norm) or norm == 0.0:
             continue
 
         basis.append(vector / norm)
