@@ -151,6 +151,15 @@ def _build_vqe_reference_state_and_artifacts(
     vqe_result: Any,
     vqe_cost: dict[str, Any],
 ) -> tuple[np.ndarray, list[dict[str, Any]]]:
+    optimal_parameters = np.asarray(vqe_result.optimal_parameters, dtype=float).reshape(-1)
+    if optimal_parameters.size != ansatz.num_parameters:
+        raise ValueError(
+            "QSE VQE reference parameter count does not match the ansatz "
+            f"(expected {ansatz.num_parameters}, received {optimal_parameters.size})"
+        )
+    if not np.all(np.isfinite(optimal_parameters)):
+        raise ValueError("QSE VQE reference parameters must be finite")
+
     if ansatz.num_parameters == 0:
         state = Statevector.from_instruction(ansatz).data
         reference_artifact = next(
@@ -163,15 +172,6 @@ def _build_vqe_reference_state_and_artifacts(
             else []
         )
         return np.asarray(state, dtype=complex), artifacts
-
-    optimal_parameters = np.asarray(vqe_result.optimal_parameters, dtype=float)
-    if optimal_parameters.size < ansatz.num_parameters:
-        padded = np.zeros(ansatz.num_parameters, dtype=float)
-        if optimal_parameters.size:
-            padded[: optimal_parameters.size] = optimal_parameters
-        optimal_parameters = padded
-    elif optimal_parameters.size > ansatz.num_parameters:
-        optimal_parameters = optimal_parameters[: ansatz.num_parameters]
 
     state = Statevector.from_instruction(ansatz.assign_parameters(optimal_parameters.tolist())).data
     state = np.asarray(state, dtype=complex)
@@ -246,7 +246,6 @@ def build_vqe_reference_state(
             "optimizer_name": optimizer_name,
             "max_iterations": reference_iterations,
             "reps": reference_reps,
-            "convergence_threshold": float(resolved_config.get("regularization") or 1e-6),
             "initial_point_strategy": "zero_plus_seeded_random",
             "initial_point_candidates": 2,
         },

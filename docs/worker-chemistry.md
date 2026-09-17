@@ -133,7 +133,9 @@ it only for intermediate basis-progress estimates. Fixed-sector QSE does not
 use it. Neither final solve shifts the projected metric. The
 legacy `conditioning_summary.regularization` field
 remains path-specific. Use the explicit fields to compare the requested value
-with a final metric shift.
+with a final metric shift. The nested VQE reference uses the VQE default
+absolute energy-delta threshold of `1e-8`. QSE regularization does not change
+that threshold.
 
 Measured QSE prepares a Hartree–Fock reference and builds directions
 `A_i |psi_ref>` from its fixed excitation pool. The dimension cap includes the
