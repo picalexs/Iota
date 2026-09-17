@@ -165,6 +165,8 @@ def execute_sqd_iteration(
         trace_builder(
             iteration=iteration,
             num_batches=options.num_batches,
+            requested_samples_per_batch=options.samples_per_batch,
+            effective_samples_per_batch=batch_outcome.effective_samples_per_batch,
             symmetrize_spin=options.symmetrize_spin,
             sampling=sampling,
             state=state,

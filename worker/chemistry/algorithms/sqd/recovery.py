@@ -39,6 +39,7 @@ class SQDBatchOutcome:
     carryover_ci_strings: tuple[np.ndarray, np.ndarray]
     last_carryover_summary: dict[str, Any]
     last_batch_energies: list[float]
+    effective_samples_per_batch: int
     selected_ci_dimensions: list[int]
     selected_ci_fractions: list[float]
 
@@ -275,6 +276,7 @@ def run_selected_ci_batches(
         carryover_ci_strings=carryover_ci_strings,
         last_carryover_summary=last_carryover_summary,
         last_batch_energies=[round(float(value), 8) for value in batch_energies],
+        effective_samples_per_batch=effective_samples_per_batch,
         selected_ci_dimensions=selected_ci_dimensions,
         selected_ci_fractions=selected_ci_fractions,
     )
