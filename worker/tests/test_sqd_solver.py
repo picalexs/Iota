@@ -354,6 +354,41 @@ def test_sample_bitstring_matrix_records_retry_work(monkeypatch) -> None:
     }
 
 
+def test_sample_bitstring_matrix_can_retry_without_increasing_requested_shots(
+    monkeypatch,
+) -> None:
+    class _Sampler:
+        def __init__(self) -> None:
+            self.shots: list[int] = []
+
+        def run(self, *args, **kwargs):
+            del args
+            self.shots.append(kwargs["shots"])
+            if len(self.shots) == 1:
+                raise RuntimeError("transient sampler failure")
+            return SimpleNamespace(result=lambda: object())
+
+    monkeypatch.setattr(
+        sqd_sampling_execution,
+        "extract_sampler_bitstrings",
+        lambda _result: ["0000"] * 8,
+    )
+    sampler = _Sampler()
+    ledger: dict[str, int] = {}
+
+    matrix = _sample_bitstring_matrix(
+        sampler,
+        num_bits=4,
+        total_samples=8,
+        work_ledger=ledger,
+        retry_with_increased_shots=False,
+    )
+
+    assert matrix.shape == (8, 4)
+    assert sampler.shots == [8, 8]
+    assert ledger["sampler_requested_shots_total"] == 16
+
+
 def test_sample_bitstring_matrix_does_not_retry_runtime_result_failure() -> None:
     class _RuntimeJob:
         def result(self):

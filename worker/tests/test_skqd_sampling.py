@@ -106,20 +106,23 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
 ) -> None:
     calls: list[object] = []
     ledgers: list[dict[str, object]] = []
+    sampling_options: list[dict[str, object]] = []
     from qiskit.quantum_info import Operator
 
     def fake_sample_bitstring_matrix(backend, **kwargs):
         del backend
         ledger = kwargs["work_ledger"]
         ledgers.append(ledger)
+        sampling_options.append(kwargs)
         ledger["sampler_run_attempts"] += 1
         ledger["sampler_successful_runs"] += 1
         ledger["sampler_requested_shots_total"] += kwargs["total_samples"]
-        ledger["sampler_returned_raw_sample_rows"] += kwargs["total_samples"]
         circuit = kwargs["sampling_circuit_factory"]()
         calls.append(circuit)
         index = len(calls) - 1
-        return np.asarray([[index == 1]], dtype=bool).repeat(3, axis=0), circuit
+        returned_rows = 6 if index == 1 else 3
+        ledger["sampler_returned_raw_sample_rows"] += returned_rows
+        return np.asarray([[index == 1]], dtype=bool).repeat(returned_rows, axis=0), circuit
 
     monkeypatch.setattr(workflow, "sample_bitstring_matrix", fake_sample_bitstring_matrix)
     hamiltonian = type(
@@ -158,12 +161,14 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
     assert metadata["sampling_source"] == "sampler_krylov_circuits"
     assert len(ledgers) == 3
     assert ledgers[0] is ledgers[1]
+    assert all(option.get("retry_with_increased_shots") is False for option in sampling_options)
     assert metadata["work_ledger"] is not ledgers[0]
     assert metadata["work_ledger"]["ledger_version"] == 1
     assert metadata["work_ledger"]["sampler_run_attempts"] == 3
     assert metadata["work_ledger"]["sampler_successful_runs"] == 3
     assert metadata["work_ledger"]["sampler_requested_shots_total"] == 9
-    assert metadata["work_ledger"]["sampler_returned_raw_sample_rows"] == 9
+    assert metadata["work_ledger"]["sampler_returned_raw_sample_rows"] == 12
+    assert metadata["work_ledger"]["sampler_retained_sample_rows"] == 9
     assert all(instruction.operation.name != "PauliEvolution" for instruction in calls[1].data)
     one_step_unitary = Operator(calls[1]).data
     two_step_unitary = Operator(calls[2]).data
