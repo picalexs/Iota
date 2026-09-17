@@ -333,6 +333,9 @@ def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
     assert result.primary_energy is not None
     # The stabilized noisy solve is a rank-reduced diagnostic.
     assert result.conditioning_summary["stability_state"] in {"stabilized", "stable"}
+    assert result.conditioning_summary["termination_reason"] == (
+        "measured_matrix_elements_diagnostic"
+    )
 
     normalized = normalize_result(result)
     convergence = normalized["algorithm_metrics"]["convergence"]
