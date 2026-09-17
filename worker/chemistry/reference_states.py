@@ -8,12 +8,14 @@ from worker.chemistry.types import HamiltonianBundle
 
 
 def _hamiltonian_num_qubits(hamiltonian: object) -> int | None:
-    raw_num_qubits = (
-        hamiltonian.num_qubits
-        if isinstance(hamiltonian, HamiltonianBundle)
-        else getattr(hamiltonian, "num_qubits", None)
-    )
-    return int(raw_num_qubits) if isinstance(raw_num_qubits, int) else None
+    raw_num_qubits = getattr(hamiltonian, "num_qubits", None)
+    if isinstance(raw_num_qubits, int) and raw_num_qubits > 0:
+        return int(raw_num_qubits)
+    pauli = getattr(hamiltonian, "pauli_hamiltonian", None)
+    pauli_num_qubits = getattr(pauli, "num_qubits", None)
+    if isinstance(pauli_num_qubits, int) and pauli_num_qubits > 0:
+        return int(pauli_num_qubits)
+    return None
 
 
 def _hamiltonian_hf_metadata(hamiltonian: object) -> tuple[int, int, int] | None:
