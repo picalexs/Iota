@@ -277,6 +277,36 @@ def test_measured_qse_dimension_cap_counts_independent_hf_excitation_states() ->
     assert np.linalg.matrix_rank(estimate.overlap, tol=1e-10) == 8
 
 
+def test_measured_qse_reports_actual_capped_excitation_pool() -> None:
+    """Measured-QSE metadata records its singles-first capped basis."""
+    hamiltonian = _HamiltonianBundle(
+        SparsePauliOp.from_list([("I" * 8, 1.0)]),
+        num_qubits=8,
+        n_alpha=2,
+        n_beta=2,
+        norb=4,
+    )
+    reference = build_hf_reference_state(hamiltonian, fallback_dim=2**8)
+    estimator = _MockEstimator(reference)
+
+    estimate = estimate_measured_qse_matrices(
+        hamiltonian=hamiltonian,
+        estimator=estimator,
+        excitation_level="singles_doubles",
+        max_dimension=7,
+        backend_context=None,
+    )
+
+    basis_selection = estimate.summary["basis_selection"]
+    assert basis_selection["candidate_selection_policy"] == "fermionic_generator_order"
+    assert basis_selection["selected_excitation_counts"] == {
+        "reference": 1,
+        "single": 6,
+        "double": 0,
+    }
+    assert len(basis_selection["selected_excitation_specs"]) == 7
+
+
 def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
     hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=3))
     reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
