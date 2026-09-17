@@ -115,11 +115,13 @@ def test_build_sqd_circuit_artifacts_downsamples_rich_previews() -> None:
 def test_build_sqd_circuit_artifacts_marks_reused_measurement_representative() -> None:
     circuit = _build_hf_reference_circuit(4, num_elec_a=1, num_elec_b=1)
 
-    artifacts, _policy = _build_sqd_circuit_artifacts([(1, circuit)], total_iterations=3)
+    artifacts, policy = _build_sqd_circuit_artifacts([(1, circuit)], total_iterations=3)
 
     assert len(artifacts) == 1
     assert artifacts[0]["iteration"] == 1
     assert artifacts[0]["representative"] is True
+    assert policy["stored_iterations"] == [1]
+    assert policy["dropped_iterations"] == [2, 3]
 
 
 def test_build_sqd_circuit_artifacts_windows_large_iteration_sets() -> None:
