@@ -34,6 +34,8 @@ def test_first_recovery_trace_deltas_are_unavailable_not_zero() -> None:
     entry = sqd_progress.build_recovery_trace_entry(
         iteration=1,
         num_batches=2,
+        requested_samples_per_batch=8,
+        effective_samples_per_batch=2,
         symmetrize_spin=False,
         sampling=sampling,
         state=state,
@@ -44,3 +46,5 @@ def test_first_recovery_trace_deltas_are_unavailable_not_zero() -> None:
 
     assert entry["delta_energy"] is None
     assert entry["occupancy_delta"] is None
+    assert entry["requested_samples_per_batch"] == 8
+    assert entry["effective_samples_per_batch"] == 2

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from worker.adapters.result_adapter import normalize_result
 from worker.chemistry.algorithms.sqd import sampling_execution as sqd_sampling_execution
 from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 from worker.chemistry.algorithms.sqd.workflow import (
@@ -939,10 +940,6 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
         ],
         dtype=bool,
     )
-    recovered_batches = [
-        np.array([[False, True, False, True]], dtype=bool),
-        np.array([[True, False, True, False]], dtype=bool),
-    ]
     batch_occupancies = iter(
         [
             (np.array([0.9, 0.1]), np.array([0.85, 0.15])),
@@ -952,12 +949,24 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
     batch_energies = iter([-1.2, -0.8])
     selected_states = [SimpleNamespace(batch_index=index) for index in range(2)]
     states = iter(selected_states)
+    effective_batch_sizes: list[int] = []
 
     monkeypatch.setattr(
         sqd_solver,
         "_sample_bitstring_matrix",
         lambda *args, **kwargs: sampled,
     )
+
+    def fake_subsample(
+        selected_bits,
+        _selected_probs,
+        samples_per_batch,
+        num_batches,
+        rand_seed,
+    ):
+        del rand_seed
+        effective_batch_sizes.append(samples_per_batch)
+        return [selected_bits[:samples_per_batch].copy() for _ in range(num_batches)]
 
     def fake_import_deps():
         return sqd_solver._SQDDependencies(
@@ -975,9 +984,7 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
                 next(batch_occupancies),
                 0.0,
             ),
-            subsample=lambda selected_bits, selected_probs, samples_per_batch, num_batches, rand_seed: (
-                recovered_batches
-            ),
+            subsample=fake_subsample,
         )
 
     monkeypatch.setattr(sqd_solver, "_import_sqd_dependencies", fake_import_deps)
@@ -997,7 +1004,7 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
         config={
             "algorithm": "sqd",
             "max_iterations": 1,
-            "samples_per_batch": 2,
+            "samples_per_batch": 8,
             "num_batches": 2,
             "min_selected_configurations": 1,
             "max_dim": 1,
@@ -1016,6 +1023,14 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
     assert result.sci_result_package["selected_ci"]["selected_determinant_count"] == 1
     assert result.configuration_recovery_trace[-1]["selected_ci_dimension"] == 1
     assert result.best_sci_state is selected_states[0]
+    assert effective_batch_sizes == [2]
+    trace = result.configuration_recovery_trace[-1]
+    assert trace["requested_samples_per_batch"] == 8
+    assert trace["effective_samples_per_batch"] == 2
+    serialized_trace = normalize_result(result)["algorithm_metrics"][
+        "configuration_recovery_trace"
+    ][-1]
+    assert serialized_trace["effective_samples_per_batch"] == 2
 
 
 def test_run_sqd_carries_over_high_weight_ci_strings(monkeypatch) -> None:
