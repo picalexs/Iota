@@ -36,6 +36,20 @@ def test_apply_fermionic_excitation_moves_dense_state_amplitude() -> None:
     np.testing.assert_array_equal(result, expected)
 
 
+def test_apply_fermionic_excitation_keeps_small_nonzero_amplitudes() -> None:
+    reference = np.zeros(4, dtype=complex)
+    reference[1] = 1e-12
+
+    result = apply_fermionic_excitation(
+        reference,
+        create_orbitals=(1,),
+        annihilate_orbitals=(0,),
+        num_qubits=2,
+    )
+
+    assert result[2] == 1e-12
+
+
 def test_fermionic_excitation_specs_preserve_spin_sectors() -> None:
     singles = list(fermionic_excitation_specs(4, excitation_level="singles"))
     doubles = list(fermionic_excitation_specs(4, excitation_level="singles_doubles"))
