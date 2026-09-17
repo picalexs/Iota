@@ -648,6 +648,7 @@ def estimate_measured_qse_matrices(
         "observable_count": sum(len(plan.observables) for plan in plans),
         "hermitian_observable_decomposition": True,
         "projected_dimension": dimension,
+        "num_qubits": num_qubits,
         "projected_matrix_element_count": 2 * dimension**2,
         "basis_cap_policy": "nonzero_independent_reference_actions",
         "pauli_terms": len(pauli_hamiltonian),

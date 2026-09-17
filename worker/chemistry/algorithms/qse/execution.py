@@ -373,9 +373,17 @@ def execute_measured_qse(
         "basis_numerical_rank": float(diagnostics.get("retained_rank", basis_rank) or basis_rank),
     }
 
+    measured_num_qubits = estimate.summary.get("num_qubits")
+    if not isinstance(measured_num_qubits, int) or measured_num_qubits < 1:
+        measured_num_qubits = getattr(hamiltonian, "num_qubits", None)
+    fallback_dim = (
+        2 ** measured_num_qubits
+        if isinstance(measured_num_qubits, int) and measured_num_qubits > 0
+        else 2**basis_rank
+    )
     reference_state, reference_source = build_hf_reference_state_fn(
         hamiltonian,
-        fallback_dim=2**basis_rank,
+        fallback_dim=fallback_dim,
     )
     reference_descriptor = build_reference_descriptor_fn(
         state=reference_state,
