@@ -122,7 +122,7 @@ export const ALGORITHM_INFO: Record<RunAlgorithm, InfoEntry> = {
       },
       {
         heading: "Typical failure modes",
-        body: "QSE cannot rescue a reference that fundamentally misses the relevant physics. Large excitation pools also increase the O(m^2) projected-matrix workload and can create nearly linearly dependent basis states, which makes the overlap matrix ill-conditioned. In measured QSE, an overly high regularization cutoff can remove useful overlap modes. Too much overlap pruning can also remove useful directions. Noise in the reference preparation or in projected matrix elements enters the generalized eigenproblem directly, where bad conditioning can amplify it.",
+        body: "QSE cannot rescue a reference that fundamentally misses the relevant physics. Large excitation pools also increase the O(m^2) projected-matrix workload and can create nearly linearly dependent basis states, which makes the overlap matrix ill-conditioned. The default pool preserves alpha and beta particle counts, but it is not spin-adapted and does not impose a total-spin S^2 constraint. In measured QSE, an overly high regularization cutoff can remove useful overlap modes. Too much overlap pruning can also remove useful directions. Noise in the reference preparation or in projected matrix elements enters the generalized eigenproblem directly, where bad conditioning can amplify it.",
       },
     ],
     blocks: [

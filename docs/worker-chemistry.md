@@ -163,7 +163,10 @@ do not guarantee the same basis across execution modes. Dense and measured QSE
 use generator order. Sector QSE ranks candidates by coupling to the reference
 when its dominant determinant probability is at least `0.5`; otherwise, it
 uses generator order. Compare the recorded basis selections before comparing
-energies from different execution modes.
+energies from different execution modes. The excitation pool preserves alpha
+and beta particle counts. It is not a spin-adapted pool and does not impose a
+total-spin `S^2` constraint. Use the reported basis and reference metadata
+when comparing spin-sensitive calculations.
 
 QFD branch-estimator runs use seven time points when the user omits the count.
 The branch path supports at most eight points. The worker rejects larger
