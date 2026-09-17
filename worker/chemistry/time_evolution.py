@@ -9,6 +9,11 @@ import numpy as np
 _AER_STATEVECTOR_METHODS = {"automatic", "statevector", "matrix_product_state"}
 
 
+def is_zero_time(time_value: float) -> bool:
+    """Return whether a time value is exactly zero."""
+    return float(time_value) == 0.0
+
+
 def prepare_exact_time_evolution(operator_matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Diagonalize a Hermitian operator once for repeated exact evolution."""
     hermitian = np.asarray(operator_matrix, dtype=complex)
@@ -117,7 +122,7 @@ def aer_pauli_time_evolution_state(
     context: Any | None = None,
 ) -> np.ndarray:
     """Evolve a state by simulating a PauliEvolutionGate with AerSimulator."""
-    if np.isclose(time_step, 0.0):
+    if is_zero_time(time_step):
         return _normalized_state(state)
     if trotter_steps < 1:
         raise ValueError("trotter_steps must be positive")

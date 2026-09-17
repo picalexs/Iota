@@ -6,6 +6,7 @@ import numpy as np
 
 from worker.chemistry.time_evolution import (
     exact_time_evolution_state_from_spectrum,
+    is_zero_time,
     prepare_exact_time_evolution,
 )
 
@@ -66,7 +67,7 @@ def time_evolved_bitstring_distribution(
     aggregate = np.zeros(dim, dtype=float)
     for step in range(num_steps):
         current_time = float(step * time_step)
-        if np.isclose(current_time, 0.0):
+        if is_zero_time(current_time):
             evolved = seed
         else:
             evolved = exact_time_evolution_state_from_spectrum(

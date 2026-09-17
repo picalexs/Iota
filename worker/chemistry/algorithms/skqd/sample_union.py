@@ -30,6 +30,7 @@ from worker.chemistry.circuit_artifacts import prepare_hf_reference_bits
 from worker.chemistry.reference_descriptor import build_reference_descriptor
 from worker.chemistry.reference_states import build_hf_reference_state_with_source
 from worker.chemistry.sector_basis import hartree_fock_sector_state
+from worker.chemistry.time_evolution import is_zero_time
 from worker.exceptions import RunExcludedError
 
 
@@ -243,7 +244,7 @@ def execute_sampler_sample_union_workflow(
         def build_circuit(**_kwargs: Any) -> QuantumCircuit:
             circuit = QuantumCircuit(num_qubits)
             prepare_hf_reference_bits(circuit, hamiltonian, num_qubits=num_qubits)
-            if not np.isclose(time_point, 0.0):
+            if not is_zero_time(time_point):
                 repetitions = max(krylov_index, 1) * trotter_steps_per_interval
                 if trotter_order <= 1:
                     synthesis: Any = LieTrotter(reps=repetitions)
@@ -315,7 +316,7 @@ def execute_sampler_sample_union_workflow(
                 ),
                 "trotter_repetitions": (
                     max(krylov_index, 1) * trotter_steps_per_interval
-                    if not np.isclose(time_point, 0.0)
+                    if not is_zero_time(time_point)
                     else 0
                 ),
                 "operation_names": sorted(

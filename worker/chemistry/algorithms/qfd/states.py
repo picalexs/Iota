@@ -16,6 +16,7 @@ from worker.chemistry.state_vectors import normalize_state_vector
 from worker.chemistry.time_evolution import (
     aer_pauli_time_evolution_state,
     exact_time_evolution_state_from_spectrum,
+    is_zero_time,
 )
 
 
@@ -42,7 +43,7 @@ def build_sector_qfd_states(
     for index, time_point in enumerate(time_grid, start=1):
         state = (
             reference.copy()
-            if np.isclose(time_point, 0.0)
+            if is_zero_time(time_point)
             else action.time_evolve(
                 reference,
                 time_point=float(time_point),
@@ -93,7 +94,7 @@ def evolve_dense_qfd_state(
     exact_time_evolution_fn: Callable[..., np.ndarray] = exact_time_evolution_state_from_spectrum,
 ) -> np.ndarray:
     """Evolve the QFD reference state to one time point."""
-    if np.isclose(time_point, 0.0):
+    if is_zero_time(time_point):
         return evolution_context.reference_state
     if evolution_context.use_aer:
         return aer_time_evolution_fn(

@@ -13,6 +13,7 @@ from worker.chemistry.sector_basis import address_to_bitstring
 from worker.chemistry.state_vectors import normalize_state_vector
 from worker.chemistry.time_evolution import (
     exact_time_evolution_state_from_spectrum,
+    is_zero_time,
     prepare_exact_time_evolution,
 )
 
@@ -187,7 +188,7 @@ def sample_exact_krylov_states(
     reference_projection = eigenvectors.conj().T @ reference
 
     def source(_krylov_index: int, time_point: float) -> np.ndarray:
-        if np.isclose(time_point, 0.0):
+        if is_zero_time(time_point):
             return reference
         return exact_time_evolution_state_from_spectrum(
             eigenvalues,
@@ -241,7 +242,7 @@ def sample_sector_krylov_states(
         time_point = float(krylov_index * time_step)
         state = (
             reference
-            if np.isclose(time_point, 0.0)
+            if is_zero_time(time_point)
             else action.time_evolve(reference, time_point=time_point)
         )
         probabilities = np.abs(state) ** 2
