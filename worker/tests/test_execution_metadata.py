@@ -193,6 +193,12 @@ def test_kqd_exact_evolution_on_aer_target_reports_local_provenance() -> None:
         chemistry_input=ChemistryInput(atoms=[], basis="6-31g"),
         backend_adapter=_adapter(
             {
+                "resolved_backend_name": "aer_simulator",
+                "noise_summary": {
+                    "enabled": True,
+                    "model_source": "backend_derived",
+                    "fingerprint": "requested-noise-profile",
+                },
                 "transpilation_summary": {"preview": "requested Aer circuit path"},
                 "backend_primitives_used": True,
                 "primitive_family": "qiskit_aer.EstimatorV2",
@@ -204,6 +210,14 @@ def test_kqd_exact_evolution_on_aer_target_reports_local_provenance() -> None:
     metadata = result["backend_execution"]
     assert metadata["backend_target"] == "aer_simulator"
     assert metadata["requested_target"] == "aer_simulator"
+    assert metadata["requested_resolved_backend_name"] == "aer_simulator"
+    assert metadata["resolved_backend_name"] is None
+    assert metadata["requested_noise_summary"] == {
+        "enabled": True,
+        "model_source": "backend_derived",
+        "fingerprint": "requested-noise-profile",
+    }
+    assert metadata["noise_summary"] == {"enabled": False}
     assert metadata["execution_mode"] == "exact_matrix_evolution"
     assert metadata["actual_path_class"] == "dense_classical"
     assert metadata["actual_execution_target"] == "local_classical"
