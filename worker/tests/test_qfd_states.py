@@ -8,7 +8,11 @@ from qiskit.quantum_info import SparsePauliOp
 from scipy.sparse.linalg import aslinearoperator
 
 from worker.adapters.base import BackendExecutionContext
-from worker.chemistry.algorithms.qfd.grid import build_qfd_time_grid
+from worker.chemistry.algorithms.qfd.grid import (
+    build_qfd_time_grid,
+    qfd_spectral_width_bound,
+    resolve_qfd_symmetric_kappa,
+)
 from worker.chemistry.algorithms.qfd.states import (
     build_dense_qfd_states,
     build_sector_qfd_states,
@@ -167,12 +171,22 @@ def test_qfd_aer_evolution_preserves_analytic_complex_phase() -> None:
 def test_small_symmetric_grid_times_are_evolved_in_dense_and_sector_paths() -> None:
     hamiltonian = np.diag([1e10, -1e10]).astype(complex)
     reference = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2.0)
+    pauli_hamiltonian = SparsePauliOp.from_list([("Z", 1e10)])
+    spectral_width, bound_source = qfd_spectral_width_bound(
+        operator_matrix=hamiltonian,
+        pauli_hamiltonian=pauli_hamiltonian,
+    )
+    kappa, _kappa_metadata = resolve_qfd_symmetric_kappa(
+        None,
+        spectral_width_bound=spectral_width,
+        bound_source=bound_source,
+    )
     time_grid = build_qfd_time_grid(
         qfd_variant="qfd_original_symmetric",
         num_time_points=3,
         max_time=1.0,
         time_grid_type="linear",
-        kappa=2.02e10,
+        kappa=kappa,
     )
     eigenvalues, eigenvectors = np.linalg.eigh(hamiltonian)
     context = SimpleNamespace(
@@ -231,7 +245,7 @@ def test_small_symmetric_grid_times_are_evolved_in_dense_and_sector_paths() -> N
     aer_context = SimpleNamespace(
         hamiltonian=SimpleNamespace(
             num_qubits=1,
-            pauli_hamiltonian=SparsePauliOp.from_list([("Z", 1e10)]),
+            pauli_hamiltonian=pauli_hamiltonian,
         ),
         operator=hamiltonian,
         reference_state=reference,
