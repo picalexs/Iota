@@ -151,7 +151,10 @@ Measured QSE prepares a Hartree–Fock reference and builds directions
 `A_i |psi_ref>` from its fixed excitation pool. The dimension cap includes the
 reference direction. The worker skips directions that are zero or linearly
 dependent on earlier directions. This is a bounded fixed-pool QSE path. It is
-not a full adaptive operator-pool solver.
+not a full adaptive operator-pool solver. Measured QSE uses the lower of the
+requested cap and its effective cap of `8`. Completion progress reports the
+effective cap. Its projected energy is always a diagnostic, including when the
+measured overlap is numerically stable.
 
 QSE result metadata records the selected excitation specifications, counts,
 selection policy, requested dimension cap, and actual basis dimension under

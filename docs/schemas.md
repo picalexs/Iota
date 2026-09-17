@@ -294,7 +294,9 @@ entry. QSE advanced payloads use `reference_method="hf"`, `"vqe"`,
 `"provided_state"`, or `"provided_sector"`. On local runs above the dense
 active-space cap, HF and provided-sector references use the fixed-particle-sector
 matrix-free path. They are the supported larger-active-space QSE references.
-QSE `max_subspace_dim` is capped at 96. QFD
+QSE `max_subspace_dim` is capped at 96 for local and fixed-sector paths. The
+measured QSE path applies an additional effective cap of 8 and reports that
+effective cap in completion progress. QFD
 advanced payloads include `trotter_steps` for Pauli-evolution circuit synthesis
 on Aer/IBM branch-estimator paths and Aer state-propagation paths.
 QFD uses 16 time points by default on local dense and fixed-sector paths. It
