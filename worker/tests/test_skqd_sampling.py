@@ -177,6 +177,48 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
     assert metadata["krylov_circuit_metadata"][2]["trotter_repetitions"] == 2
 
 
+def test_sampler_sample_union_rejects_too_few_rows_for_a_krylov_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def fake_sample_bitstring_matrix(_backend, **kwargs):
+        nonlocal calls
+        circuit = kwargs["sampling_circuit_factory"]()
+        returned_rows = 2 if calls == 0 else 3
+        calls += 1
+        return np.zeros((returned_rows, 1), dtype=bool), circuit
+
+    monkeypatch.setattr(workflow, "sample_bitstring_matrix", fake_sample_bitstring_matrix)
+    hamiltonian = type(
+        "QubitHamiltonian",
+        (),
+        {
+            "num_qubits": 1,
+            "pauli_hamiltonian": SparsePauliOp.from_list([("X", 1.0), ("Z", 0.7)]),
+        },
+    )()
+    config = type(
+        "SKQDConfig",
+        (),
+        {
+            "krylov_extension_dim": 2,
+            "sampling_time_step": 0.2,
+            "samples_per_state": 3,
+            "seed": 7,
+            "trotter_steps": 1,
+        },
+    )()
+
+    with pytest.raises(RuntimeError, match="returned 2 rows.*requested 3"):
+        workflow.execute_sampler_sample_union_workflow(
+            hamiltonian=hamiltonian,
+            backend=object(),
+            skqd_config=config,
+            backend_context=type("Context", (), {"backend_target": "ibm_runtime"})(),
+        )
+
+
 @pytest.mark.parametrize(
     ("num_states", "samples_per_state"),
     [(0, 1), (1, 0)],
