@@ -28,6 +28,44 @@ logger = logging.getLogger(__name__)
 ExcitationSpec = tuple[str, tuple[int, ...], tuple[int, ...]]
 
 
+def build_basis_selection_summary(
+    selected_specs: list[ExcitationSpec],
+    *,
+    candidate_selection_policy: str,
+    excitation_level: str,
+    dimension_cap: int,
+    actual_dimension: int,
+    policy_details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Describe the exact excitation pool retained by a QSE basis builder."""
+    counts = {"reference": 0, "single": 0, "double": 0}
+    serialized_specs: list[dict[str, Any]] = []
+    for basis_index, (kind, create_orbitals, annihilate_orbitals) in enumerate(
+        selected_specs
+    ):
+        if kind in counts:
+            counts[kind] += 1
+        serialized_specs.append(
+            {
+                "basis_index": basis_index,
+                "kind": kind,
+                "create_orbitals": list(create_orbitals),
+                "annihilate_orbitals": list(annihilate_orbitals),
+            }
+        )
+    return {
+        "candidate_selection_policy": candidate_selection_policy,
+        "policy_details": dict(policy_details or {}),
+        "requested_excitation_level": excitation_level,
+        "requested_dimension_cap": int(dimension_cap),
+        "actual_basis_dimension": int(actual_dimension),
+        "selected_specs_complete": len(selected_specs) == int(actual_dimension),
+        "dimension_cap_reached": int(actual_dimension) >= int(dimension_cap),
+        "selected_excitation_counts": counts,
+        "selected_excitation_specs": serialized_specs,
+    }
+
+
 def real_scalar(value: Any, *, label: str, atol: float = 1e-8) -> float:
     """Return the real part of a scalar that should be real by construction."""
     array_value = np.asarray(value)
@@ -89,6 +127,7 @@ def build_sector_excitation_basis(
     overlap_threshold: float,
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
+    selection_callback: abc.Callable[[ExcitationSpec], None] | None = None,
     sector_excitation_specs_fn: abc.Callable[..., list[ExcitationSpec]] = sector_excitation_specs,
     apply_fermionic_excitation_sector_fn: abc.Callable[..., np.ndarray] = (
         apply_fermionic_excitation_sector
@@ -127,6 +166,8 @@ def build_sector_excitation_basis(
         )
         if independence_norm is None:
             continue
+        if selection_callback is not None:
+            selection_callback((kind, create_orbitals, annihilate_orbitals))
 
         candidate_norm = float(np.linalg.norm(candidate))
         partial_energy_m = None
@@ -196,6 +237,7 @@ def build_excitation_basis(
     overlap_builder_fn = basis_dependencies.get("overlap_builder_fn", build_overlap_matrix)
     eigensolver_fn = basis_dependencies.get("eigensolver_fn", solve_generalized_eigenproblem)
     real_scalar_fn = basis_dependencies.get("real_scalar_fn", real_scalar)
+    selection_callback = basis_dependencies.get("selection_callback")
     basis: list[np.ndarray] = []
     orthonormal_basis: list[np.ndarray] = []
     num_qubits = vector_size_to_qubits_fn(reference_state.size)
@@ -222,6 +264,8 @@ def build_excitation_basis(
         )
         if independence_norm is None:
             continue
+        if selection_callback is not None:
+            selection_callback((kind, create_orbitals, annihilate_orbitals))
 
         candidate_norm = float(np.linalg.norm(candidate))
         partial_basis_m = np.column_stack(basis)
@@ -266,6 +310,7 @@ def build_excitation_basis(
 
 __all__ = [
     "accept_basis_candidate",
+    "build_basis_selection_summary",
     "build_excitation_basis",
     "build_sector_excitation_basis",
     "real_scalar",

@@ -163,6 +163,9 @@ def build_qse_result(
             "projected_matrix_element_count": 2 * basis_rank**2,
             "basis_construction_rule": "fermionic_excitation_basis",
         }
+    basis_selection = diagnostics.get("basis_selection")
+    if isinstance(basis_selection, dict):
+        matrix_element_summary["basis_selection"] = basis_selection
     if reference_state is not None:
         matrix_element_summary["reference_descriptor"] = build_reference_descriptor(
             state=reference_state,
@@ -183,6 +186,10 @@ def build_qse_result(
             circuit_metadata=reference_circuit_artifacts,
             ansatz_name=("hartree_fock" if reference_method == "hf" else reference_method),
         )
+    conditioning_summary = {
+        key: value for key, value in diagnostics.items() if key != "basis_selection"
+    }
+    conditioning_summary["termination_reason"] = termination_reason
     return QSEResult(
         algorithm="qse",
         primary_energy=normalized_eigenvalues[0],
@@ -205,7 +212,7 @@ def build_qse_result(
         execution_mode=execution_mode,
         excitation_level=excitation_level,
         regularization=regularization,
-        conditioning_summary={**diagnostics, "termination_reason": termination_reason},
+        conditioning_summary=conditioning_summary,
         matrix_element_summary=matrix_element_summary,
     )
 

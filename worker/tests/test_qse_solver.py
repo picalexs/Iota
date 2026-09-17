@@ -307,6 +307,8 @@ def test_qse_sector_result_reports_actual_capped_excitation_pool() -> None:
 
     basis_selection = result.matrix_element_summary["basis_selection"]
     assert basis_selection["candidate_selection_policy"] == "reference_coupling_descending"
+    assert basis_selection["selected_specs_complete"] is True
+    assert basis_selection["actual_basis_dimension"] == 7
     assert basis_selection["selected_excitation_counts"] == {
         "reference": 1,
         "single": 0,

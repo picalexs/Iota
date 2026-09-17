@@ -143,6 +143,15 @@ reference direction. The worker skips directions that are zero or linearly
 dependent on earlier directions. This is a bounded fixed-pool QSE path. It is
 not a full adaptive operator-pool solver.
 
+QSE result metadata records the selected excitation specifications, counts,
+selection policy, requested dimension cap, and actual basis dimension under
+`matrix_element_summary.basis_selection`. A matching excitation level and cap
+do not guarantee the same basis across execution modes. Dense and measured QSE
+use generator order. Sector QSE ranks candidates by coupling to the reference
+when its dominant determinant probability is at least `0.5`; otherwise, it
+uses generator order. Compare the recorded basis selections before comparing
+energies from different execution modes.
+
 QFD branch-estimator runs use seven time points when the user omits the count.
 The branch path supports at most eight points. The worker rejects larger
 explicit values before it creates the estimator primitive. Dense and

@@ -15,6 +15,8 @@ from worker.chemistry.sector_basis import (
     display_bitstring_to_basis_index,
 )
 
+DOMINANT_DETERMINANT_SELECTION_THRESHOLD = 0.5
+
 
 def dominant_sector_occupations(
     reference_state: np.ndarray,
@@ -28,7 +30,7 @@ def dominant_sector_occupations(
     if probabilities.size == 0:
         return None
     dominant_address = int(np.argmax(probabilities))
-    if float(probabilities[dominant_address]) < 0.5:
+    if float(probabilities[dominant_address]) < DOMINANT_DETERMINANT_SELECTION_THRESHOLD:
         return None
 
     bitstring = address_to_bitstring(
@@ -98,6 +100,7 @@ def sector_excitation_specs(
 
 
 __all__ = [
+    "DOMINANT_DETERMINANT_SELECTION_THRESHOLD",
     "dominant_sector_occupations",
     "sector_excitation_coupling_score",
     "sector_excitation_specs",

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 
 from worker.chemistry.algorithms.qse.basis import (
+    ExcitationSpec,
     accept_basis_candidate,
     build_excitation_basis,
     build_sector_excitation_basis,
@@ -173,6 +175,7 @@ def _build_sector_excitation_basis(
     overlap_threshold: float,
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
+    selection_callback: Callable[[ExcitationSpec], None] | None = None,
 ) -> list[np.ndarray]:
     """Adapt sector-basis inputs to the basis module."""
     return build_sector_excitation_basis(
@@ -183,6 +186,7 @@ def _build_sector_excitation_basis(
         overlap_threshold=overlap_threshold,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
+        selection_callback=selection_callback,
         sector_excitation_specs_fn=sector_excitation_specs,
         apply_fermionic_excitation_sector_fn=apply_fermionic_excitation_sector,
         accept_basis_candidate_fn=accept_basis_candidate,
@@ -199,6 +203,7 @@ def _build_excitation_basis(
     overlap_threshold: float,
     regularization: float,
     progress_callback: ProgressCallback | None,
+    selection_callback: Callable[[ExcitationSpec], None] | None = None,
 ) -> list[np.ndarray]:
     """Adapt dense-basis inputs to the basis module."""
     return build_excitation_basis(
@@ -209,6 +214,7 @@ def _build_excitation_basis(
         overlap_threshold=overlap_threshold,
         regularization=regularization,
         progress_callback=progress_callback,
+        selection_callback=selection_callback,
         vector_size_to_qubits_fn=vector_size_to_qubits,
         fermionic_excitation_specs_fn=fermionic_excitation_specs,
         apply_fermionic_excitation_fn=apply_fermionic_excitation,

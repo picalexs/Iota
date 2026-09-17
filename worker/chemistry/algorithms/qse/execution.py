@@ -8,6 +8,14 @@ from typing import Any
 
 import numpy as np
 
+from worker.chemistry.algorithms.qse.basis import (
+    ExcitationSpec,
+    build_basis_selection_summary,
+)
+from worker.chemistry.algorithms.qse.sector import (
+    DOMINANT_DETERMINANT_SELECTION_THRESHOLD,
+    dominant_sector_occupations,
+)
 from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_subspace import (
@@ -39,6 +47,17 @@ def _record_regularization_scope(
             "regularization_may_change_reported_energy": may_change_reported_energy,
         }
     )
+
+
+def _basis_selection_observer(
+) -> tuple[Callable[[ExcitationSpec], None], list[ExcitationSpec]]:
+    """Capture accepted specifications without creating progress events."""
+    selected_specs: list[ExcitationSpec] = []
+
+    def observe(spec: ExcitationSpec) -> None:
+        selected_specs.append(spec)
+
+    return observe, selected_specs
 
 
 @dataclass(frozen=True)
@@ -82,6 +101,7 @@ def execute_sector_qse(
         action=action,
         resolved_config=resolved_config,
     )
+    basis_selection_callback, selected_specs = _basis_selection_observer()
     basis = build_excitation_basis_fn(
         reference_state,
         action,
@@ -90,6 +110,7 @@ def execute_sector_qse(
         overlap_threshold=overlap_threshold,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
+        selection_callback=basis_selection_callback,
     )
     basis_matrix = np.column_stack(basis)
     eigenvalues, _, diagnostics, residual_diagnostics, _ = solve_action_subspace_fn(
@@ -99,6 +120,26 @@ def execute_sector_qse(
         regularization=0.0,
     )
     diagnostics["regularization"] = 0.0
+    dominant_reference_used = (
+        dominant_sector_occupations(reference_state, action) is not None
+    )
+    diagnostics["basis_selection"] = build_basis_selection_summary(
+        selected_specs,
+        candidate_selection_policy=(
+            "reference_coupling_descending"
+            if dominant_reference_used
+            else "full_fermionic_generator_order"
+        ),
+        excitation_level=excitation_level,
+        dimension_cap=target_rank,
+        actual_dimension=int(basis_matrix.shape[1]),
+        policy_details={
+            "dominant_determinant_reference_used": dominant_reference_used,
+            "dominant_determinant_probability_threshold": (
+                DOMINANT_DETERMINANT_SELECTION_THRESHOLD
+            ),
+        },
+    )
     _record_regularization_scope(
         diagnostics,
         requested_regularization=regularization,
@@ -161,6 +202,7 @@ def execute_dense_qse(
         resolved_config=resolved_config,
         progress_callback=progress_callback,
     )
+    basis_selection_callback, selected_specs = _basis_selection_observer()
     basis = build_excitation_basis_fn(
         reference_state,
         operator,
@@ -169,6 +211,7 @@ def execute_dense_qse(
         overlap_threshold=overlap_threshold,
         regularization=regularization,
         progress_callback=progress_callback,
+        selection_callback=basis_selection_callback,
     )
     basis_matrix = np.column_stack(basis)
     overlap = build_overlap_matrix_fn(basis)
@@ -214,6 +257,13 @@ def execute_dense_qse(
         ),
     }
     diagnostics["regularization"] = 0.0
+    diagnostics["basis_selection"] = build_basis_selection_summary(
+        selected_specs,
+        candidate_selection_policy="fermionic_generator_order",
+        excitation_level=excitation_level,
+        dimension_cap=target_rank,
+        actual_dimension=int(basis_matrix.shape[1]),
+    )
     _record_regularization_scope(
         diagnostics,
         requested_regularization=regularization,

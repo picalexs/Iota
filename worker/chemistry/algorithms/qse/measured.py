@@ -26,6 +26,7 @@ from typing import Any
 import numpy as np
 from qiskit.quantum_info import SparsePauliOp, Statevector
 
+from worker.chemistry.algorithms.qse.basis import build_basis_selection_summary
 from worker.chemistry.algorithms.qse.excitations import (
     apply_fermionic_excitation,
     fermionic_excitation_specs,
@@ -152,14 +153,14 @@ def _excitation_operator(
     return product.simplify(atol=1e-12)
 
 
-def build_measured_excitation_operators(
+def _build_measured_excitation_pool(
     *,
     num_qubits: int,
     reference_state: np.ndarray,
     excitation_level: str,
     max_dimension: int,
-) -> list[SparsePauliOp]:
-    """Build a capped set of independent excitation actions on the reference.
+) -> tuple[list[SparsePauliOp], list[tuple[str, tuple[int, ...], tuple[int, ...]]]]:
+    """Build a capped set of independent excitation actions and their specs.
 
     The dimension cap includes the identity/reference direction. Skip an
     excitation when it annihilates the reference or its resulting state is
@@ -184,8 +185,9 @@ def build_measured_excitation_operators(
 
     identity = SparsePauliOp.from_list([("I" * num_qubits, 1.0)])
     operators: list[SparsePauliOp] = [identity]
+    selected_specs = [("reference", (), ())]
     orthonormal_states = [reference]
-    for _kind, create_orbitals, annihilate_orbitals in fermionic_excitation_specs(
+    for kind, create_orbitals, annihilate_orbitals in fermionic_excitation_specs(
         num_qubits,
         excitation_level=excitation_level,
     ):
@@ -222,6 +224,24 @@ def build_measured_excitation_operators(
 
         operators.append(operator)
         orthonormal_states.append(residual / residual_norm)
+        selected_specs.append((kind, create_orbitals, annihilate_orbitals))
+    return operators, selected_specs
+
+
+def build_measured_excitation_operators(
+    *,
+    num_qubits: int,
+    reference_state: np.ndarray,
+    excitation_level: str,
+    max_dimension: int,
+) -> list[SparsePauliOp]:
+    """Build a capped set of independent excitation actions on the reference."""
+    operators, _selected_specs = _build_measured_excitation_pool(
+        num_qubits=num_qubits,
+        reference_state=reference_state,
+        excitation_level=excitation_level,
+        max_dimension=max_dimension,
+    )
     return operators
 
 
@@ -514,7 +534,7 @@ def estimate_measured_qse_matrices(
     # reference. This keeps the cap filter tied to the measured state if the
     # circuit preparation policy changes.
     reference_state = Statevector.from_instruction(circuit).data
-    operators = build_measured_excitation_operators(
+    operators, selected_specs = _build_measured_excitation_pool(
         num_qubits=num_qubits,
         reference_state=reference_state,
         excitation_level=excitation_level,
@@ -641,6 +661,13 @@ def estimate_measured_qse_matrices(
         "basis_construction_rule": "jordan_wigner_fermionic_excitation_operators",
         "excitation_level": excitation_level,
         "backend_target": getattr(backend_context, "backend_target", None),
+        "basis_selection": build_basis_selection_summary(
+            selected_specs,
+            candidate_selection_policy="fermionic_generator_order",
+            excitation_level=excitation_level,
+            dimension_cap=bounded_dimension,
+            actual_dimension=dimension,
+        ),
     }
     return MeasuredQSEMatrixElements(projected, overlap, summary)
 
