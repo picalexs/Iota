@@ -386,6 +386,7 @@ def test_sample_bitstring_matrix_can_retry_without_increasing_requested_shots(
 
     assert matrix.shape == (8, 4)
     assert sampler.shots == [8, 8]
+    assert ledger["sampler_retry_count"] == 1
     assert ledger["sampler_requested_shots_total"] == 16
 
 
