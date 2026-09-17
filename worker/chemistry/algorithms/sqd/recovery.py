@@ -86,7 +86,9 @@ def _emit_selected_ci_progress(
                 options.selected_ci_limit_summary["cap_active"]
                 or ci_summary["cap_active_for_batch"]
             ),
-            "selected_ci_spin_symmetrized": bool(options.symmetrize_spin),
+            "selected_ci_spin_symmetrized": bool(
+                not options.open_shell or options.symmetrize_spin
+            ),
             "selected_ci_carryover_alpha": int(ci_summary["carryover_strings_alpha"]),
             "selected_ci_carryover_beta": int(ci_summary["carryover_strings_beta"]),
         },

@@ -216,7 +216,9 @@ def emit_configuration_recovery_progress(
             "full_sci_dimension": int(state.last_selected_ci_summary.get("full_sci_dimension", 0)),
             "selected_ci_fraction": round(float(selected_ci_fraction_value), 6),
             "selected_ci_cap_active": bool(state.last_selected_ci_summary.get("cap_active")),
-            "selected_ci_spin_symmetrized": bool(options.symmetrize_spin),
+            "selected_ci_spin_symmetrized": bool(
+                not options.open_shell or options.symmetrize_spin
+            ),
             "carryover_strings_alpha": int(
                 state.last_carryover_summary.get("carryover_strings_alpha", 0)
             ),
