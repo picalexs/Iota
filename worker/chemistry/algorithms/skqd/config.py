@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from worker.chemistry.solver_utils import bounded_int, positive_float
 
 _MAX_NUMPY_SEED = 2**32 - 1
+_MAX_SAMPLES_PER_STATE = 4096
 _ANALYSIS_ONLY_SAMPLING_MODE = "sample_union_exact"
 _LEGACY_SAMPLING_MODE = "legacy_statevector_extension"
 _SUPPORTED_SAMPLING_MODES = {
@@ -66,7 +67,7 @@ def resolve_skqd_config(resolved: Mapping[str, Any]) -> SKQDConfig:
         resolved.get("samples_per_state"),
         default=512,
         low=1,
-        high=2000,
+        high=_MAX_SAMPLES_PER_STATE,
     )
     base_seed = (
         base_sampling_options.get("seed") if isinstance(base_sampling_options, dict) else None

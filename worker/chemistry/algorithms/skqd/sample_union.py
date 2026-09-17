@@ -274,6 +274,7 @@ def execute_sampler_sample_union_workflow(
         "sampler_retry_count": 0,
         "sampler_requested_shots_total": 0,
         "sampler_returned_raw_sample_rows": 0,
+        "sampler_retained_sample_rows": 0,
     }
     for krylov_index in range(skqd_config.krylov_extension_dim):
         time_point = float(krylov_index * sampling_time_step)
@@ -285,12 +286,21 @@ def execute_sampler_sample_union_workflow(
             sampling_circuit_factory=factory_for_time(krylov_index, time_point),
             return_circuit=True,
             work_ledger=work_ledger,
+            retry_with_increased_shots=False,
         )
+        samples = np.asarray(samples, dtype=bool)
+        if samples.shape[0] < skqd_config.samples_per_state:
+            raise RuntimeError(
+                f"SKQD sampler returned {samples.shape[0]} rows for Krylov state "
+                f"{krylov_index}; requested {skqd_config.samples_per_state}"
+            )
+        samples = samples[: skqd_config.samples_per_state]
+        work_ledger["sampler_retained_sample_rows"] += int(samples.shape[0])
         samples_by_state.append(
             SKQDKrylovSample(
                 krylov_index=krylov_index,
                 time_point=time_point,
-                bitstring_matrix=np.asarray(samples, dtype=bool),
+                bitstring_matrix=samples,
             )
         )
         circuit_metadata.append(

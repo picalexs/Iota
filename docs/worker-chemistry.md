@@ -98,6 +98,15 @@ SQD retrieves that job's result once and does not submit a replacement if
 result retrieval fails. The work ledger counts each worker attempt and its
 requested shots. It does not claim that IBM accepted or billed those shots.
 
+SKQD uses the public `samples_per_state` limit of 4096. It keeps that number
+of rows for every Krylov state. If a sampler returns fewer rows, SKQD stops
+with an error. The [SKQD paper](https://arxiv.org/html/2501.09702) defines the
+sampling procedure with the same sample count for each Krylov state. SKQD
+retries use the same shot request each time. The work
+ledger separates raw returned rows from retained rows and counts retries even
+when their shot requests do not increase. This prevents a successful retry
+from silently changing the sampling weight of one Krylov state.
+
 Branch-estimator KQD and QFD measure projected Hamiltonian and overlap
 matrices. Their residual is the residual of that measured generalized
 eigenproblem. It is not a full-space Ritz residual. A small projected residual
@@ -159,7 +168,9 @@ SKQD sample-union results record the same worker-observed sampler fields in
 `algorithm_metrics.work_ledger`. Exact local sample oracles record
 `local_exact_sampling_runs` and returned rows instead. Do not compare
 these counts as provider shots. Use `sampling_source` and `execution_path` to
-separate exact local, Aer, and IBM Runtime evidence.
+separate exact local, Aer, and IBM Runtime evidence. For sampler execution,
+`sampler_returned_raw_sample_rows` includes excess returned rows, while
+`sampler_retained_sample_rows` counts rows used to build the sample union.
 
 The `legacy_statevector_extension` mode is a project-specific local Krylov
 extension, not the paper's sampled SKQD circuit path. It seeds the extension

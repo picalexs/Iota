@@ -171,8 +171,9 @@ def sample_bitstring_matrix(
     sampling_circuit_factory: Callable[..., Any] | None = None,
     return_circuit: bool = False,
     work_ledger: dict[str, int] | None = None,
+    retry_with_increased_shots: bool = True,
 ) -> np.ndarray | tuple[np.ndarray, Any]:
-    """Sample backend bitstrings from HF or a supplied preparation circuit."""
+    """Sample backend bitstrings, optionally keeping retry shot requests fixed."""
     if not hasattr(backend, "run"):
         raise ValueError("SQD backend must expose a sampler run() method")
     sampler = backend  # Structural SamplerBackend protocol keeps runtime types local.
@@ -194,13 +195,18 @@ def sample_bitstring_matrix(
     allow_submission_retries = (
         getattr(sampler, "allow_sampler_submission_retries", True) is not False
     )
-    multipliers = (1, 2, 4) if allow_submission_retries else (1,)
-    for multiplier in multipliers:
+    if not allow_submission_retries:
+        multipliers = (1,)
+    elif retry_with_increased_shots:
+        multipliers = (1, 2, 4)
+    else:
+        multipliers = (1, 1, 1)
+    for attempt_index, multiplier in enumerate(multipliers):
         shots = max(total_samples * multiplier, 1)
         if work_ledger is not None:
             work_ledger["sampler_run_attempts"] = work_ledger.get("sampler_run_attempts", 0) + 1
             work_ledger["sampler_retry_count"] = work_ledger.get("sampler_retry_count", 0) + (
-                1 if multiplier > 1 else 0
+                1 if attempt_index > 0 else 0
             )
             work_ledger["sampler_requested_shots_total"] = work_ledger.get(
                 "sampler_requested_shots_total", 0
