@@ -20,6 +20,7 @@ from worker.chemistry.algorithms.qse.measured import (
 from worker.chemistry.algorithms.qse.workflow import run_qse
 from worker.chemistry.eigensolver import solve_stabilized_generalized_eigenproblem
 from worker.chemistry.reference_states import build_hf_reference_state
+from worker.chemistry.reference_descriptor import fingerprint_state_vector
 
 
 def test_measured_qse_accepts_bounded_aer_pub_chunk_override() -> None:
@@ -370,6 +371,37 @@ def test_measured_qse_completion_reports_effective_basis_cap() -> None:
     completion = events[-1]
     assert completion["stage"] == "completed"
     assert completion["max_subspace_dim"] == 8
+
+
+def test_measured_qse_fallback_reference_matches_pauli_circuit_width() -> None:
+    pauli = _four_qubit_hamiltonian(seed=10)
+    hamiltonian = SimpleNamespace(
+        pauli_hamiltonian=pauli,
+        num_electrons_alpha=1,
+        num_electrons_beta=1,
+        num_spatial_orbitals=2,
+    )
+    expected_reference = np.zeros(16, dtype=complex)
+    expected_reference[0] = 1.0
+
+    result = run_qse(
+        hamiltonian=hamiltonian,
+        backend=_MockEstimator(expected_reference, noise=0.01, seed=12),
+        config={
+            "algorithm": "qse",
+            "advanced_config": {
+                "algorithm": "qse",
+                "reference_method": "hf",
+                "excitation_level": "singles",
+                "max_subspace_dim": 4,
+            },
+        },
+        backend_context=_noisy_ctx("aer_simulator"),
+    )
+
+    assert result.conditioning_summary["reference_descriptor"]["state_fingerprint"] == (
+        fingerprint_state_vector(expected_reference)
+    )
 
 
 def test_measured_qse_rejects_non_hf_reference_before_estimator_run() -> None:
