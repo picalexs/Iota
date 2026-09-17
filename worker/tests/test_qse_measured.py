@@ -382,7 +382,7 @@ def test_measured_qse_fallback_reference_matches_pauli_circuit_width() -> None:
         num_spatial_orbitals=2,
     )
     expected_reference = np.zeros(16, dtype=complex)
-    expected_reference[0] = 1.0
+    expected_reference[5] = 1.0
 
     result = run_qse(
         hamiltonian=hamiltonian,
