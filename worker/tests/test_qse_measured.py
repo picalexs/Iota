@@ -346,6 +346,32 @@ def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
     }
 
 
+def test_measured_qse_completion_reports_effective_basis_cap() -> None:
+    hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=6))
+    reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
+    events: list[dict[str, object]] = []
+
+    run_qse(
+        hamiltonian=hamiltonian,
+        backend=_MockEstimator(reference, noise=0.01, seed=8),
+        config={
+            "algorithm": "qse",
+            "advanced_config": {
+                "algorithm": "qse",
+                "reference_method": "hf",
+                "excitation_level": "singles_doubles",
+                "max_subspace_dim": 96,
+            },
+        },
+        progress_callback=events.append,
+        backend_context=_noisy_ctx("aer_simulator"),
+    )
+
+    completion = events[-1]
+    assert completion["stage"] == "completed"
+    assert completion["max_subspace_dim"] == 8
+
+
 def test_measured_qse_rejects_non_hf_reference_before_estimator_run() -> None:
     hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=4))
     estimator = _MockEstimator(np.ones(16, dtype=complex) / 4.0)
