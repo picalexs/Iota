@@ -98,6 +98,12 @@ SQD retrieves that job's result once and does not submit a replacement if
 result retrieval fails. The work ledger counts each worker attempt and its
 requested shots. It does not claim that IBM accepted or billed those shots.
 
+SQD measures one sample set for a run and reuses those rows for each recovery
+iteration. `max_iterations` controls occupancy updates and selected-CI solves.
+It does not request a new measurement set. The base shot request is
+`samples_per_batch * num_batches`. A local retry can request more shots after a
+submission error. Check the work ledger for the worker's requested total.
+
 SKQD uses the public `samples_per_state` limit of 4096. It keeps that number
 of rows for every Krylov state. If a sampler returns fewer rows, SKQD stops
 with an error. The [SKQD paper](https://arxiv.org/html/2501.09702) defines the

@@ -128,6 +128,8 @@ def _run_sqd_sampling_iteration(
     progress_callback: ProgressCallback | None,
     sampling_circuit_factory: Any | None = None,
     work_ledger: dict[str, int] | None = None,
+    measured_bitstring_matrix: np.ndarray | None = None,
+    measured_circuit: Any | None = None,
 ) -> _SQDIterationSampling:
     """Adapt sampling inputs to the focused sampling module."""
     return run_sqd_sampling_iteration(
@@ -141,6 +143,8 @@ def _run_sqd_sampling_iteration(
         sample_bitstrings=_sample_bitstring_matrix,
         sampling_circuit_factory=sampling_circuit_factory,
         work_ledger=work_ledger,
+        measured_bitstring_matrix=measured_bitstring_matrix,
+        measured_circuit=measured_circuit,
     )
 
 

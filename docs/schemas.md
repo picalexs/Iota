@@ -577,11 +577,12 @@ quantum-circuit artifacts:
 VQE emits an `ansatz` artifact plus a representative `final` artifact for the
 reported parameter set; when the optimizer's last point differs from that
 reported point, it also records an `optimizer_final` artifact for the last
-optimizer circuit. SQD emits `sqd_sampling` artifacts for stored recovery
-iterations and records the storage policy in
-`algorithm_metrics.circuit_artifact_policy`: all iterations are kept up to 32,
-and larger runs keep the first 4, last 12, and 16 evenly spaced middle
-iterations. The legacy `algorithm_metrics.sci_result_package.circuit_preview` is
+optimizer circuit. SQD emits `sqd_sampling` artifacts for measured circuits
+and records the storage policy in `algorithm_metrics.circuit_artifact_policy`:
+all circuits are kept up to 32, and larger sets keep the first 4, last 12, and
+16 evenly spaced middle circuits. SQD reuses one measured sample set for the
+recovery loop, so a run normally emits one SQD sampling artifact. The legacy
+`algorithm_metrics.sci_result_package.circuit_preview` is
 still preserved for older consumers. SQD/SKQD SCI packages also include a
 `selected_ci` object with the selected-CI cap source, effective dimension, full
 sector dimension, and an `exact_sector_solve` flag. SQD result packages include
@@ -591,7 +592,8 @@ both final-iteration and best-observed recovery fields (`final_energy`,
 energy uses the best observed SQD recovery iteration. SQD postselection
 summaries use `selected_samples` and `selected_configurations` for the latest
 accepted selected configurations, while `selected_sample_shots_estimate` keeps
-the cross-iteration shot estimate. VQE stores the optimizer's last objective
+an estimate based on the average selected fraction and the per-run sample set.
+VQE stores the optimizer's last objective
 under `final_energy` and the best observed objective under
 `best_observed_energy`, while keeping `converged` tied to optimizer success or
 SPSA stability rather than "minimum seen once" semantics. VQE diagnostics also

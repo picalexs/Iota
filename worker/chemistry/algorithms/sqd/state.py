@@ -29,6 +29,8 @@ class SQDRunState:
     last_recovered_distribution: list[dict[str, Any]] = field(default_factory=list)
     last_selected_stage_distribution: list[dict[str, Any]] = field(default_factory=list)
     last_selected_distribution: list[dict[str, Any]] = field(default_factory=list)
+    measured_bitstring_matrix: np.ndarray | None = None
+    measured_circuit: Any | None = None
     last_sampled_circuit: Any | None = None
     sampled_circuits: list[tuple[int, Any]] = field(default_factory=list)
     selected_ci_dimensions: list[int] = field(default_factory=list)

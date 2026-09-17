@@ -87,6 +87,7 @@ def execute_sqd_iteration(
 ) -> SQDIterationOutcome:
     """Run one SQD sampling and recovery iteration and update run state."""
     iter_start = time.monotonic()
+    reuse_sample_set = state.measured_bitstring_matrix is not None
     sampling = sampling_iteration(
         iteration=iteration,
         backend=backend,
@@ -97,11 +98,16 @@ def execute_sqd_iteration(
         progress_callback=progress_callback,
         sampling_circuit_factory=sampling_circuit_factory,
         work_ledger=state.work_ledger,
+        measured_bitstring_matrix=state.measured_bitstring_matrix,
+        measured_circuit=state.measured_circuit,
     )
+    if not reuse_sample_set:
+        state.measured_bitstring_matrix = sampling.raw_bitstring_matrix
+        state.measured_circuit = sampling.sampled_circuit
+        if sampling.sampled_circuit is not None:
+            state.sampled_circuits.append((iteration, sampling.sampled_circuit))
     state.work_ledger["recovery_iterations"] += 1
     state.last_sampled_circuit = sampling.sampled_circuit
-    if sampling.sampled_circuit is not None:
-        state.sampled_circuits.append((iteration, sampling.sampled_circuit))
     state.sampled_sizes.append(int(sampling.raw_bitstring_matrix.shape[0]))
     state.last_sampled_distribution = sampling.last_sampled_distribution
     state.last_raw_distribution = sampling.raw_distribution

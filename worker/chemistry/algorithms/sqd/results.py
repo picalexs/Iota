@@ -95,12 +95,17 @@ def build_sqd_circuit_artifacts(
     total_iterations: int,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Build per-iteration SQD artifacts with bounded full preview storage."""
-    stored_iterations = select_sqd_artifact_iterations(total_iterations)
+    available_iterations = sorted({int(iteration) for iteration, _circuit in sampled_circuits})
+    selected_iterations = set(select_sqd_artifact_iterations(total_iterations))
+    stored_iterations = [
+        iteration for iteration in available_iterations if iteration in selected_iterations
+    ]
     policy = circuit_artifact_downsampling_policy(
         total_iterations=total_iterations,
         stored_iterations=stored_iterations,
     )
     stored_iteration_set = set(stored_iterations)
+    representative_iteration = available_iterations[-1] if available_iterations else None
     artifacts: list[dict[str, Any]] = []
     for iteration, circuit in sampled_circuits:
         if iteration not in stored_iteration_set:
@@ -113,7 +118,7 @@ def build_sqd_circuit_artifacts(
                 role="sqd_sampling",
                 label=f"Recovery iter {iteration}",
                 phase="recovery",
-                representative=iteration == stored_iterations[-1],
+                representative=iteration == representative_iteration,
                 source="backend_sampler",
                 iteration=iteration,
                 downsampling={

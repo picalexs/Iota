@@ -325,8 +325,10 @@ def run_sqd_sampling_iteration(
     sample_bitstrings: Callable[..., np.ndarray | tuple[np.ndarray, Any]],
     sampling_circuit_factory: Callable[..., Any] | None = None,
     work_ledger: dict[str, int] | None = None,
+    measured_bitstring_matrix: np.ndarray | None = None,
+    measured_circuit: Any | None = None,
 ) -> SQDIterationSampling:
-    """Sample, solve raw valid rows, then recover only later invalid rows."""
+    """Reuse one measured sample set for each recovery iteration."""
     if progress_callback is not None:
         progress_callback(
             {
@@ -337,6 +339,7 @@ def run_sqd_sampling_iteration(
                 "completed_iterations": iteration - 1,
                 "total_iterations": options.max_iterations,
                 "energy": None,
+                "sample_set_reused": measured_bitstring_matrix is not None,
                 "samples_per_batch": options.samples_per_batch,
                 "num_batches": options.num_batches,
                 "total_samples": options.total_samples,
@@ -345,24 +348,28 @@ def run_sqd_sampling_iteration(
             }
         )
 
-    sample_kwargs: dict[str, Any] = {
-        "num_bits": 2 * options.norb,
-        "total_samples": options.total_samples,
-        "num_elec_a": options.num_elec_a,
-        "num_elec_b": options.num_elec_b,
-        "rng": rng,
-        "return_circuit": True,
-    }
-    if sampling_circuit_factory is not None:
-        sample_kwargs["sampling_circuit_factory"] = sampling_circuit_factory
-    if work_ledger is not None:
-        sample_kwargs["work_ledger"] = work_ledger
-    sampled_output = sample_bitstrings(backend, **sample_kwargs)
-    if isinstance(sampled_output, tuple):
-        raw_bitstring_matrix, sampled_circuit = sampled_output
-    else:  # pragma: no cover - compatibility fallback for monkeypatched tests
-        raw_bitstring_matrix = sampled_output
-        sampled_circuit = None
+    if measured_bitstring_matrix is None:
+        sample_kwargs: dict[str, Any] = {
+            "num_bits": 2 * options.norb,
+            "total_samples": options.total_samples,
+            "num_elec_a": options.num_elec_a,
+            "num_elec_b": options.num_elec_b,
+            "rng": rng,
+            "return_circuit": True,
+        }
+        if sampling_circuit_factory is not None:
+            sample_kwargs["sampling_circuit_factory"] = sampling_circuit_factory
+        if work_ledger is not None:
+            sample_kwargs["work_ledger"] = work_ledger
+        sampled_output = sample_bitstrings(backend, **sample_kwargs)
+        if isinstance(sampled_output, tuple):
+            raw_bitstring_matrix, sampled_circuit = sampled_output
+        else:  # pragma: no cover - compatibility fallback for monkeypatched tests
+            raw_bitstring_matrix = sampled_output
+            sampled_circuit = None
+    else:
+        raw_bitstring_matrix = np.asarray(measured_bitstring_matrix, dtype=bool)
+        sampled_circuit = measured_circuit
 
     bitstring_matrix, probabilities, bitstring_counts = aggregate_bitstring_frequencies(
         raw_bitstring_matrix
