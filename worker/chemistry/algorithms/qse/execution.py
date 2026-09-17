@@ -348,16 +348,18 @@ def execute_measured_qse(
     diagnostics = dict(stabilized.diagnostics)
     reportable = diagnostic_reportable_fn(diagnostics)
     is_stable = projected_matrix_converged(diagnostics)
-    diagnostics["diagnostic_only"] = not is_stable
+    diagnostics["diagnostic_only"] = True
     relative_residual = float(
         diagnostics.get("relative_projected_ritz_residual", float("inf"))
     )
-    if diagnostics["diagnostic_only"]:
+    if not is_stable:
         diagnostics["diagnostic_reason"] = projected_convergence_reason(
             diagnostics,
             relative_residual=relative_residual,
             residual_tolerance=residual_tolerance,
         )
+    else:
+        diagnostics["diagnostic_reason"] = "measured_matrix_elements_diagnostic"
     # Measured QSE is a diagnostic construction: never converged, never
     # chemically accurate. Convergence stays False even when a stable subspace
     # remains, because the measured metric only yields a diagnostic energy.

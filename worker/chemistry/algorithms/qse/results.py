@@ -129,6 +129,8 @@ def build_qse_result(
         relative_residual=relative_residual,
         residual_tolerance=residual_tolerance,
     )
+    if execution_mode == "measured_matrix_elements" and not converged:
+        termination_reason = "measured_matrix_elements_diagnostic"
     if execution_mode == "measured_matrix_elements":
         matrix_element_summary = {
             "matrix_element_strategy": "branch_estimator",
