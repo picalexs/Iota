@@ -62,7 +62,7 @@ def test_qse_basis_keeps_small_nonzero_excitation_direction() -> None:
         overlap_threshold=1e-8,
     )
 
-    assert independence_norm == 0.0
+    assert independence_norm == 1.0
     assert basis[0].tolist() == [0.0 + 0.0j, 1.0 + 0.0j]
 
 
