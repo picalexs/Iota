@@ -72,3 +72,13 @@ def test_orthonormalize_candidate_rejects_dependent_vector() -> None:
 
     assert candidate is None
     assert norm == pytest.approx(0.0)
+
+
+def test_orthonormalize_candidate_keeps_small_nonzero_direction() -> None:
+    candidate, norm = orthonormalize_candidate(
+        np.array([1e-13, 0.0], dtype=complex),
+        [],
+    )
+
+    assert norm == pytest.approx(1e-13)
+    np.testing.assert_allclose(candidate, [1.0, 0.0])

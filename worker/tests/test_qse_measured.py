@@ -174,6 +174,20 @@ def test_measured_excitation_operators_match_statevector_excitations() -> None:
         assert np.allclose(matrix @ vector, expected, atol=1e-9)
 
 
+def test_measured_qse_keeps_small_nonzero_excitation_direction() -> None:
+    reference = np.zeros(16, dtype=complex)
+    reference[1] = 1e-13
+
+    operators = build_measured_excitation_operators(
+        num_qubits=4,
+        reference_state=reference,
+        excitation_level="singles",
+        max_dimension=2,
+    )
+
+    assert len(operators) == 2
+
+
 def test_measured_qse_assembles_hermitian_matrices_with_identity_reference() -> None:
     hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian())
     reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
