@@ -9,7 +9,11 @@ from scipy.sparse.linalg import aslinearoperator
 
 from worker.adapters.base import BackendExecutionContext
 from worker.chemistry.algorithms.qfd.grid import build_qfd_time_grid
-from worker.chemistry.algorithms.qfd.states import build_dense_qfd_states, build_sector_qfd_states
+from worker.chemistry.algorithms.qfd.states import (
+    build_dense_qfd_states,
+    build_sector_qfd_states,
+    evolve_dense_qfd_state,
+)
 from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.time_evolution import aer_pauli_time_evolution_state
 
@@ -158,3 +162,116 @@ def test_qfd_aer_evolution_preserves_analytic_complex_phase() -> None:
 
     assert positive == pytest.approx(expected_positive)
     assert negative == pytest.approx(expected_negative)
+
+
+def test_small_symmetric_grid_times_are_evolved_in_dense_and_sector_paths() -> None:
+    hamiltonian = np.diag([1e10, -1e10]).astype(complex)
+    reference = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2.0)
+    time_grid = build_qfd_time_grid(
+        qfd_variant="qfd_original_symmetric",
+        num_time_points=3,
+        max_time=1.0,
+        time_grid_type="linear",
+        kappa=2.02e10,
+    )
+    eigenvalues, eigenvectors = np.linalg.eigh(hamiltonian)
+    context = SimpleNamespace(
+        hamiltonian=object(),
+        operator=hamiltonian,
+        reference_state=reference,
+        use_aer=False,
+        trotter_steps=1,
+        eigenvalues=eigenvalues,
+        eigenvectors=eigenvectors,
+        reference_projection=eigenvectors.conj().T @ reference,
+        backend_context=None,
+    )
+    expected = np.column_stack(
+        [
+            eigenvectors
+            @ (np.exp(-1j * eigenvalues * time) * (eigenvectors.conj().T @ reference))
+            for time in time_grid
+        ]
+    )
+    action = HamiltonianAction(
+        norb=2,
+        nelec=(1, 0),
+        dimension=2,
+        linear_operator=aslinearoperator(hamiltonian),
+    )
+
+    dense_states = [
+        evolve_dense_qfd_state(evolution_context=context, time_point=float(time))
+        for time in time_grid
+    ]
+    sector_time_grid = np.array([0.0, 7e-10])
+    sector_expected = np.column_stack(
+        [
+            eigenvectors
+            @ (
+                np.exp(-1j * eigenvalues * time)
+                * (eigenvectors.conj().T @ reference)
+            )
+            for time in sector_time_grid
+        ]
+    )
+    sector_states = build_sector_qfd_states(
+        action,
+        reference,
+        sector_time_grid,
+        max_time=None,
+        time_grid_type="symmetric_kappa",
+        progress_callback=None,
+    )
+
+    assert 0.0 < abs(time_grid[0]) < 1e-8
+    assert np.column_stack(dense_states) == pytest.approx(expected)
+    assert np.column_stack(sector_states) == pytest.approx(sector_expected)
+
+    aer_context = SimpleNamespace(
+        hamiltonian=SimpleNamespace(
+            num_qubits=1,
+            pauli_hamiltonian=SparsePauliOp.from_list([("Z", 1e10)]),
+        ),
+        operator=hamiltonian,
+        reference_state=reference,
+        use_aer=True,
+        trotter_steps=1,
+        eigenvalues=None,
+        eigenvectors=None,
+        reference_projection=None,
+        backend_context=BackendExecutionContext(
+            backend_target="aer_simulator",
+            simulator_method="statevector",
+        ),
+    )
+    aer_states = [
+        evolve_dense_qfd_state(evolution_context=aer_context, time_point=float(time))
+        for time in time_grid
+    ]
+    assert np.column_stack(aer_states) == pytest.approx(expected)
+
+
+def test_aer_evolves_small_nonzero_time_with_large_hamiltonian() -> None:
+    time = 7e-10
+    reference = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2.0)
+    hamiltonian = SimpleNamespace(
+        num_qubits=1,
+        pauli_hamiltonian=SparsePauliOp.from_list([("Z", 1e10)]),
+    )
+    context = BackendExecutionContext(
+        backend_target="aer_simulator",
+        simulator_method="statevector",
+    )
+
+    evolved = aer_pauli_time_evolution_state(
+        hamiltonian,
+        reference,
+        time_step=time,
+        context=context,
+    )
+    expected = np.array(
+        [np.exp(-1j * 1e10 * time), np.exp(1j * 1e10 * time)], dtype=complex
+    ) / np.sqrt(2.0)
+
+    assert evolved == pytest.approx(expected)

@@ -96,3 +96,20 @@ def test_branch_circuit_time_zero_does_not_add_evolution_gate() -> None:
     )
 
     assert circuit.count_ops() == {"h": 1}
+
+
+def test_branch_circuit_keeps_small_nonzero_evolution_gate() -> None:
+    circuit = build_branch_state_circuit(
+        hamiltonian=SimpleNamespace(
+            num_spatial_orbitals=1,
+            num_electrons_alpha=1,
+            num_electrons_beta=0,
+        ),
+        pauli_hamiltonian=SparsePauliOp.from_list([("Z", 1e10)]),
+        num_qubits=1,
+        left_time=0.0,
+        right_time=7e-10,
+        trotter_steps=1,
+    )
+
+    assert len(circuit.data) == 3

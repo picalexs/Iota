@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from qiskit.quantum_info import SparsePauliOp
+from scipy.sparse.linalg import aslinearoperator
 
 from worker.chemistry.algorithms.skqd import sample_union as workflow
 from worker.chemistry.algorithms.skqd.sampling import (
@@ -13,6 +14,7 @@ from worker.chemistry.algorithms.skqd.sampling import (
     sample_sector_krylov_states,
 )
 from worker.chemistry.hamiltonian_action import build_hamiltonian_action
+from worker.chemistry.hamiltonian_action import HamiltonianAction
 
 
 def test_sample_krylov_state_sources_samples_every_index_and_keeps_provenance() -> None:
@@ -51,23 +53,45 @@ def test_sample_krylov_state_sources_samples_every_index_and_keeps_provenance() 
 
 
 def test_sample_exact_krylov_states_uses_time_evolved_probabilities() -> None:
-    operator = np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=complex)
+    operator = np.asarray([[0.0, 1e10], [1e10, 0.0]], dtype=complex)
     reference = np.asarray([1.0, 0.0], dtype=complex)
 
     result = sample_exact_krylov_states(
         operator,
         reference,
         num_states=2,
-        time_step=np.pi / 2,
+        time_step=7e-10,
         samples_per_state=200,
         num_qubits=1,
         rng=np.random.default_rng(11),
     )
 
     assert result.samples_by_state[0].bitstring_matrix[:, 0].sum() == 0
-    assert result.samples_by_state[1].bitstring_matrix[:, 0].sum() == 200
-    assert result.provenance[0]["krylov_indices"] == [0]
-    assert result.provenance[1]["krylov_indices"] == [1]
+    assert result.samples_by_state[1].bitstring_matrix[:, 0].sum() > 50
+    assert [sample.krylov_index for sample in result.samples_by_state] == [0, 1]
+
+
+def test_sample_sector_krylov_states_evolves_small_nonzero_time() -> None:
+    action = HamiltonianAction(
+        norb=2,
+        nelec=(1, 0),
+        dimension=2,
+        linear_operator=aslinearoperator(
+            np.asarray([[0.0, 1e10], [1e10, 0.0]], dtype=complex)
+        ),
+    )
+    reference = np.asarray([1.0, 0.0], dtype=complex)
+
+    result = sample_sector_krylov_states(
+        action,
+        reference,
+        num_states=2,
+        time_step=7e-10,
+        samples_per_state=200,
+        rng=np.random.default_rng(11),
+    )
+
+    assert np.unique(result.samples_by_state[1].bitstring_matrix, axis=0).shape[0] == 2
 
 
 def test_sample_sector_krylov_states_returns_target_sector_bitstrings() -> None:
@@ -138,7 +162,7 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
         (),
         {
             "krylov_extension_dim": 3,
-            "sampling_time_step": 0.2,
+            "sampling_time_step": 7e-10,
             "samples_per_state": 3,
             "seed": 7,
             "trotter_steps": 1,
@@ -154,8 +178,8 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
 
     assert len(calls) == 3
     assert result.samples_by_state[0].time_point == pytest.approx(0.0)
-    assert result.samples_by_state[1].time_point == pytest.approx(0.2)
-    assert result.samples_by_state[2].time_point == pytest.approx(0.4)
+    assert result.samples_by_state[1].time_point == pytest.approx(7e-10)
+    assert result.samples_by_state[2].time_point == pytest.approx(14e-10)
     assert result.merged_counts.tolist() == [6, 3]
     assert metadata["sampling_mode"] == "sample_union_sampler"
     assert metadata["sampling_source"] == "sampler_krylov_circuits"
@@ -172,6 +196,7 @@ def test_sampler_sample_union_builds_and_samples_each_krylov_circuit(
     assert all(instruction.operation.name != "PauliEvolution" for instruction in calls[1].data)
     one_step_unitary = Operator(calls[1]).data
     two_step_unitary = Operator(calls[2]).data
+    assert np.linalg.norm(one_step_unitary - np.eye(2)) > 1e-10
     assert two_step_unitary == pytest.approx(one_step_unitary @ one_step_unitary)
     assert metadata["krylov_circuit_metadata"][1]["trotter_repetitions"] == 1
     assert metadata["krylov_circuit_metadata"][2]["trotter_repetitions"] == 2
