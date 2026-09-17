@@ -228,6 +228,36 @@ def refine_backend_metadata_from_result(
 
     metrics = result.get("algorithm_metrics")
     summary = metrics.get("matrix_element_summary") if isinstance(metrics, dict) else None
+    if (
+        algorithm == "kqd"
+        and isinstance(summary, dict)
+        and summary.get("matrix_element_strategy") == "dense_classical"
+        and summary.get("implemented_evolution_method") == "exact_matrix_evolution"
+    ):
+        metadata = dict(backend_metadata)
+        metadata.pop("transpilation_summary", None)
+        metadata.update(
+            {
+                "execution_mode": "exact_matrix_evolution",
+                "actual_path_class": "dense_classical",
+                "actual_execution_target": "local_classical",
+                "aer_simulator_used": False,
+                "backend_primitives_used": False,
+                "primitive_family": None,
+                "shots": None,
+                "effective_shots": None,
+                "effective_estimator_precision": None,
+                "measurement_mode": "exact",
+                "uncertainty_policy": "exact_local_computation",
+                "simulator_method": None,
+                "actual_noise_applied": False,
+                "backend_note": (
+                    "KQD exact matrix-spectrum evolution runs locally; the requested "
+                    "backend was not invoked."
+                ),
+            }
+        )
+        return metadata
     if isinstance(summary, dict) and summary.get("matrix_element_strategy") == "sector_matrix_free":
         return {
             **backend_metadata,
