@@ -237,9 +237,14 @@ def refine_backend_metadata_from_result(
         metadata = dict(backend_metadata)
         metadata.pop("transpilation_summary", None)
         requested_backend_name = metadata.pop("resolved_backend_name", None)
+        requested_optimization_level = metadata.pop("optimization_level", None)
         requested_noise_summary = metadata.pop("noise_summary", None)
+        for key in ("job_id", "job_ids", "pub_count"):
+            metadata.pop(key, None)
         if requested_backend_name is not None:
             metadata["requested_resolved_backend_name"] = requested_backend_name
+        if requested_optimization_level is not None:
+            metadata["requested_optimization_level"] = requested_optimization_level
         if requested_noise_summary is not None:
             metadata["requested_noise_summary"] = requested_noise_summary
         metadata.update(
@@ -248,6 +253,7 @@ def refine_backend_metadata_from_result(
                 "actual_path_class": "dense_classical",
                 "actual_execution_target": "local_classical",
                 "resolved_backend_name": None,
+                "optimization_level": None,
                 "aer_simulator_used": False,
                 "backend_primitives_used": False,
                 "primitive_family": None,
