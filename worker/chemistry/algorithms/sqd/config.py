@@ -35,7 +35,7 @@ class SQDOptions:
     norb: int
     num_elec_a: int
     num_elec_b: int
-    target_spin_sq: float
+    target_spin_sq: float | None
     energy_tol: float
     occupancies_tol: float
     carryover_threshold: float
@@ -135,10 +135,15 @@ def resolve_sqd_options(
     ):
         raise ValueError("SQD symmetrize_spin requires identical alpha and beta max_dim limits")
 
-    target_spin_sq = nonnegative_float(
-        resolved.get("spin_sq_target"),
-        default=0.0,
-        name="SQD spin_sq_target",
+    open_shell = num_elec_a != num_elec_b
+    target_spin_sq = (
+        None
+        if open_shell and resolved.get("spin_sq_target") is None
+        else nonnegative_float(
+            resolved.get("spin_sq_target"),
+            default=0.0,
+            name="SQD spin_sq_target",
+        )
     )
     energy_tol = positive_float(
         resolved.get("energy_tol"),
@@ -196,5 +201,5 @@ def resolve_sqd_options(
         selected_ci_limits=selected_ci_limits,
         selected_ci_limit_summary=selected_ci_limit_summary,
         sci_solver_options=sci_solver_options,
-        open_shell=num_elec_a != num_elec_b,
+        open_shell=open_shell,
     )
