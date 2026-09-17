@@ -114,6 +114,21 @@ def test_qse_vqe_reference_rejects_parameter_count_mismatch() -> None:
             )
 
 
+def test_qse_vqe_reference_rejects_non_finite_optimizer_parameters() -> None:
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
+
+    with pytest.raises(ValueError, match="finite"):
+        _build_vqe_reference_state_and_artifacts(
+            ansatz=ansatz,
+            vqe_result=SimpleNamespace(
+                optimal_parameters=np.asarray([np.nan]),
+                circuit_artifacts=[],
+            ),
+            vqe_cost={},
+        )
+
+
 def test_resolve_reference_state_normalizes_provided_state() -> None:
     method, state, artifacts = resolve_reference_state(
         hamiltonian=object(),
