@@ -194,6 +194,9 @@ def test_kqd_exact_evolution_on_aer_target_reports_local_provenance() -> None:
         backend_adapter=_adapter(
             {
                 "resolved_backend_name": "aer_simulator",
+                "optimization_level": 3,
+                "job_ids": ["stale-aer-job"],
+                "pub_count": 1,
                 "noise_summary": {
                     "enabled": True,
                     "model_source": "backend_derived",
@@ -212,6 +215,10 @@ def test_kqd_exact_evolution_on_aer_target_reports_local_provenance() -> None:
     assert metadata["requested_target"] == "aer_simulator"
     assert metadata["requested_resolved_backend_name"] == "aer_simulator"
     assert metadata["resolved_backend_name"] is None
+    assert metadata["requested_optimization_level"] == 3
+    assert metadata["optimization_level"] is None
+    assert "job_ids" not in metadata
+    assert "pub_count" not in metadata
     assert metadata["requested_noise_summary"] == {
         "enabled": True,
         "model_source": "backend_derived",
