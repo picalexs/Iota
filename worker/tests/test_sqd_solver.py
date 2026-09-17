@@ -746,28 +746,31 @@ def test_run_sqd_solves_raw_sector_before_recovering_invalid_rows_and_persists_s
     valid = np.array([False, True, False, True], dtype=bool)
     invalid = np.array([True, True, False, True], dtype=bool)
     recovered = np.array([True, False, False, True], dtype=bool)
-    samples = iter(
-        [
-            np.asarray([valid, valid, valid, invalid], dtype=bool),
-            np.asarray([valid, invalid, invalid, invalid], dtype=bool),
-        ]
-    )
+    samples = np.asarray([valid, valid, valid, invalid], dtype=bool)
+    sample_calls = 0
     events: list[str] = []
     recovery_inputs: list[np.ndarray] = []
     solved_strings: list[tuple[list[int], list[int]]] = []
     occupancies = (np.array([0.8, 0.2]), np.array([0.7, 0.3]))
 
-    monkeypatch.setattr(
-        sqd_solver,
-        "_sample_bitstring_matrix",
-        lambda *args, **kwargs: next(samples),
-    )
+    def fake_sample(*args, **kwargs):
+        nonlocal sample_calls
+        del args
+        sample_calls += 1
+        ledger = kwargs["work_ledger"]
+        ledger["sampler_run_attempts"] += 1
+        ledger["sampler_successful_runs"] += 1
+        ledger["sampler_requested_shots_total"] += kwargs["total_samples"]
+        ledger["sampler_returned_raw_sample_rows"] += int(samples.shape[0])
+        return samples
+
+    monkeypatch.setattr(sqd_solver, "_sample_bitstring_matrix", fake_sample)
 
     def fake_recover(bitstrings, probabilities, **kwargs):
         del kwargs
         events.append("recover")
         recovery_inputs.append(np.asarray(bitstrings, dtype=bool).copy())
-        assert np.asarray(probabilities, dtype=float) == pytest.approx([0.75])
+        assert np.asarray(probabilities, dtype=float) == pytest.approx([0.25])
         return np.asarray([recovered], dtype=bool), np.asarray([1.0])
 
     monkeypatch.setattr(configuration_recovery, "recover_configurations", fake_recover)
@@ -818,6 +821,7 @@ def test_run_sqd_solves_raw_sector_before_recovering_invalid_rows_and_persists_s
     assert events == ["solve", "recover", "solve"]
     assert len(recovery_inputs) == 1
     np.testing.assert_array_equal(recovery_inputs[0], np.asarray([invalid], dtype=bool))
+    assert sample_calls == 1
     assert solved_strings[0] == ([1], [1])
     assert solved_strings[1] == ([1, 2], [1, 2])
 
@@ -839,6 +843,9 @@ def test_run_sqd_solves_raw_sector_before_recovering_invalid_rows_and_persists_s
     assert result.sci_result_package["final_sampling_stages"]["recovered"]
     assert result.sci_result_package["best_sampling_stages"]["raw"]
     assert len(result.sci_result_package["occupation_history"]) == 2
+    assert result.sci_result_package["work_ledger"]["sampler_run_attempts"] == 1
+    assert result.sci_result_package["work_ledger"]["sampler_requested_shots_total"] == 4
+    assert first["raw_bitstring_distribution"] == second["raw_bitstring_distribution"]
 
 
 def test_run_sqd_requires_raw_valid_sector_for_first_solve(monkeypatch) -> None:
