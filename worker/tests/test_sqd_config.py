@@ -48,6 +48,26 @@ def test_resolve_sqd_options_applies_runtime_bounds_and_hamiltonian_defaults() -
     assert options.hamiltonian_constant == -0.25
     assert options.seed == 0
     assert options.sci_solver_options == {"max_cycle": 80}
+    assert options.target_spin_sq == 0.0
+
+
+def test_resolve_sqd_options_does_not_impose_singlet_on_open_shell_defaults() -> None:
+    options = sqd_config.resolve_sqd_options(
+        {"algorithm": "sqd"},
+        _hamiltonian(num_elec_a=2, num_elec_b=1),
+    )
+
+    assert options.open_shell is True
+    assert options.target_spin_sq is None
+
+
+def test_resolve_sqd_options_preserves_explicit_open_shell_spin_target() -> None:
+    options = sqd_config.resolve_sqd_options(
+        {"algorithm": "sqd", "spin_sq_target": 0.75},
+        _hamiltonian(num_elec_a=2, num_elec_b=1),
+    )
+
+    assert options.target_spin_sq == 0.75
 
 
 def test_resolve_sqd_options_maps_backend_sample_budget_when_unspecified() -> None:
