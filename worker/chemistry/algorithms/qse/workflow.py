@@ -247,6 +247,7 @@ def run_qse(
 
     qse_config = resolve_qse_config(resolved)
     max_subspace_dim = qse_config.max_subspace_dim
+    effective_max_subspace_dim = max_subspace_dim
     regularization = qse_config.regularization
     overlap_threshold = qse_config.overlap_threshold
     residual_tolerance = qse_config.residual_tolerance
@@ -264,6 +265,7 @@ def run_qse(
     )
     if qse_policy.uses_measured_matrix_elements:
         measured_rank = min(max_subspace_dim, measured_qse_dimension_limit())
+        effective_max_subspace_dim = measured_rank
         logger.info(
             "QSE setup: max_subspace_dim=%d excitation=%s reference_method=%s "
             "execution_mode=measured_matrix_elements backend_target=%s",
@@ -385,7 +387,7 @@ def run_qse(
             build_qse_completion_payload(
                 subspace_dim=outcome.basis_rank,
                 primary_energy=primary_energy,
-                max_subspace_dim=max_subspace_dim,
+                max_subspace_dim=effective_max_subspace_dim,
                 reference_method=outcome.reference_method,
                 excitation_level=excitation_level,
                 regularization=regularization,
