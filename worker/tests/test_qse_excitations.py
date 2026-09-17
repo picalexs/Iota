@@ -11,6 +11,7 @@ from worker.chemistry.algorithms.qse.excitations import (
     fermionic_excitation_specs,
     same_spin_count,
 )
+from worker.chemistry.algorithms.qse.basis import accept_basis_candidate
 
 
 def test_apply_fermionic_ladder_enforces_occupancy_and_jordan_wigner_sign() -> None:
@@ -48,6 +49,21 @@ def test_apply_fermionic_excitation_keeps_small_nonzero_amplitudes() -> None:
     )
 
     assert result[2] == 1e-12
+
+
+def test_qse_basis_keeps_small_nonzero_excitation_direction() -> None:
+    basis: list[np.ndarray] = []
+    orthonormal_basis: list[np.ndarray] = []
+
+    independence_norm = accept_basis_candidate(
+        np.array([0.0, 1e-12], dtype=complex),
+        basis=basis,
+        orthonormal_basis=orthonormal_basis,
+        overlap_threshold=1e-8,
+    )
+
+    assert independence_norm == 0.0
+    assert basis[0].tolist() == [0.0 + 0.0j, 1.0 + 0.0j]
 
 
 def test_fermionic_excitation_specs_preserve_spin_sectors() -> None:
