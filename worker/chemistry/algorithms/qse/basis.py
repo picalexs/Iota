@@ -97,7 +97,7 @@ def accept_basis_candidate(
     """Append a normalized candidate when it is linearly independent enough."""
     vector = np.asarray(candidate, dtype=complex)
     norm = float(np.linalg.norm(vector))
-    if np.isclose(norm, 0.0):
+    if norm == 0.0:
         return None
 
     normalized = vector / norm

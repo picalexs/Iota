@@ -63,7 +63,7 @@ def sector_excitation_coupling_score(
         nelec=action.nelec,
     )
     norm = float(np.linalg.norm(candidate))
-    if np.isclose(norm, 0.0):
+    if norm == 0.0:
         return 0.0
     return float(abs(np.vdot(candidate / norm, h_reference)))
 
