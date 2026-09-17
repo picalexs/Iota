@@ -174,6 +174,45 @@ def test_projected_result_metadata_marks_sector_path_local() -> None:
         assert metadata["fallback_reason"] == f"{algorithm}_uses_local_sector_matrix_free_solver"
 
 
+def test_kqd_exact_evolution_on_aer_target_reports_local_provenance() -> None:
+    result = {
+        "raw_result": {},
+        "algorithm_metrics": {
+            "matrix_element_summary": {
+                "matrix_element_strategy": "dense_classical",
+                "implemented_evolution_method": "exact_matrix_evolution",
+            }
+        },
+    }
+
+    apply_result_metadata(
+        result,
+        algorithm="kqd",
+        mode="advanced",
+        backend_target="aer_simulator",
+        chemistry_input=ChemistryInput(atoms=[], basis="6-31g"),
+        backend_adapter=_adapter(
+            {
+                "transpilation_summary": {"preview": "requested Aer circuit path"},
+                "backend_primitives_used": True,
+                "primitive_family": "qiskit_aer.EstimatorV2",
+            }
+        ),
+        backend_context=BackendExecutionContext(backend_target="aer_simulator"),
+    )
+
+    metadata = result["backend_execution"]
+    assert metadata["backend_target"] == "aer_simulator"
+    assert metadata["requested_target"] == "aer_simulator"
+    assert metadata["execution_mode"] == "exact_matrix_evolution"
+    assert metadata["actual_path_class"] == "dense_classical"
+    assert metadata["actual_execution_target"] == "local_classical"
+    assert metadata["aer_simulator_used"] is False
+    assert metadata["backend_primitives_used"] is False
+    assert metadata["primitive_family"] is None
+    assert "transpilation_summary" not in metadata
+
+
 def test_qse_result_metadata_marks_local_reference_without_primitive() -> None:
     result = {
         "raw_result": {},
