@@ -210,8 +210,9 @@ non-binary sample strings.
 KQD `exact` mode uses exact matrix evolution, including for an Aer target.
 Branch-estimator KQD supports Trotter evolution only. The runner validates this
 setting before it creates an estimator primitive. Result metadata keeps the
-requested target and reports exact matrix evolution as local execution. It does
-not report Aer or IBM primitive use for this path.
+requested target and noise configuration separate from actual execution. It
+reports exact matrix evolution as local. It also states that this path did not
+use Aer or IBM Runtime primitives and did not apply noise.
 
 KQD and QFD work estimates count matrix-pair and projected-solve units for IBM
 Runtime and noisy Aer. Ideal Aer uses the algorithm-native estimate for the
