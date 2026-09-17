@@ -680,6 +680,12 @@ def test_run_qfd_aer_state_propagation_matches_statevector() -> None:
     assert aer_result.conditioning_summary["time_points"] == pytest.approx(2.0)
     assert aer_result.matrix_element_summary["matrix_element_strategy"] == "dense_classical"
     assert aer_result.matrix_element_summary["projected_dimension"] == 2
+    assert aer_result.matrix_element_summary["implemented_evolution_method"] == (
+        "aer_pauli_lie_trotter"
+    )
+    assert aer_result.matrix_element_summary["reference_descriptor"]["execution_mode"] == (
+        "aer_pauli_lie_trotter"
+    )
     assert aer_result.matrix_element_summary["timing_breakdown"]["total_seconds"] >= 0.0
 
 
