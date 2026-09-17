@@ -83,7 +83,12 @@ def test_progress_reports_actual_shared_spin_pool_for_balanced_inputs() -> None:
         iteration=1,
         batch_index=1,
         options=options,
-        ci_summary={"sci_dimension": 2, "cap_active_for_batch": False},
+        ci_summary={
+            "sci_dimension": 2,
+            "cap_active_for_batch": False,
+            "carryover_strings_alpha": 0,
+            "carryover_strings_beta": 0,
+        },
         progress_callback=events.append,
     )
     sqd_progress.emit_configuration_recovery_progress(
