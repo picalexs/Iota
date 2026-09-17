@@ -71,6 +71,44 @@ def test_execute_dense_qse_uses_exact_final_solver_and_tracks_progress_regulariz
     assert outcome.diagnostics["regularization_may_change_reported_energy"] is False
 
 
+def test_execute_dense_qse_collects_basis_without_enabling_progress_work() -> None:
+    operator = np.diag([1.0, -0.5]).astype(complex)
+    reference_state = np.array([1.0, 0.0], dtype=complex)
+    excitation = ("single", (1,), (0,))
+
+    def build_basis(state, _matrix, **kwargs):
+        assert kwargs["progress_callback"] is None
+        kwargs["selection_callback"](("reference", (), ()))
+        kwargs["selection_callback"](excitation)
+        return [state, np.array([0.0, 1.0], dtype=complex)]
+
+    outcome = execute_dense_qse(
+        hamiltonian=object(),
+        backend=object(),
+        operator=operator,
+        resolved_config={"reference_method": "provided_state"},
+        excitation_level="singles",
+        target_rank=2,
+        overlap_threshold=1e-8,
+        regularization=0.0,
+        residual_tolerance=1e-6,
+        progress_callback=None,
+        resolve_reference_state_fn=lambda **_kwargs: (
+            "provided_state",
+            reference_state,
+            [],
+        ),
+        build_excitation_basis_fn=build_basis,
+        build_overlap_matrix_fn=lambda basis: np.eye(len(basis)),
+        solve_generalized_eigensystem_fn=solve_exact_generalized_eigensystem,
+        real_scalar_fn=lambda value, label: float(np.real(value)),
+    )
+
+    selection = outcome.diagnostics["basis_selection"]
+    assert selection["selected_specs_complete"] is True
+    assert selection["selected_excitation_specs"][1]["kind"] == "single"
+
+
 def test_execute_sector_qse_preserves_matrix_free_metadata() -> None:
     action = _FakeAction()
     reference_state = np.array([1.0, 0.0, 0.0], dtype=complex)
