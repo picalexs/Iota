@@ -211,7 +211,6 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     removeAdvancedVariant,
   } = useBenchmarkVariantSelectionState({
     benchmarkMode,
-    selectedBackendMode,
     selectedAlgorithms,
     algorithmVariants,
     selectedPresets,

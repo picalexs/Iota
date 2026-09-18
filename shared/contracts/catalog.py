@@ -13,7 +13,7 @@ from .registry_metadata import (
     supported_optimizer_metadata,
 )
 
-CATALOG_VERSION = "2026-09-16-v22"
+CATALOG_VERSION = "2026-09-11-v21"
 
 
 JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
@@ -98,9 +98,9 @@ PUBLIC_LIMITS: dict[str, NumericLimit] = {
 }
 
 PUBLIC_DEFAULTS: dict[str, JsonValue] = {
-    "ansatz_name": "NumberPreserving",
+    "ansatz_name": "EfficientSU2",
     "optimizer_name": "COBYLA",
-    "qse_reference_ansatz_name": "NumberPreserving",
+    "qse_reference_ansatz_name": "EfficientSU2",
     "qse_reference_optimizer_name": "COBYLA",
 }
 
@@ -331,7 +331,7 @@ PUBLIC_RECOMMENDATIONS: RecommendationCatalog = {
             "reference_method": "hf",
             "excitation_level": "singles",
             "max_subspace_dim": 4,
-            "vqe_reference_ansatz_name": "NumberPreserving",
+            "vqe_reference_ansatz_name": "EfficientSU2",
             "vqe_reference_optimizer_name": "COBYLA",
             "vqe_reference_max_iterations": 128,
             "vqe_reference_reps": 1,
@@ -344,7 +344,7 @@ PUBLIC_RECOMMENDATIONS: RecommendationCatalog = {
             "reference_method": "hf",
             "excitation_level": "singles_doubles",
             "max_subspace_dim": 8,
-            "vqe_reference_ansatz_name": "NumberPreserving",
+            "vqe_reference_ansatz_name": "EfficientSU2",
             "vqe_reference_optimizer_name": "COBYLA",
             "vqe_reference_max_iterations": 256,
             "vqe_reference_reps": 1,
@@ -357,7 +357,7 @@ PUBLIC_RECOMMENDATIONS: RecommendationCatalog = {
             "reference_method": "hf",
             "excitation_level": "singles_doubles",
             "max_subspace_dim": 12,
-            "vqe_reference_ansatz_name": "NumberPreserving",
+            "vqe_reference_ansatz_name": "EfficientSU2",
             "vqe_reference_optimizer_name": "COBYLA",
             "vqe_reference_max_iterations": 512,
             "vqe_reference_reps": 1,

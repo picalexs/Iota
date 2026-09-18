@@ -291,21 +291,11 @@ warm-start selection before optimization. When `initial_parameters` or
 `parameter_bounds` are provided, they must match the resolved ansatz parameter
 count; `parameter_bounds` also require `[lower, upper]` ordering for every
 entry. QSE advanced payloads use `reference_method="hf"`, `"vqe"`,
-`"provided_state"`, or `"provided_sector"`. On local runs above the dense
-active-space cap, HF and provided-sector references use the fixed-particle-sector
-matrix-free path. They are the supported larger-active-space QSE references.
-QSE `max_subspace_dim` is capped at 96 for local and fixed-sector paths. The
-measured QSE path applies an additional effective cap of 8 and reports that
-effective cap in completion progress. QFD
+`"provided_state"`, or `"provided_sector"`. The HF and provided-sector
+references use the fixed-particle-sector matrix-free path and are the supported
+larger-active-space QSE references. QSE `max_subspace_dim` is capped at 96. QFD
 advanced payloads include `trotter_steps` for Pauli-evolution circuit synthesis
 on Aer/IBM branch-estimator paths and Aer state-propagation paths.
-QFD uses 16 time points by default on local dense and fixed-sector paths. It
-uses 7 by default on branch-estimator paths. Branch-estimator paths support at
-most 8 points. The worker rejects larger values before it creates the
-estimator primitive.
-Measured QSE on noisy Aer or IBM Runtime supports `reference_method="hf"` only,
-because its measured circuit prepares the Hartree-Fock reference state. Use
-statevector or ideal Aer for non-HF QSE references.
 `provided_state_vector` is a list of `QSEReferenceScalar`, where each entry is
 either a real number or `{real, imag}`. `provided_sector_amplitudes` is a list
 of `{bitstring, amplitude}` determinant entries using the same scalar shape.
@@ -450,22 +440,8 @@ Typed estimate envelope used by `RunResponse`, validation responses, and
 
 | Source            | Fields                                         | Current status                                                         |
 | ----------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
-| `custom_preset`   | `preset` plus preset-specific fields | Supported for `aer_simulator`; rejected for non-noise-capable targets. |
-| `backend_derived` | `reference_backend`, optional `temperature_mk` | Supported for `aer_simulator`; the reference must be an IBM backend. |
-
-Custom preset fields are:
-
-- `depolarizing_cx`: `strength` in `[0, 1]`, applied to `cx` gates.
-- `readout_bias`: `p01` for `P(1|0)` and `p10` for `P(0|1)`, each in `[0, 1]`.
-- `thermal_relaxation`: positive `t1_us`, `t2_us`, and `gate_time_us` values.
-  The worker requires `t2_us <= 2 * t1_us`.
-
-Backend-derived noise loads the named IBM backend through the active IBM Runtime
-credential profile. It passes the selected temperature in milli-Kelvin to Aer
-and records the resolved backend name, backend version, basis gates, coupling
-map, and model fingerprint in execution metadata. The worker fails the run when
-it cannot load the requested backend. It does not substitute a simulator or a
-different backend.
+| `custom_preset`   | `preset`, `strength`                           | Supported for `aer_simulator`; rejected for non-noise-capable targets. |
+| `backend_derived` | `reference_backend`, optional `temperature_mk` | Supported by the Aer adapter through fake-provider backend resolution. |
 
 Relevant upstream references for these runtime targets are Qiskit Aer
 `AerSimulator`, Qiskit Aer noise models, IBM Runtime service docs, and IBM
@@ -529,20 +505,13 @@ Returned by `GET /api/runs/{id}/result`. Extends `BaseORMModel`.
 | `created_at`             | `datetime`      | Result creation timestamp                                              |
 
 For KQD/QFD, `algorithm_metrics` can include both the reported retained
-projected spectrum (`ritz_values` or `filter_eigenvalues`) and the
-pre-stabilization projected spectrum (`raw_ritz_values` or
-`raw_filter_eigenvalues`). On noisy branch-estimator paths, the latter is
-computed by the regularized generalized solve before overlap-mode projection.
-The `stability_summary.raw_spectrum_definition` field identifies this as
-`regularized_unfiltered_generalized_spectrum`; it is not an unregularized
-generalized spectrum. The same summary includes overlap-threshold diagnostics
-and `selected_level_index` for the retained level used as the canonical
-energy. A stable retained overlap solve can produce the canonical `energy`
-while leaving `converged=false`. Branch-estimator residuals apply only to the
-measured projected generalized eigenproblem. They do not measure the full-space
-Ritz residual. The worker records `projected_solver_converged` for that limited
-check and leaves `scientific_converged` unknown when the projected system is
-stable. Dense and fixed-sector paths can evaluate the full-space residual.
+projected spectrum (`ritz_values` or `filter_eigenvalues`) and the raw noisy
+projected spectrum (`raw_ritz_values` or `raw_filter_eigenvalues`), plus a
+`stability_summary` object with overlap-threshold diagnostics and
+`selected_level_index` for the retained level used as the canonical energy. On
+noisy Aer/IBM branch-estimator KQD/QFD paths, a stabilized retained solve can
+still produce the canonical `energy` while leaving `converged=false`; only a
+fully stable retained overlap solve is treated as converged on that path.
 
 When present, `algorithm_metrics.circuit_artifacts` is a list of typed
 quantum-circuit artifacts:
@@ -579,12 +548,11 @@ quantum-circuit artifacts:
 VQE emits an `ansatz` artifact plus a representative `final` artifact for the
 reported parameter set; when the optimizer's last point differs from that
 reported point, it also records an `optimizer_final` artifact for the last
-optimizer circuit. SQD emits `sqd_sampling` artifacts for measured circuits
-and records the storage policy in `algorithm_metrics.circuit_artifact_policy`:
-all circuits are kept up to 32, and larger sets keep the first 4, last 12, and
-16 evenly spaced middle circuits. SQD reuses one measured sample set for the
-recovery loop, so a run normally emits one SQD sampling artifact. The legacy
-`algorithm_metrics.sci_result_package.circuit_preview` is
+optimizer circuit. SQD emits `sqd_sampling` artifacts for stored recovery
+iterations and records the storage policy in
+`algorithm_metrics.circuit_artifact_policy`: all iterations are kept up to 32,
+and larger runs keep the first 4, last 12, and 16 evenly spaced middle
+iterations. The legacy `algorithm_metrics.sci_result_package.circuit_preview` is
 still preserved for older consumers. SQD/SKQD SCI packages also include a
 `selected_ci` object with the selected-CI cap source, effective dimension, full
 sector dimension, and an `exact_sector_solve` flag. SQD result packages include
@@ -594,16 +562,12 @@ both final-iteration and best-observed recovery fields (`final_energy`,
 energy uses the best observed SQD recovery iteration. SQD postselection
 summaries use `selected_samples` and `selected_configurations` for the latest
 accepted selected configurations, while `selected_sample_shots_estimate` keeps
-an estimate based on the average selected fraction and the per-run sample set.
-VQE stores the optimizer's last objective
+the cross-iteration shot estimate. VQE stores the optimizer's last objective
 under `final_energy` and the best observed objective under
 `best_observed_energy`, while keeping `converged` tied to optimizer success or
 SPSA stability rather than "minimum seen once" semantics. VQE diagnostics also
 record `reported_iterations_unit="objective_evaluations"` while
-`optimizer_iterations` keeps the optimizer-native attempted-step count and SPSA
-keeps rejected blocking steps separate under `accepted_steps`; the VQE work
-ledger also separates objective evaluation attempts and failures from successful
-observations. SKQD flattens the
+`optimizer_iterations` keeps the optimizer-native step count. SKQD flattens the
 representative SQD seed artifact as a top-level `sqd_seed` artifact. QSE emits
 reference artifacts for circuit-defined `reference_method="hf"` and
 `reference_method="vqe"`. KQD/QFD branch-estimator results expose retained
@@ -615,18 +579,6 @@ All normalized worker results include `algorithm_metrics.energy_policy` and
 `RunResultResponse.energy_policy` when available. The policy records the
 reported energy field, primary energy source, candidate energy fields, and that
 classical references are context only rather than replacement energies.
-
-Normalized algorithm metrics also include `benchmark_provenance` when metrics
-are available. This object records the requested and actual execution target,
-actual path class, primitive use, sampling controls, noise source and
-fingerprint, worker-observed work ledger, and reportable-energy status. Missing
-values remain `null`; this object does not provide provider billing totals or
-change benchmark scoring.
-
-The benchmark state and visible accuracy-versus-runtime CSV preserve the
-reported energy source, validity flag, diagnostic projected-solve flag, and
-scientific-convergence flag. These fields describe evidence quality. They do
-not remove rows or change the accuracy score.
 
 `run_results.raw_result` is stored in the DB but deliberately **not** exposed on
 `RunResultResponse`. Consumers that need the raw worker payload should pull it

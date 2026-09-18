@@ -72,7 +72,6 @@ services:
       LOCAL_CREDENTIALS_KEY_FILE: ${LOCAL_CREDENTIALS_KEY_FILE:-/app/local-state/credential-fernet.key}
       LOCAL_OPERATOR_TOKEN: ${LOCAL_OPERATOR_TOKEN:-}
       LOCAL_OPERATOR_TOKEN_FILE: ${LOCAL_OPERATOR_TOKEN_FILE:-/app/local-operator/operator-access.token}
-      ALLOW_INSECURE_DEFAULTS: ${ALLOW_INSECURE_DEFAULTS:-true}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       APP_VERSION: ${APP_VERSION:-dev}
       SKIP_PUBCHEM_SYNC: "true"

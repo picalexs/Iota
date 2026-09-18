@@ -39,8 +39,6 @@ def build_recovery_trace_entry(
     *,
     iteration: int,
     num_batches: int,
-    requested_samples_per_batch: int,
-    effective_samples_per_batch: int,
     symmetrize_spin: bool,
     sampling: SQDIterationSampling,
     state: SQDProgressState,
@@ -88,8 +86,6 @@ def build_recovery_trace_entry(
         "sampled_bitstrings": int(sampling.raw_bitstring_matrix.shape[0]),
         "sampled_configurations": int(sampling.bitstring_matrix.shape[0]),
         "batch_count": num_batches,
-        "requested_samples_per_batch": int(requested_samples_per_batch),
-        "effective_samples_per_batch": int(effective_samples_per_batch),
         "energy": round(energy_value, 8),
         "delta_energy": _finite_or_none(round(delta_energy, 8)),
         "occupancy_delta": _finite_or_none(round(occupancy_delta, 8)),
@@ -216,9 +212,7 @@ def emit_configuration_recovery_progress(
             "full_sci_dimension": int(state.last_selected_ci_summary.get("full_sci_dimension", 0)),
             "selected_ci_fraction": round(float(selected_ci_fraction_value), 6),
             "selected_ci_cap_active": bool(state.last_selected_ci_summary.get("cap_active")),
-            "selected_ci_spin_symmetrized": bool(
-                not options.open_shell or options.symmetrize_spin
-            ),
+            "selected_ci_spin_symmetrized": bool(options.symmetrize_spin),
             "carryover_strings_alpha": int(
                 state.last_carryover_summary.get("carryover_strings_alpha", 0)
             ),

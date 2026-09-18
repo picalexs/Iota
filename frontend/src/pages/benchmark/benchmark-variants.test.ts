@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BenchmarkAlgorithmVariant } from "./benchmark-variants";
-import {
-  buildBenchmarkVariantFormValues,
-  buildBenchmarkVariantFromFormValues,
-  createAdvancedBenchmarkVariant,
-  duplicateBenchmarkVariant,
-  kqdRequiresBranchEstimatorForBackendMode,
-  normalizeBenchmarkVariantLabels,
-} from "./benchmark-variants";
+import { duplicateBenchmarkVariant, normalizeBenchmarkVariantLabels } from "./benchmark-variants";
 
 function buildVariant(overrides: Partial<BenchmarkAlgorithmVariant>): BenchmarkAlgorithmVariant {
   return {
@@ -32,48 +25,6 @@ function buildVariant(overrides: Partial<BenchmarkAlgorithmVariant>): BenchmarkA
 }
 
 describe("benchmark-variants", () => {
-  it("recommends Trotter for KQD variants on IBM and noisy Aer paths only", () => {
-    const local = createAdvancedBenchmarkVariant("kqd", 0.0016);
-    const idealAer = createAdvancedBenchmarkVariant(
-      "kqd",
-      0.0016,
-      null,
-      kqdRequiresBranchEstimatorForBackendMode("aer_simulator"),
-    );
-    const ibm = createAdvancedBenchmarkVariant(
-      "kqd",
-      0.0016,
-      null,
-      kqdRequiresBranchEstimatorForBackendMode("ibm_runtime"),
-    );
-    const noisyAer = createAdvancedBenchmarkVariant(
-      "kqd",
-      0.0016,
-      null,
-      kqdRequiresBranchEstimatorForBackendMode("aer_simulator_backend_noise"),
-    );
-    const vqe = createAdvancedBenchmarkVariant("vqe", 0.0016, null, true);
-
-    expect(local.advancedConfig).toMatchObject({ algorithm: "kqd", evolution_method: "exact" });
-    expect(idealAer.advancedConfig).toMatchObject({ algorithm: "kqd", evolution_method: "exact" });
-    expect(ibm.advancedConfig).toMatchObject({ algorithm: "kqd", evolution_method: "trotter" });
-    expect(noisyAer.advancedConfig).toMatchObject({
-      algorithm: "kqd",
-      evolution_method: "trotter",
-    });
-    expect(vqe.advancedConfig).toMatchObject({ algorithm: "vqe" });
-    expect(kqdRequiresBranchEstimatorForBackendMode("aer_simulator")).toBe(false);
-    expect(kqdRequiresBranchEstimatorForBackendMode("statevector")).toBe(false);
-
-    const explicitExactValues = buildBenchmarkVariantFormValues(ibm);
-    explicitExactValues.advanced_kqd.evolution_method = "exact";
-    const explicitlyEdited = buildBenchmarkVariantFromFormValues(ibm, explicitExactValues);
-    expect(explicitlyEdited.advancedConfig).toMatchObject({
-      algorithm: "kqd",
-      evolution_method: "exact",
-    });
-  });
-
   it("normalizes generated and legacy copy labels to config-based row labels", () => {
     const variants = [
       buildVariant({

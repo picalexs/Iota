@@ -505,7 +505,7 @@ def test_build_easy_mode_keeps_projected_kqd_qfd_dimensions_for_target_paths() -
     assert kqd_noisy_aer["evolution_method"] == "trotter"
 
 
-def test_build_easy_mode_qse_uses_hf_reference_for_ibm_measured_path() -> None:
+def test_build_easy_mode_qse_uses_small_ibm_vqe_reference_when_hardware_can_execute_it() -> None:
     molecule = _molecule_with_active_space(2, n_orbitals=2)
 
     config = build_easy_mode_advanced_config(
@@ -521,9 +521,10 @@ def test_build_easy_mode_qse_uses_hf_reference_for_ibm_measured_path() -> None:
         backend_target=BackendTarget.IBM_RUNTIME,
     )
 
-    assert config["reference_method"] == "hf"
-    assert "vqe_reference_max_iterations" not in config
-    assert metadata["reference_solve_policy"] == "hf_easy_mode"
+    assert config["reference_method"] == "vqe"
+    assert config["vqe_reference_ansatz_name"] == "RealAmplitudes"
+    assert config["vqe_reference_max_iterations"] == 48
+    assert metadata["reference_solve_policy"] == "vqe_small_system_ibm_easy_mode"
 
 
 def test_build_easy_mode_advanced_config_sqd_skips_electron_injection_without_active_space() -> (

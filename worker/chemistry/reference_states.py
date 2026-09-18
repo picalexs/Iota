@@ -8,14 +8,12 @@ from worker.chemistry.types import HamiltonianBundle
 
 
 def _hamiltonian_num_qubits(hamiltonian: object) -> int | None:
-    raw_num_qubits = getattr(hamiltonian, "num_qubits", None)
-    if isinstance(raw_num_qubits, int) and raw_num_qubits > 0:
-        return int(raw_num_qubits)
-    pauli = getattr(hamiltonian, "pauli_hamiltonian", None)
-    pauli_num_qubits = getattr(pauli, "num_qubits", None)
-    if isinstance(pauli_num_qubits, int) and pauli_num_qubits > 0:
-        return int(pauli_num_qubits)
-    return None
+    raw_num_qubits = (
+        hamiltonian.num_qubits
+        if isinstance(hamiltonian, HamiltonianBundle)
+        else getattr(hamiltonian, "num_qubits", None)
+    )
+    return int(raw_num_qubits) if isinstance(raw_num_qubits, int) else None
 
 
 def _hamiltonian_hf_metadata(hamiltonian: object) -> tuple[int, int, int] | None:
@@ -65,11 +63,7 @@ def build_hf_reference_state_with_source(
     """
     hf_metadata = _hamiltonian_hf_metadata(hamiltonian)
     num_qubits = _hamiltonian_num_qubits(hamiltonian)
-    if (
-        hf_metadata is not None
-        and num_qubits is not None
-        and 2 * hf_metadata[0] == num_qubits
-    ):
+    if hf_metadata is not None and num_qubits is not None:
         n_orb, n_alpha, n_beta = hf_metadata
         dim = 2 ** (2 * n_orb)
         hf_index = 0

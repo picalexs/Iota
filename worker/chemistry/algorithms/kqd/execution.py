@@ -10,7 +10,6 @@ import numpy as np
 
 from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.projected_execution import (
-    ProjectedExecutionPolicy,
     prepare_projected_execution,
 )
 
@@ -45,7 +44,6 @@ def prepare_kqd_execution(
     resolve_operator_matrix_fn: OperatorResolver,
     num_qubits_fn: QubitResolver,
     backend_label_fn: BackendLabeler,
-    execution_policy: ProjectedExecutionPolicy | None = None,
 ) -> KQDExecutionPlan:
     """Resolve KQD's branch, sector, or dense execution resources."""
     resources = prepare_projected_execution(
@@ -58,7 +56,6 @@ def prepare_kqd_execution(
         resolve_operator_matrix_fn=resolve_operator_matrix_fn,
         num_qubits_fn=num_qubits_fn,
         backend_label_fn=backend_label_fn,
-        execution_policy=execution_policy,
     )
     return KQDExecutionPlan(
         use_branch_matrix_elements=resources.use_branch_matrix_elements,

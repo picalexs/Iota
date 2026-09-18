@@ -8,6 +8,7 @@ import type {
 
 export const POLICY_LEAST_ERROR_VALUE = "policy:least_error";
 export const POLICY_LEAST_BUSY_VALUE = "policy:least_busy";
+export const DEFAULT_NOISE_REFERENCE_BACKEND = "ibm_brisbane";
 export const DEFAULT_TOPOLOGY_COLOR = "#6f8fdc";
 
 type OptionalBackendDevice = BackendDeviceSummary | null | undefined;
@@ -231,7 +232,7 @@ export function resolveNoiseReference(
   noiseReferenceDevices: BackendDeviceSummary[],
 ): string {
   if (target === "aer_simulator") {
-    return noiseReferenceDevices[0]?.name ?? "";
+    return noiseReferenceDevices[0]?.name ?? DEFAULT_NOISE_REFERENCE_BACKEND;
   }
 
   return (
@@ -239,7 +240,7 @@ export function resolveNoiseReference(
     capability?.default_backend ||
     capability?.backends?.[0]?.name ||
     target ||
-    ""
+    DEFAULT_NOISE_REFERENCE_BACKEND
   );
 }
 

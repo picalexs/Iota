@@ -205,7 +205,7 @@ class TestMain:
                 with caplog.at_level(logging.INFO):
                     main_module.main()
 
-        assert "Worker initialized for queue 'default'" in caplog.text
+        assert "Worker scaffold initialized for queue 'default'" in caplog.text
 
 
 class TestRedisClientConfig:

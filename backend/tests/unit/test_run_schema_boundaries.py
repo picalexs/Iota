@@ -1,11 +1,7 @@
 """Tests for responsibility-specific run schema modules and compatibility exports."""
 
 from app.schemas import run as compatibility
-from app.schemas.run_config import (
-    BackendDerivedNoiseProfile,
-    BackendOptions,
-    CustomPresetNoiseProfile,
-)
+from app.schemas.run_config import BackendOptions
 from app.schemas.run_requests import RunCreate
 from app.schemas.run_responses import RunResponse
 from app.schemas.run_results import RunResultResponse
@@ -60,45 +56,3 @@ def test_backend_options_keep_aer_tuning_fields_optional_and_bounded() -> None:
             pass
         else:
             raise AssertionError(f"expected invalid {field} to fail: {value!r}")
-
-
-def test_noise_profiles_require_explicit_parameters_and_real_references() -> None:
-    assert CustomPresetNoiseProfile(
-        source="custom_preset",
-        preset="readout_bias",
-        p01=0.01,
-        p10=0.02,
-    ).model_dump(exclude_none=True) == {
-        "source": "custom_preset",
-        "preset": "readout_bias",
-        "p01": 0.01,
-        "p10": 0.02,
-    }
-
-    for payload in (
-        {"source": "custom_preset", "preset": "readout_bias", "strength": 0.01},
-        {
-            "source": "custom_preset",
-            "preset": "thermal_relaxation",
-            "t1_us": 100,
-            "t2_us": 250,
-            "gate_time_us": 0.1,
-        },
-    ):
-        try:
-            CustomPresetNoiseProfile(**payload)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError(f"expected invalid noise profile to fail: {payload!r}")
-
-    for reference_backend in ("aer_simulator", "statevector"):
-        try:
-            BackendDerivedNoiseProfile(
-                source="backend_derived",
-                reference_backend=reference_backend,
-            )
-        except ValueError:
-            pass
-        else:
-            raise AssertionError(f"expected simulator reference to fail: {reference_backend}")

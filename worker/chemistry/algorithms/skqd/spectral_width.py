@@ -5,7 +5,7 @@ requires the Krylov time step to be ``Delta t = pi / Delta E_{N-1}``, where
 ``Delta E_{N-1} = E_{N-1} - E_0`` is the spectral width of the Hamiltonian.
 This module estimates that width from whichever representation is available,
 preferring an exact extreme-eigenvalue solve when the operator is small enough
-and otherwise using a conservative Pauli-coefficient bound.
+and otherwise using a cheap norm-based upper bound.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 
 # Exact extreme eigenvalues via ``eigvalsh`` stay cheap only for modest dense
-# operators. Above this dimension, use the conservative Pauli L1 bound.
+# operators. Above this dimension, fall back to the norm-based upper bound.
 _MAX_EXACT_SPECTRAL_DIMENSION = 4096
 _MIN_SPECTRAL_WIDTH = 1e-9
 
@@ -49,16 +49,12 @@ def estimate_pauli_spectral_width(pauli_hamiltonian: Any) -> tuple[float, str]:
     return max(2.0 * coefficient_l1, _MIN_SPECTRAL_WIDTH), "pauli_coefficient_l1_bound"
 
 
-def estimate_action_spectral_width(
-    action: Any,
-    *,
-    pauli_hamiltonian: Any | None = None,
-) -> tuple[float, str]:
+def estimate_action_spectral_width(action: Any) -> tuple[float, str]:
     """Estimate ``Delta E_{N-1}`` for a matrix-free fixed-sector action.
 
-    Small sectors are diagonalized exactly via a dense reconstruction. Large
-    sectors require a conservative bound from the Pauli representation. Power
-    iteration estimates an extremal eigenvalue but does not bound the spectrum.
+    Small sectors are diagonalized exactly via a dense reconstruction; larger
+    sectors fall back to a Gershgorin-style bound built from the action's
+    diagonal reach, using a power-iteration estimate of ``||H||``.
     """
     dimension = int(getattr(action, "dimension", 0))
     if dimension < 1:
@@ -71,11 +67,24 @@ def estimate_action_spectral_width(
         eigenvalues = np.linalg.eigvalsh(matrix)
         width = float(eigenvalues[-1] - eigenvalues[0])
         return max(width, _MIN_SPECTRAL_WIDTH), "exact_sector_spectrum"
-    if pauli_hamiltonian is None:
-        raise ValueError(
-            "Large-sector SKQD time-step resolution requires a conservative Pauli spectral bound"
-        )
-    return estimate_pauli_spectral_width(pauli_hamiltonian)
+    spectral_norm = _power_iteration_norm(action, dimension)
+    return max(2.0 * spectral_norm, _MIN_SPECTRAL_WIDTH), "action_power_iteration_bound"
+
+
+def _power_iteration_norm(action: Any, dimension: int, *, iterations: int = 32) -> float:
+    """Estimate ``||H||`` for a matrix-free action via power iteration on H^2."""
+    rng = np.random.default_rng(0)
+    vector = rng.standard_normal(dimension) + 1j * rng.standard_normal(dimension)
+    vector = vector / np.linalg.norm(vector)
+    estimate = 0.0
+    for _ in range(iterations):
+        applied = action.matvec(action.matvec(vector))
+        norm = float(np.linalg.norm(applied))
+        if norm <= 0.0:
+            return 0.0
+        vector = applied / norm
+        estimate = np.sqrt(norm)
+    return float(estimate)
 
 
 def paper_time_step(spectral_width: float) -> float:

@@ -15,7 +15,6 @@ public service.
 | [API endpoints](api-endpoints.md) | REST and Server-Sent Events endpoints. |
 | [Pydantic schemas](schemas.md) | API request and response models. |
 | [Worker and queue](worker-and-queue.md) | Worker execution and Redis/RQ behavior. |
-| [Worker chemistry algorithms](worker-chemistry.md) | Chemistry algorithm ownership, dispatch, configuration, and tests. |
 
 ## Scope rules
 

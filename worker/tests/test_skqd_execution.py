@@ -85,7 +85,6 @@ def test_execute_skqd_extension_dispatches_sector_hf_fallback() -> None:
     )
 
     assert outcome.seed_source == "hf_sector_reference"
-    assert outcome.seed_fallback_reason == "missing"
     assert outcome.sqd_seed is None
     assert outcome.krylov_seed is hf_seed
     assert outcome.basis_rank == 1

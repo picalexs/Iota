@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -30,12 +29,6 @@ def bounded_optional_positive_int(value: Any, *, high: int) -> int | None:
     """Return a positive integer capped at ``high`` or ``None`` for invalid input."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    try:
-        numeric = float(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
-    if not math.isfinite(numeric):
-        return None
     parsed = int(value)
     if parsed <= 0:
         return None
@@ -47,7 +40,7 @@ def positive_float_or_default(value: Any, *, default: float) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return default
     parsed = float(value)
-    if not math.isfinite(parsed) or parsed <= 0.0:
+    if parsed <= 0.0:
         return default
     return parsed
 
@@ -78,8 +71,6 @@ def resolve_parameter_bounds(
             raise ValueError("VQE parameter_bounds entries must be numeric [lower, upper] pairs")
         lower = float(item[0])
         upper = float(item[1])
-        if not math.isfinite(lower) or not math.isfinite(upper):
-            raise ValueError("VQE parameter_bounds values must be finite")
         if lower > upper:
             raise ValueError("VQE parameter_bounds lower values cannot exceed upper values")
         bounds.append((lower, upper))
@@ -89,8 +80,8 @@ def resolve_parameter_bounds(
 
 def resolve_vqe_config(resolved: Mapping[str, Any]) -> VQEConfig:
     """Resolve user VQE options into bounded internal values."""
-    max_iterations = bounded_optional_positive_int(resolved.get("max_iterations"), high=5000)
-    max_iterations = max_iterations if max_iterations is not None else 500
+    max_iterations = int(resolved.get("max_iterations") or 500)
+    max_iterations = max(1, min(max_iterations, 5000))
     optimizer_name = str(resolved.get("optimizer_name") or resolved.get("optimizer") or "COBYLA")
     optimizer_policy = str(resolved.get("optimizer_policy") or "explicit").strip().lower()
     if optimizer_policy not in _SUPPORTED_OPTIMIZER_POLICIES:
@@ -114,7 +105,7 @@ def resolve_vqe_config(resolved: Mapping[str, Any]) -> VQEConfig:
             optimizer_options.get("maxfun"),
             high=_MAX_FUNCTION_EVALUATIONS,
         )
-    reps = bounded_optional_positive_int(resolved.get("reps"), high=6) or 2
+    reps = max(1, min(int(resolved.get("reps") or 2), 6))
     return VQEConfig(
         max_iterations=max_iterations,
         optimizer_name=optimizer_name,

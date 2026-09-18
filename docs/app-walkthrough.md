@@ -20,12 +20,12 @@ Supported algorithm identifiers are defined in
 
 | Algorithm | Worker runner                                                              |
 | --------- | -------------------------------------------------------------------------- |
-| `vqe`     | [`worker/chemistry/algorithms/vqe/workflow.py`](../worker/chemistry/algorithms/vqe/workflow.py)   |
-| `sqd`     | [`worker/chemistry/algorithms/sqd/workflow.py`](../worker/chemistry/algorithms/sqd/workflow.py)   |
-| `kqd`     | [`worker/chemistry/algorithms/kqd/workflow.py`](../worker/chemistry/algorithms/kqd/workflow.py)   |
-| `qfd`     | [`worker/chemistry/algorithms/qfd/workflow.py`](../worker/chemistry/algorithms/qfd/workflow.py)   |
-| `qse`     | [`worker/chemistry/algorithms/qse/workflow.py`](../worker/chemistry/algorithms/qse/workflow.py)   |
-| `skqd`    | [`worker/chemistry/algorithms/skqd/workflow.py`](../worker/chemistry/algorithms/skqd/workflow.py) |
+| `vqe`     | [`worker/chemistry/vqe_solver.py`](../worker/chemistry/vqe_solver.py)   |
+| `sqd`     | [`worker/chemistry/sqd_solver.py`](../worker/chemistry/sqd_solver.py)   |
+| `kqd`     | [`worker/chemistry/kqd_solver.py`](../worker/chemistry/kqd_solver.py)   |
+| `qfd`     | [`worker/chemistry/qfd_solver.py`](../worker/chemistry/qfd_solver.py)   |
+| `qse`     | [`worker/chemistry/qse_solver.py`](../worker/chemistry/qse_solver.py)   |
+| `skqd`    | [`worker/chemistry/skqd_solver.py`](../worker/chemistry/skqd_solver.py) |
 
 ## Runtime Architecture
 

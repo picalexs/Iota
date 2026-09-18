@@ -13,6 +13,5 @@ describe("run form balanced defaults", () => {
       initial_point_strategy: "zero_plus_seeded_random",
       initial_point_candidates: 2,
     });
-    expect(initialValues.advanced_qse.vqe_reference_ansatz_name).toBe("NumberPreserving");
   });
 });

@@ -8,8 +8,7 @@ import pytest
 from worker.chemistry.algorithms.vqe.scipy import run_scipy_vqe_optimizer
 
 
-@pytest.mark.parametrize("scipy_method", ["L-BFGS-B", "SLSQP", "COBYLA"])
-def test_run_scipy_vqe_optimizer_normalizes_scipy_result(scipy_method: str) -> None:
+def test_run_scipy_vqe_optimizer_normalizes_scipy_result() -> None:
     initial_point = np.array([0.2, -0.1], dtype=float)
     scipy_result = SimpleNamespace(
         x=np.array([0.0, 0.3]),
@@ -30,7 +29,7 @@ def test_run_scipy_vqe_optimizer_normalizes_scipy_result(scipy_method: str) -> N
         objective=lambda _point: 0.0,
         initial_point=initial_point,
         optimizer=SimpleNamespace(
-            scipy_method=scipy_method,
+            scipy_method="L-BFGS-B",
             options=None,
             max_iterations=5,
         ),
@@ -47,7 +46,7 @@ def test_run_scipy_vqe_optimizer_normalizes_scipy_result(scipy_method: str) -> N
     assert final_energy == pytest.approx(-0.25)
     assert iterations == 2
     assert converged is True
-    assert diagnostics["scipy_method"] == scipy_method
+    assert diagnostics["scipy_method"] == "L-BFGS-B"
     assert diagnostics["function_evaluations"] == 4
     assert diagnostics["optimizer_function_evaluations"] == 4
     assert diagnostics["termination_reason"] == "optimizer_success"

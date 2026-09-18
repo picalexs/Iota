@@ -6,7 +6,6 @@ import numpy as np
 
 from worker.chemistry.time_evolution import (
     exact_time_evolution_state_from_spectrum,
-    is_zero_time,
     prepare_exact_time_evolution,
 )
 
@@ -53,7 +52,7 @@ def time_evolved_bitstring_distribution(
     """Aggregate computational-basis probabilities from exact evolved states."""
     seed = np.asarray(seed_state, dtype=complex).reshape(-1)
     seed_norm = float(np.linalg.norm(seed))
-    if not np.isfinite(seed_norm) or seed_norm == 0.0 or num_steps < 1:
+    if np.isclose(seed_norm, 0.0) or num_steps < 1:
         return []
     seed = seed / seed_norm
 
@@ -67,7 +66,7 @@ def time_evolved_bitstring_distribution(
     aggregate = np.zeros(dim, dtype=float)
     for step in range(num_steps):
         current_time = float(step * time_step)
-        if is_zero_time(current_time):
+        if np.isclose(current_time, 0.0):
             evolved = seed
         else:
             evolved = exact_time_evolution_state_from_spectrum(

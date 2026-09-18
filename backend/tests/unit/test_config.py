@@ -386,7 +386,7 @@ class TestInsecureDefaultsGuard:
     """Tests for the placeholder-credential guard and docs exposure gate."""
 
     def test_placeholder_password_allowed_by_default(self):
-        """Local development opts in explicitly to the checked-in placeholder."""
+        """Local development keeps working with the checked-in placeholder."""
         with patch.dict(
             os.environ,
             {
@@ -396,7 +396,6 @@ class TestInsecureDefaultsGuard:
                 "DB_PASSWORD": LOCAL_DEV_DB_CREDENTIAL,
                 "REDIS_URL": "redis://localhost:6379/0",
                 "DATABASE_URL": "",
-                "ALLOW_INSECURE_DEFAULTS": "true",
             },
             clear=False,
         ):
@@ -404,21 +403,6 @@ class TestInsecureDefaultsGuard:
 
             assert settings.allow_insecure_defaults is True
             assert settings.docs_enabled is True
-
-    def test_insecure_defaults_are_disabled_without_explicit_opt_in(self):
-        """Direct application startup does not enable development credentials."""
-        with patch.dict(
-            os.environ,
-            {
-                "DATABASE_URL": "postgresql://localhost:5432/testdb",
-                "REDIS_URL": "redis://localhost:6379/0",
-            },
-            clear=True,
-        ):
-            settings = Settings(_env_file=None)
-
-            assert settings.allow_insecure_defaults is False
-            assert settings.docs_enabled is False
 
     def test_placeholder_password_rejected_when_insecure_defaults_disabled(self):
         """Hardened deployments must not run on the development password."""

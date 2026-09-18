@@ -1,10 +1,10 @@
-"""VQE workflow orchestration."""
+"""VQE solver scaffold."""
 
 from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from qiskit.quantum_info import SparsePauliOp
@@ -15,6 +15,9 @@ from worker.chemistry.algorithms.vqe import objective as _vqe_objective
 from worker.chemistry.algorithms.vqe import spsa as _vqe_spsa
 from worker.chemistry.algorithms.vqe import state_data as _vqe_state_data
 from worker.chemistry.algorithms.vqe.config import (
+    VQEConfig,
+    bounded_optional_positive_int,
+    positive_float_or_default,
     resolve_parameter_bounds,
     resolve_vqe_config,
     select_vqe_execution_policy,
@@ -24,9 +27,7 @@ from worker.chemistry.algorithms.vqe.initial_point import (
     _build_initial_point_candidates,
     _select_initial_point,
 )
-from worker.chemistry.algorithms.vqe.objective import (
-    evaluate_energy as _evaluate_energy,
-)
+from worker.chemistry.algorithms.vqe.objective import evaluate_energy as _evaluate_energy
 from worker.chemistry.algorithms.vqe.objective import (
     evaluate_energy_with_uncertainty as _evaluate_energy_with_uncertainty,
 )
@@ -60,8 +61,6 @@ from worker.chemistry.algorithms.vqe.state_data import (
 from worker.chemistry.algorithms.vqe.telemetry import (
     FunctionEvaluationLimitReached,
     VQEObjectiveState,
-    VQEObservedPrimitive,
-    VQEPrimitiveWork,
 )
 from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.optimizer_registry import build_optimizer
@@ -71,6 +70,20 @@ from worker.chemistry.types import VQEResult
 
 logger = logging.getLogger(__name__)
 
+# Re-export private names for existing solver tests and importers.
+_VQEConfig = VQEConfig
+_bounded_optional_positive_int = bounded_optional_positive_int
+_positive_float_or_default = positive_float_or_default
+_resolve_parameter_bounds = resolve_parameter_bounds
+_resolve_vqe_config = resolve_vqe_config
+_select_vqe_execution_policy = select_vqe_execution_policy
+_select_vqe_optimizer_name = select_vqe_optimizer_name
+_best_or_latest_energy = best_or_latest_energy
+
+
+# Re-export private names for existing solver tests and importers.
+_FunctionEvaluationLimitReached = FunctionEvaluationLimitReached
+_VQEObjectiveState = VQEObjectiveState
 _extract_pub_energy = _vqe_objective.extract_pub_energy
 _bloch_vectors_from_statevector = _vqe_state_data.bloch_vectors_from_statevector
 
@@ -114,7 +127,7 @@ def _run_parameterless_vqe(
     optimizer_name: str,
     reps: int,
 ) -> VQEResult:
-    """Adapt parameterless execution inputs to the result builder."""
+    """Keep the legacy parameterless VQE result helper import-compatible."""
     return build_parameterless_vqe_result(
         objective=objective,
         initial_point=initial_point,
@@ -144,10 +157,9 @@ def _build_vqe_initial_point_limit_result(
     candidate_points: list[np.ndarray],
     convergence_trace: list[float],
     exc: Exception,
-    objective_state: VQEObjectiveState | None = None,
-    sector_diagnostics_fn: Callable[[np.ndarray], dict[str, Any]] | None = None,
+    objective_state: _VQEObjectiveState | None = None,
 ) -> VQEResult:
-    """Adapt evaluation-limit inputs to the result builder."""
+    """Keep the legacy VQE limit-result helper import-compatible."""
     return build_vqe_initial_point_limit_result(
         ansatz=ansatz,
         ansatz_name=ansatz_name,
@@ -161,8 +173,7 @@ def _build_vqe_initial_point_limit_result(
         convergence_trace=convergence_trace,
         exc=exc,
         objective_state=objective_state,
-        sector_diagnostics_fn=sector_diagnostics_fn,
-        best_energy_selector_fn=best_or_latest_energy,
+        best_energy_selector_fn=_best_or_latest_energy,
         build_circuit_artifacts_fn=_build_vqe_circuit_artifacts,
     )
 
@@ -200,7 +211,7 @@ def _should_retry_stationary_warm_start(
     converged: bool,
     optimizer_diagnostics: dict[str, Any],
 ) -> bool:
-    """Adapt retry-policy inputs to the retry module."""
+    """Keep the legacy VQE retry-policy import compatible."""
     return should_retry_stationary_warm_start(
         optimizer=optimizer,
         initial_point=initial_point,
@@ -215,7 +226,7 @@ def _warm_start_retry_indices(
     candidate_points: list[np.ndarray],
     selected_initial_diagnostics: dict[str, Any],
 ) -> list[int]:
-    """Adapt warm-start ordering inputs to the retry module."""
+    """Keep the legacy warm-start ordering import compatible."""
     return warm_start_retry_indices(
         candidate_points=candidate_points,
         selected_initial_diagnostics=selected_initial_diagnostics,
@@ -224,7 +235,7 @@ def _warm_start_retry_indices(
 
 def _retry_stationary_warm_start(
     *,
-    objective: VQEObjectiveState,
+    objective: _VQEObjectiveState,
     optimizer: Any,
     optimizer_diagnostics: dict[str, Any],
     convergence_trace: list[float],
@@ -234,7 +245,7 @@ def _retry_stationary_warm_start(
     current_result: tuple[np.ndarray, float, int, bool, dict[str, Any]],
     run_optimizer_fn: Any | None = None,
 ) -> tuple[np.ndarray, float, int, bool, dict[str, Any]]:
-    """Adapt retry execution inputs to the retry module."""
+    """Keep the legacy VQE retry helper import compatible."""
     return _retry_stationary_warm_start_impl(
         objective=objective,
         optimizer=optimizer,
@@ -250,7 +261,7 @@ def _retry_stationary_warm_start(
 
 def _run_scipy_vqe_with_retry(
     *,
-    objective: VQEObjectiveState,
+    objective: _VQEObjectiveState,
     initial_point: np.ndarray,
     optimizer: Any,
     optimizer_diagnostics: dict[str, Any],
@@ -276,7 +287,7 @@ def _run_scipy_vqe_with_retry(
 
 def _select_initial_point_or_limit_result(
     *,
-    objective: VQEObjectiveState,
+    objective: _VQEObjectiveState,
     candidate_points: list[np.ndarray],
     ansatz: Any,
     ansatz_name: str,
@@ -284,14 +295,13 @@ def _select_initial_point_or_limit_result(
     reps: int,
     optimizer_diagnostics: dict[str, Any],
     initial_point_diagnostics: dict[str, Any],
-    sector_diagnostics_fn: Callable[[np.ndarray], dict[str, Any]] | None,
 ) -> tuple[np.ndarray, dict[str, Any]] | VQEResult:
     try:
         initial_point, selected_initial_diagnostics = _select_initial_point(
             objective=objective,
             candidates=candidate_points,
         )
-    except FunctionEvaluationLimitReached as exc:
+    except _FunctionEvaluationLimitReached as exc:
         return _build_vqe_initial_point_limit_result(
             ansatz=ansatz,
             ansatz_name=ansatz_name,
@@ -305,7 +315,6 @@ def _select_initial_point_or_limit_result(
             convergence_trace=objective.convergence_trace,
             exc=exc,
             objective_state=objective,
-            sector_diagnostics_fn=sector_diagnostics_fn,
         )
     merged_diagnostics = {
         **optimizer_diagnostics,
@@ -317,7 +326,7 @@ def _select_initial_point_or_limit_result(
 
 def _optimize_vqe(
     *,
-    objective: VQEObjectiveState,
+    objective: _VQEObjectiveState,
     initial_point: np.ndarray,
     optimizer: Any,
     optimizer_name: str,
@@ -397,14 +406,14 @@ def _run_spsa_vqe_optimizer(
         ):
             final_energy = float(objective(optimal_point))
         else:
-            final_energy = best_or_latest_energy(best_energy_getter(), convergence_trace)
+            final_energy = _best_or_latest_energy(best_energy_getter(), convergence_trace)
         return optimal_point, final_energy, iterations, converged, optimizer_diagnostics
-    except FunctionEvaluationLimitReached as exc:
+    except _FunctionEvaluationLimitReached as exc:
         best_point = best_point_getter()
         optimal_point = best_point if best_point is not None else initial_point
         return (
             optimal_point,
-            best_or_latest_energy(best_energy_getter(), convergence_trace),
+            _best_or_latest_energy(best_energy_getter(), convergence_trace),
             max(len(convergence_trace), 1),
             False,
             {
@@ -432,11 +441,10 @@ def _build_vqe_result(
     final_energy: float,
     iterations: int,
     converged: bool,
-    objective_state: VQEObjectiveState,
+    objective_state: _VQEObjectiveState,
     optimizer_diagnostics: dict[str, Any],
-    sector_diagnostics_fn: Callable[[np.ndarray], dict[str, Any]] | None,
 ) -> VQEResult:
-    """Adapt canonical VQE inputs to the result builder."""
+    """Keep the legacy canonical VQE result helper import-compatible."""
     return build_vqe_result(
         ansatz=ansatz,
         ansatz_name=ansatz_name,
@@ -450,7 +458,6 @@ def _build_vqe_result(
         converged=converged,
         objective_state=objective_state,
         optimizer_diagnostics=optimizer_diagnostics,
-        sector_diagnostics_fn=sector_diagnostics_fn,
         compute_state_data_fn=_compute_quantum_state_data,
         build_circuit_artifacts_fn=_build_vqe_circuit_artifacts,
     )
@@ -463,7 +470,7 @@ def _reported_vqe_energy_source(
     final_point: np.ndarray,
     reported_point: np.ndarray,
 ) -> str:
-    """Adapt VQE energy-source inputs to the result builder."""
+    """Keep the legacy VQE energy-source helper import-compatible."""
     return reported_vqe_energy_source(
         final_energy=final_energy,
         best_observed_energy=best_observed_energy,
@@ -475,7 +482,7 @@ def _reported_vqe_energy_source(
 def _update_independent_reevaluation(
     *,
     diagnostics: dict[str, Any],
-    objective: VQEObjectiveState,
+    objective: _VQEObjectiveState,
     backend: Any,
     ansatz: Any,
     operator: Any,
@@ -484,7 +491,6 @@ def _update_independent_reevaluation(
     include_statevector_data: bool,
 ) -> None:
     reevaluation_mode = "exact_statevector" if include_statevector_data else "estimator_backend"
-    reevaluation_parameters = [float(value) for value in np.asarray(optimal_point, dtype=float)]
     max_evaluations = objective.max_function_evaluations
     if max_evaluations is not None and objective.evaluation_count >= max_evaluations:
         diagnostics.update(
@@ -492,7 +498,6 @@ def _update_independent_reevaluation(
                 "independent_final_energy": None,
                 "independent_reevaluation_status": "skipped_max_function_evaluations",
                 "independent_reevaluation_mode": reevaluation_mode,
-                "independent_reevaluation_parameters": reevaluation_parameters,
                 "independent_final_standard_error": None,
                 "independent_uncertainty_status": "skipped_max_function_evaluations",
             }
@@ -512,7 +517,6 @@ def _update_independent_reevaluation(
                 "independent_final_energy": independent_final_energy,
                 "independent_reevaluation_status": "completed",
                 "independent_reevaluation_mode": reevaluation_mode,
-                "independent_reevaluation_parameters": reevaluation_parameters,
                 "independent_reevaluation_delta": float(
                     abs(independent_final_energy - float(final_energy))
                 ),
@@ -530,7 +534,6 @@ def _update_independent_reevaluation(
                 "independent_final_energy": None,
                 "independent_reevaluation_status": "failed",
                 "independent_reevaluation_mode": reevaluation_mode,
-                "independent_reevaluation_parameters": reevaluation_parameters,
                 "independent_reevaluation_error": exc.__class__.__name__,
                 "independent_final_standard_error": None,
                 "independent_uncertainty_status": "failed",
@@ -538,27 +541,27 @@ def _update_independent_reevaluation(
         )
 
 
-def _sector_diagnostics_builder(
-    hamiltonian: object,
+def _update_sector_diagnostics(
+    diagnostics: dict[str, Any],
     *,
+    hamiltonian: object,
     ansatz: Any,
-) -> Callable[[np.ndarray], dict[str, Any]] | None:
+    parameter_point: np.ndarray,
+) -> None:
     if not all(
         isinstance(getattr(hamiltonian, name, None), int)
         for name in ("num_spatial_orbitals", "num_electrons_alpha", "num_electrons_beta")
     ):
-        return None
-
-    def build(parameter_point: np.ndarray) -> dict[str, Any]:
-        return _sector_diagnostics_from_ansatz(
+        return
+    diagnostics.update(
+        _sector_diagnostics_from_ansatz(
             ansatz,
             parameter_point,
             num_spatial_orbitals=int(hamiltonian.num_spatial_orbitals),
             num_electrons_alpha=int(hamiltonian.num_electrons_alpha),
             num_electrons_beta=int(hamiltonian.num_electrons_beta),
         )
-
-    return build
+    )
 
 
 def run_vqe(
@@ -571,45 +574,25 @@ def run_vqe(
 ) -> VQEResult:
     """Run VQE using scipy/SPSA optimizers and Qiskit V2 estimator PUBs."""
     resolved = resolve_algorithm_config(config, "vqe")
-    operator, num_qubits = _resolve_operator_and_width(hamiltonian)
-    if not resolved.get("ansatz_name") and not resolved.get("ansatz"):
-        sector_fields = (
-            "num_spatial_orbitals",
-            "num_electrons_alpha",
-            "num_electrons_beta",
-        )
-        sector_values = [getattr(hamiltonian, name, None) for name in sector_fields]
-        raw_num_qubits = getattr(hamiltonian, "num_qubits", None)
-        chemistry_sector_available = (
-            all(isinstance(value, int) and not isinstance(value, bool) for value in sector_values)
-            and isinstance(raw_num_qubits, int)
-            and not isinstance(raw_num_qubits, bool)
-            and raw_num_qubits == 2 * int(sector_values[0])
-        )
-        resolved = {
-            **resolved,
-            "ansatz_name": "NumberPreserving" if chemistry_sector_available else "EfficientSU2",
-        }
-    vqe_config = resolve_vqe_config(resolved)
-    optimizer_name, optimizer_selection_reason = select_vqe_optimizer_name(
+    vqe_config = _resolve_vqe_config(resolved)
+    optimizer_name, optimizer_selection_reason = _select_vqe_optimizer_name(
         resolved,
         optimizer_policy=vqe_config.optimizer_policy,
         backend_target=getattr(backend_context, "backend_target", None),
         noise_profile=getattr(backend_context, "noise_profile", None),
     )
-    execution_policy, execution_policy_selection_reason = select_vqe_execution_policy(
+    execution_policy, execution_policy_selection_reason = _select_vqe_execution_policy(
         backend_target=getattr(backend_context, "backend_target", None),
         noise_profile=getattr(backend_context, "noise_profile", None),
     )
 
+    operator, num_qubits = _resolve_operator_and_width(hamiltonian)
     statevector_context = {**config, **resolved}
     include_statevector_data = _should_compute_statevector_data(backend, statevector_context)
     if not hasattr(backend, "run"):
         raise ValueError(
             "VQE backend must provide a run() method compatible with estimator primitives"
         )
-    primitive_work = VQEPrimitiveWork()
-    observed_backend = VQEObservedPrimitive(backend, primitive_work)
 
     ansatz = build_ansatz(
         ansatz_name=vqe_config.ansatz_name,
@@ -707,48 +690,24 @@ def run_vqe(
     }
 
     def evaluate_energy(parameter_values: np.ndarray) -> tuple[float, float | None] | float:
-        # Keep the evaluator injection seam explicit. The production path
-        # obtains uncertainty from this same primitive submission.
+        # Keep the legacy solver seam usable for local integrations that
+        # replace ``_evaluate_energy``. The production path obtains the
+        # uncertainty from this same primitive submission.
         if _evaluate_energy is not _vqe_objective.evaluate_energy:
             return _evaluate_energy(
-                backend=observed_backend,
+                backend=backend,
                 ansatz=ansatz,
                 operator=operator,
                 parameter_values=parameter_values,
             )
         return _evaluate_energy_with_uncertainty(
-            backend=observed_backend,
+            backend=backend,
             ansatz=ansatz,
             operator=operator,
             parameter_values=parameter_values,
         )
 
-    backend_target = getattr(backend_context, "backend_target", None)
-    backend_precision = getattr(backend_context, "estimator_precision", None)
-    precision_driven = (
-        isinstance(backend_precision, (int, float)) and float(backend_precision) > 0.0
-    )
-    exact_expectation = backend_target == "statevector" or (
-        backend_target == "aer_simulator"
-        and isinstance(backend_precision, (int, float))
-        and float(backend_precision) == 0.0
-    )
-    objective_shots = (
-        None
-        if exact_expectation or precision_driven
-        else (
-            int(getattr(backend_context, "shots"))
-            if isinstance(getattr(backend_context, "shots", None), (int, float))
-            and not isinstance(getattr(backend_context, "shots", None), bool)
-            else None
-        )
-    )
-    objective_precision = (
-        float(backend_precision)
-        if precision_driven and backend_target != "statevector"
-        else None
-    )
-    objective_state = VQEObjectiveState(
+    objective_state = _VQEObjectiveState(
         energy_evaluator=evaluate_energy,
         progress_callback=progress_callback,
         ansatz_name=vqe_config.ansatz_name,
@@ -758,12 +717,15 @@ def run_vqe(
         max_function_evaluations=optimizer.max_function_evaluations,
         parameter_count=ansatz.num_parameters,
         num_qubits=num_qubits,
-        shots=objective_shots,
-        estimator_precision=objective_precision,
-        primitive_work=primitive_work,
+        shots=(
+            int(getattr(backend_context, "shots"))
+            if isinstance(getattr(backend_context, "shots", None), (int, float))
+            and not isinstance(getattr(backend_context, "shots", None), bool)
+            else None
+        ),
     )
 
-    parameter_bounds = resolve_parameter_bounds(
+    parameter_bounds = _resolve_parameter_bounds(
         resolved,
         num_parameters=ansatz.num_parameters,
     )
@@ -800,10 +762,6 @@ def run_vqe(
         ).items()
     }
     optimizer_diagnostics.update(sector_metadata)
-    sector_diagnostics_fn = _sector_diagnostics_builder(
-        hamiltonian,
-        ansatz=ansatz,
-    )
     if ansatz.num_parameters == 0:
         return _run_parameterless_vqe(
             objective=objective_state,
@@ -827,7 +785,6 @@ def run_vqe(
         reps=vqe_config.reps,
         optimizer_diagnostics=optimizer_diagnostics,
         initial_point_diagnostics=initial_point_diagnostics,
-        sector_diagnostics_fn=sector_diagnostics_fn,
     )
     if isinstance(selected_initial_point, VQEResult):
         return selected_initial_point
@@ -858,13 +815,20 @@ def run_vqe(
     _update_independent_reevaluation(
         diagnostics=optimizer_diagnostics,
         objective=objective_state,
-        backend=observed_backend,
+        backend=backend,
         ansatz=ansatz,
         operator=operator,
         optimal_point=optimal_point,
         final_energy=final_energy,
         include_statevector_data=include_statevector_data,
     )
+    _update_sector_diagnostics(
+        optimizer_diagnostics,
+        hamiltonian=hamiltonian,
+        ansatz=ansatz,
+        parameter_point=optimal_point,
+    )
+
     return _build_vqe_result(
         ansatz=ansatz,
         ansatz_name=vqe_config.ansatz_name,
@@ -878,5 +842,4 @@ def run_vqe(
         converged=converged,
         objective_state=objective_state,
         optimizer_diagnostics=optimizer_diagnostics,
-        sector_diagnostics_fn=sector_diagnostics_fn,
     )

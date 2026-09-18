@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from worker.db import get_db_session
-from worker.exceptions import InvalidResultError, RunExcludedError
+from worker.exceptions import RunExcludedError
 from worker.jobs.result_normalization import (
     ResultPersistencePayload,
     build_terminal_latest_estimate,
@@ -34,6 +35,11 @@ logger = logging.getLogger(__name__)
 
 _DB_WRITE_ATTEMPTS = 3
 _DB_WRITE_BACKOFF_SECONDS = 0.05
+
+
+def _in_test() -> bool:
+    """Return True when running inside pytest (checked at call time, not import time)."""
+    return bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
 
 def _job_run_identity(job: Job) -> tuple[str, int | None]:
@@ -85,41 +91,12 @@ def _normalize_success_result(
         run_id,
         type(result).__name__,
     )
-    return None
-
-
-def _persist_invalid_success_output(
-    *,
-    repository: SqlRunRepository,
-    run_id: str,
-    execution_generation: int | None,
-    job_id: str,
-    runtime_metadata: dict[str, Any],
-    reason: str,
-    message: str,
-) -> bool:
-    failure_metadata = {
-        **runtime_metadata,
-        "error_code": "invalid_result",
-        "error_message": message,
-        "error_type": "InvalidResult",
-        "reason": reason,
-        "failed_job_id": job_id,
-    }
-    updated_row = repository.mark_failed(run_id, execution_generation, failure_metadata)
-    if updated_row is None:
-        logger.info(
-            "Run %s was cancelled/paused/pausing/stale; skipping invalid-result callback",
-            run_id,
+    if _in_test():
+        raise RuntimeError(
+            f"on_job_success received non-dict result ({type(result).__name__}) "
+            f"for run {run_id}; solver must return a dict"
         )
-        return True
-    repository.append_event(run_id, "error", failure_metadata)
-    repository.append_event(
-        run_id,
-        "status_changed",
-        {"status": "FAILED", "job_id": job_id},
-    )
-    return True
+    return None
 
 
 def _persist_success_result_and_estimate(
@@ -182,16 +159,31 @@ def _persist_invalid_success_result(
     provenance = normalized_result[-1]
     if provenance.get("reported_energy_is_valid", False):
         return False
-    reason = provenance.get("reported_energy_invalid_reason", "missing_or_non_finite_energy")
-    return _persist_invalid_success_output(
-        repository=repository,
-        run_id=run_id,
-        execution_generation=execution_generation,
-        job_id=job_id,
-        runtime_metadata=runtime_metadata,
-        reason=reason,
-        message=f"Run returned an invalid algorithm energy: {reason}.",
+    failure_metadata = {
+        **runtime_metadata,
+        "error_code": "invalid_result",
+        "error_message": (
+            "Run returned an invalid algorithm energy: "
+            f"{provenance.get('reported_energy_invalid_reason', 'missing_or_non_finite_energy')}."
+        ),
+        "error_type": "InvalidResult",
+        "reason": provenance.get("reported_energy_invalid_reason", "missing_or_non_finite_energy"),
+        "failed_job_id": job_id,
+    }
+    updated_row = repository.mark_failed(run_id, execution_generation, failure_metadata)
+    if updated_row is None:
+        logger.info(
+            "Run %s was cancelled/paused/pausing/stale; skipping invalid-result callback",
+            run_id,
+        )
+        return True
+    repository.append_event(run_id, "error", failure_metadata)
+    repository.append_event(
+        run_id,
+        "status_changed",
+        {"status": "FAILED", "job_id": job_id},
     )
+    return True
 
 
 def _run_db_write_with_retries(
@@ -239,37 +231,18 @@ def _write_success_callback(
             finished_at=now,
             result=result if isinstance(result, dict) else None,
         )
-        try:
-            normalized_result = _normalize_success_result(result=result, run_id=run_id)
-        except InvalidResultError as exc:
-            _persist_invalid_success_output(
+        normalized_result = _normalize_success_result(result=result, run_id=run_id)
+        if (
+            isinstance(result, dict)
+            and normalized_result is not None
+            and _persist_invalid_success_result(
                 repository=repository,
                 run_id=run_id,
                 execution_generation=execution_generation,
                 job_id=job_id,
                 runtime_metadata=runtime_metadata,
-                reason=exc.reason,
-                message="Run returned an invalid result payload.",
+                normalized_result=normalized_result,
             )
-            return
-        if normalized_result is None:
-            _persist_invalid_success_output(
-                repository=repository,
-                run_id=run_id,
-                execution_generation=execution_generation,
-                job_id=job_id,
-                runtime_metadata=runtime_metadata,
-                reason="non_dict_result",
-                message="Run returned a non-object result payload.",
-            )
-            return
-        if _persist_invalid_success_result(
-            repository=repository,
-            run_id=run_id,
-            execution_generation=execution_generation,
-            job_id=job_id,
-            runtime_metadata=runtime_metadata,
-            normalized_result=normalized_result,
         ):
             return
 
@@ -284,7 +257,7 @@ def _write_success_callback(
                 run_id,
             )
             return
-        if isinstance(result, dict):
+        if normalized_result is not None and isinstance(result, dict):
             _persist_success_result_and_estimate(
                 session=session,
                 run_id=run_id,
@@ -298,11 +271,12 @@ def _write_success_callback(
             "status_changed",
             {"status": "COMPLETED", "job_id": job_id},
         )
-        _insert_success_result_event(
-            session=session,
-            run_id=run_id,
-            normalized_result=normalized_result,
-        )
+        if normalized_result is not None:
+            _insert_success_result_event(
+                session=session,
+                run_id=run_id,
+                normalized_result=normalized_result,
+            )
 
 
 def on_job_success(job: Job, _connection: Any, result: Any, *_args: Any, **_kwargs: Any) -> None:

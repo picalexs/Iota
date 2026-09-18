@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
 
 import type { RunAlgorithm } from "@/types/run";
-import type { BenchmarkBackendMode } from "@/types/benchmark";
 
 import {
   createAdvancedBenchmarkVariant,
   createSimpleBenchmarkVariant,
   duplicateBenchmarkVariant,
-  kqdRequiresBranchEstimatorForBackendMode,
   normalizeBenchmarkVariantLabels,
   type BenchmarkAlgorithmVariant,
   type BenchmarkVariantMode,
@@ -49,7 +47,6 @@ function resizeAdvancedBenchmarkVariants(
   algorithm: RunAlgorithm,
   targetCount: number,
   chemicalAccuracyHa: number,
-  requiresBranchEstimator: boolean,
 ): BenchmarkAlgorithmVariant[] {
   const currentCount = previous.filter((variant) => variant.algorithm === algorithm).length;
   if (currentCount === targetCount) {
@@ -61,12 +58,7 @@ function resizeAdvancedBenchmarkVariants(
     for (let index = currentCount; index < targetCount; index += 1) {
       nextVariants = insertAdvancedVariantAfterAlgorithmTail(
         nextVariants,
-        createAdvancedBenchmarkVariant(
-          algorithm,
-          chemicalAccuracyHa,
-          undefined,
-          requiresBranchEstimator,
-        ),
+        createAdvancedBenchmarkVariant(algorithm, chemicalAccuracyHa),
       );
     }
     return normalizeBenchmarkVariantLabels(nextVariants);
@@ -90,12 +82,10 @@ function resizeAdvancedBenchmarkVariants(
 
 function useAdvancedBenchmarkVariantActions({
   chemicalAccuracyHa,
-  selectedBackendMode,
   disabledAlgorithms,
   setAlgorithmVariants,
 }: {
   chemicalAccuracyHa: number;
-  selectedBackendMode: BenchmarkBackendMode;
   disabledAlgorithms: ReadonlyMap<RunAlgorithm, string>;
   setAlgorithmVariants: Dispatch<SetStateAction<BenchmarkAlgorithmVariant[]>>;
 }) {
@@ -108,17 +98,12 @@ function useAdvancedBenchmarkVariantActions({
         normalizeBenchmarkVariantLabels(
           insertAdvancedVariantAfterAlgorithmTail(
             previous,
-            createAdvancedBenchmarkVariant(
-              algorithm,
-              chemicalAccuracyHa,
-              undefined,
-              kqdRequiresBranchEstimatorForBackendMode(selectedBackendMode),
-            ),
+            createAdvancedBenchmarkVariant(algorithm, chemicalAccuracyHa),
           ),
         ),
       );
     },
-    [chemicalAccuracyHa, disabledAlgorithms, selectedBackendMode, setAlgorithmVariants],
+    [chemicalAccuracyHa, disabledAlgorithms, setAlgorithmVariants],
   );
 
   const setAdvancedVariantCount = useCallback(
@@ -129,16 +114,10 @@ function useAdvancedBenchmarkVariantActions({
 
       const targetCount = Math.max(0, Math.floor(count));
       setAlgorithmVariants((previous) =>
-        resizeAdvancedBenchmarkVariants(
-          previous,
-          algorithm,
-          targetCount,
-          chemicalAccuracyHa,
-          kqdRequiresBranchEstimatorForBackendMode(selectedBackendMode),
-        ),
+        resizeAdvancedBenchmarkVariants(previous, algorithm, targetCount, chemicalAccuracyHa),
       );
     },
-    [chemicalAccuracyHa, disabledAlgorithms, selectedBackendMode, setAlgorithmVariants],
+    [chemicalAccuracyHa, disabledAlgorithms, setAlgorithmVariants],
   );
 
   const duplicateAdvancedVariant = useCallback(
@@ -196,7 +175,6 @@ function useAdvancedBenchmarkVariantActions({
 
 export function useBenchmarkVariantSelectionState({
   benchmarkMode,
-  selectedBackendMode,
   selectedAlgorithms,
   algorithmVariants,
   selectedPresets,
@@ -211,7 +189,6 @@ export function useBenchmarkVariantSelectionState({
   setEntries,
 }: {
   benchmarkMode: BenchmarkVariantMode;
-  selectedBackendMode: BenchmarkBackendMode;
   selectedAlgorithms: RunAlgorithm[];
   algorithmVariants: BenchmarkAlgorithmVariant[];
   selectedPresets: BenchmarkPreset[];
@@ -242,7 +219,6 @@ export function useBenchmarkVariantSelectionState({
   );
   const advancedVariantActions = useAdvancedBenchmarkVariantActions({
     chemicalAccuracyHa,
-    selectedBackendMode,
     disabledAlgorithms,
     setAlgorithmVariants,
   });

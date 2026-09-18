@@ -29,8 +29,6 @@ class SQDRunState:
     last_recovered_distribution: list[dict[str, Any]] = field(default_factory=list)
     last_selected_stage_distribution: list[dict[str, Any]] = field(default_factory=list)
     last_selected_distribution: list[dict[str, Any]] = field(default_factory=list)
-    measured_bitstring_matrix: np.ndarray | None = None
-    measured_circuit: Any | None = None
     last_sampled_circuit: Any | None = None
     sampled_circuits: list[tuple[int, Any]] = field(default_factory=list)
     selected_ci_dimensions: list[int] = field(default_factory=list)
@@ -40,7 +38,6 @@ class SQDRunState:
     best_observed_energy: float = float("inf")
     best_observed_iteration: int = 0
     best_observed_spin_sq: float = 0.0
-    best_sci_state: Any | None = None
     best_observed_occupancies: np.ndarray | None = None
     best_sampled_distribution: list[dict[str, Any]] = field(default_factory=list)
     best_sampling_stages: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
@@ -63,19 +60,6 @@ class SQDRunState:
         )
     )
     last_carryover_summary: dict[str, Any] = field(default_factory=dict)
-    work_ledger: dict[str, int] = field(
-        default_factory=lambda: {
-            "ledger_version": 1,
-            "counting_scope": "worker_observed",
-            "sampler_run_attempts": 0,
-            "sampler_successful_runs": 0,
-            "sampler_retry_count": 0,
-            "sampler_requested_shots_total": 0,
-            "sampler_returned_raw_sample_rows": 0,
-            "recovery_iterations": 0,
-            "selected_ci_batch_solves": 0,
-        }
-    )
 
 
 def import_sqd_dependencies() -> SQDDependencies:

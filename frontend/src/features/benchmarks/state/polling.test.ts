@@ -103,19 +103,7 @@ describe("benchmark polling", () => {
 
   it("loads the terminal result after the run reaches completed", async () => {
     mockedGetRun.mockResolvedValueOnce(makeRun("COMPLETED"));
-    mockedGetRunResult.mockResolvedValueOnce(
-      makeResult({
-        algorithm_metrics: {
-          classical_references: { hf: -1.116, fci: -1.137 },
-          backend_execution: {
-            actual_execution_target: "local_classical",
-            actual_path_class: "sector_matrix_free",
-            backend_primitives_used: false,
-            primitive_family: null,
-          },
-        },
-      }),
-    );
+    mockedGetRunResult.mockResolvedValueOnce(makeResult());
 
     await expect(
       buildBenchmarkEntryUpdate(
@@ -131,19 +119,15 @@ describe("benchmark polling", () => {
       currentEnergy: -1.137,
       converged: true,
       classicalRefs: { hf: -1.116, fci: -1.137 },
-      executionMetadata: {
-        actualExecutionTarget: "local_classical",
-        actualPathClass: "sector_matrix_free",
-        backendPrimitivesUsed: false,
-        primitiveFamily: null,
-      },
     });
     expect(mockedGetRunEvents).not.toHaveBeenCalled();
   });
 
   it("recovers classical references from terminal events when the result omits them", async () => {
     mockedGetRun.mockResolvedValueOnce(makeRun("COMPLETED"));
-    mockedGetRunResult.mockResolvedValueOnce(makeResult({ algorithm_metrics: {} }));
+    mockedGetRunResult.mockResolvedValueOnce(
+      makeResult({ algorithm_metrics: {} }),
+    );
     mockedGetRunEvents.mockResolvedValueOnce({
       events: [
         {

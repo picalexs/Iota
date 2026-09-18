@@ -13,7 +13,7 @@
         "efficient_su2",
         "efficientsu2"
       ],
-      "description": "Hardware-efficient SU(2) ansatz with single-qubit rotations and CX entanglement.",
+      "description": "Hardware-efficient SU(2) ansatz used as the balanced default.",
       "id": "EfficientSU2",
       "label": "EfficientSU2",
       "metadata": {
@@ -99,11 +99,11 @@
       "supports_shots": false
     }
   },
-  "catalog_version": "2026-09-16-v22",
+  "catalog_version": "2026-09-11-v21",
   "defaults": {
-    "ansatz_name": "NumberPreserving",
+    "ansatz_name": "EfficientSU2",
     "optimizer_name": "COBYLA",
-    "qse_reference_ansatz_name": "NumberPreserving",
+    "qse_reference_ansatz_name": "EfficientSU2",
     "qse_reference_optimizer_name": "COBYLA"
   },
   "easy_goal_presets": [
@@ -353,7 +353,7 @@
         "reference_method": "hf",
         "regularization": 1e-07,
         "residual_tolerance": 1e-08,
-        "vqe_reference_ansatz_name": "NumberPreserving",
+        "vqe_reference_ansatz_name": "EfficientSU2",
         "vqe_reference_max_iterations": 256,
         "vqe_reference_optimizer_name": "COBYLA",
         "vqe_reference_reps": 1
@@ -369,7 +369,7 @@
         "reference_method": "hf",
         "regularization": 1e-07,
         "residual_tolerance": 1e-08,
-        "vqe_reference_ansatz_name": "NumberPreserving",
+        "vqe_reference_ansatz_name": "EfficientSU2",
         "vqe_reference_max_iterations": 512,
         "vqe_reference_optimizer_name": "COBYLA",
         "vqe_reference_reps": 1
@@ -385,7 +385,7 @@
         "reference_method": "hf",
         "regularization": 1e-06,
         "residual_tolerance": 1e-08,
-        "vqe_reference_ansatz_name": "NumberPreserving",
+        "vqe_reference_ansatz_name": "EfficientSU2",
         "vqe_reference_max_iterations": 128,
         "vqe_reference_optimizer_name": "COBYLA",
         "vqe_reference_reps": 1

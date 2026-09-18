@@ -19,16 +19,6 @@ export interface CompletedPoint {
   absErrorMha: number;
   verdict: AccuracyVerdict;
   tooltipSections: readonly ChartTooltipSection[];
-  actualExecutionTarget?: string | null;
-  actualPathClass?: string | null;
-  primitiveFamily?: string | null;
-  reportedEnergySource?: string | null;
-  reportedEnergyIsValid?: boolean | null;
-  projectedSolveIsDiagnostic?: boolean | null;
-  scientificConverged?: boolean | null;
-  noiseSource?: string | null;
-  noiseFingerprint?: string | null;
-  workLedger?: Record<string, unknown> | null;
 }
 
 function isWhitespace(char: string): boolean {
@@ -122,16 +112,6 @@ export function buildCompletedPoints(
           absErrorMha: assessment.absErrorMha,
           verdict: assessment.verdict,
           tooltipSections: buildBenchmarkTooltipLines(preset, entry, assessment.absErrorMha),
-          actualExecutionTarget: entry.executionMetadata?.actualExecutionTarget ?? null,
-          actualPathClass: entry.executionMetadata?.actualPathClass ?? null,
-          primitiveFamily: entry.executionMetadata?.primitiveFamily ?? null,
-          reportedEnergySource: entry.executionMetadata?.reportedEnergySource ?? null,
-          reportedEnergyIsValid: entry.executionMetadata?.reportedEnergyIsValid ?? null,
-          projectedSolveIsDiagnostic: entry.executionMetadata?.projectedSolveIsDiagnostic ?? null,
-          scientificConverged: entry.executionMetadata?.scientificConverged ?? null,
-          noiseSource: entry.executionMetadata?.noiseSource ?? null,
-          noiseFingerprint: entry.executionMetadata?.noiseFingerprint ?? null,
-          workLedger: entry.executionMetadata?.workLedger ?? null,
         },
       ];
     }),

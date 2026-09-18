@@ -6,21 +6,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from worker.chemistry.algorithms.kqd import workflow as kqd_solver
-from worker.chemistry.algorithms.qfd import workflow as qfd_solver
+from worker.chemistry import kqd_solver, qfd_solver
 from worker.chemistry.projected_execution import (
-    ProjectedExecutionPolicy,
-    QSEExecutionPolicy,
     backend_label,
     can_use_sector_action,
     num_qubits,
     num_spatial_orbitals,
-    resolve_projected_execution_policy,
-    resolve_qse_execution_policy,
     should_use_branch_matrix_elements,
     validate_branch_estimator_feasibility,
 )
-from worker.chemistry.types import ExecutionPlan
 
 
 def _context(target: str | None = None, *, noise: object | None = None) -> SimpleNamespace:
@@ -86,61 +80,6 @@ def test_should_use_branch_matrix_elements_matches_backend_policy(
 
 
 @pytest.mark.parametrize(
-    ("target", "noise", "expected_path", "expected_primitive"),
-    [
-        ("statevector", None, "dense_matrix", None),
-        ("aer_simulator", object(), "branch_estimator", "EstimatorV2"),
-        ("ibm_runtime", None, "branch_estimator", "EstimatorV2"),
-    ],
-)
-def test_projected_policy_contains_one_path_and_primitive_decision(
-    target: str,
-    noise: object | None,
-    expected_path: str,
-    expected_primitive: str | None,
-) -> None:
-    policy = resolve_projected_execution_policy(
-        hamiltonian=SimpleNamespace(num_qubits=2),
-        backend_context=_context(target, noise=noise),
-    )
-
-    assert isinstance(policy, ProjectedExecutionPolicy)
-    assert isinstance(policy, ExecutionPlan)
-    assert policy.requested_backend_target == target
-    assert policy.actual_path == expected_path
-    assert policy.primitive == expected_primitive
-    assert policy.requires_estimator is (expected_primitive is not None)
-    assert policy.selection_reason
-
-
-@pytest.mark.parametrize(
-    ("target", "noise", "reference_method", "expected_path", "expected_primitive"),
-    [
-        ("statevector", None, "hf", "local_projected_matrices", None),
-        ("statevector", None, "vqe", "local_vqe_reference", "EstimatorV2"),
-        ("aer_simulator", object(), "hf", "measured_matrix_elements", "EstimatorV2"),
-        ("ibm_runtime", None, "vqe", "measured_matrix_elements", "EstimatorV2"),
-    ],
-)
-def test_qse_policy_owns_measurement_and_reference_primitive_decisions(
-    target: str,
-    noise: object | None,
-    reference_method: str,
-    expected_path: str,
-    expected_primitive: str | None,
-) -> None:
-    policy = resolve_qse_execution_policy(
-        backend_context=_context(target, noise=noise),
-        reference_method=reference_method,
-    )
-
-    assert isinstance(policy, QSEExecutionPolicy)
-    assert policy.actual_path == expected_path
-    assert policy.primitive == expected_primitive
-    assert policy.requires_estimator is (expected_primitive is not None)
-
-
-@pytest.mark.parametrize(
     ("branch", "sector", "target", "expected"),
     [
         (True, False, "ibm_runtime", "hardware_branch_estimator"),
@@ -185,6 +124,20 @@ def test_validate_branch_estimator_feasibility_keeps_algorithm_diagnostic(
             _context(target, noise=noise),
             algorithm=algorithm,
         )
+
+
+def test_projected_solvers_keep_legacy_dimension_and_path_aliases() -> None:
+    assert kqd_solver._num_qubits is num_qubits
+    assert kqd_solver._num_spatial_orbitals is num_spatial_orbitals
+    assert kqd_solver._can_use_sector_action is can_use_sector_action
+    assert kqd_solver._should_use_branch_matrix_elements is should_use_branch_matrix_elements
+    assert kqd_solver._backend_label is backend_label
+
+    assert qfd_solver._num_qubits is num_qubits
+    assert qfd_solver._num_spatial_orbitals is num_spatial_orbitals
+    assert qfd_solver._can_use_sector_action is can_use_sector_action
+    assert qfd_solver._should_use_branch_matrix_elements is should_use_branch_matrix_elements
+    assert qfd_solver._backend_label is backend_label
 
 
 def test_validate_branch_estimator_feasibility_raises_run_excluded_with_reason() -> None:

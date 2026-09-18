@@ -1393,42 +1393,14 @@ export interface components {
         CustomNoisePreset: "depolarizing_cx" | "thermal_relaxation" | "readout_bias";
         /** CustomPresetNoiseProfile */
         CustomPresetNoiseProfile: {
-            /**
-             * Gate Time Us
-             * @description Gate time in microseconds for thermal relaxation.
-             */
-            gate_time_us?: number | null;
-            /**
-             * P01
-             * @description Probability of reading 1 when the true value is 0.
-             */
-            p01?: number | null;
-            /**
-             * P10
-             * @description Probability of reading 0 when the true value is 1.
-             */
-            p10?: number | null;
             preset: components["schemas"]["CustomNoisePreset"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
             source: "custom_preset";
-            /**
-             * Strength
-             * @description Gate strength for depolarizing CX noise.
-             */
-            strength?: number | null;
-            /**
-             * T1 Us
-             * @description T1 relaxation time in microseconds.
-             */
-            t1_us?: number | null;
-            /**
-             * T2 Us
-             * @description T2 relaxation time in microseconds.
-             */
-            t2_us?: number | null;
+            /** Strength */
+            strength: number;
         };
         /**
          * EasyGoal
@@ -1974,7 +1946,7 @@ export interface components {
              * @default qfd_chemistry_forward
              * @enum {string}
              */
-            qfd_variant: "qfd_chemistry_forward" | "qfd_original_symmetric";
+            qfd_variant: "qfd_chemistry_forward" | "qfd_original_symmetric" | "qfd_custom_grid";
             /** Residual Tolerance */
             residual_tolerance?: number | null;
             /**

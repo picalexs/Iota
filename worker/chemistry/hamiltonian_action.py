@@ -13,7 +13,6 @@ from worker.chemistry.sector_basis import (
     resolve_sector_metadata,
     sector_dimension,
 )
-from worker.chemistry.time_evolution import is_zero_time
 
 
 def can_build_hamiltonian_action(hamiltonian: object) -> bool:
@@ -48,7 +47,7 @@ class HamiltonianAction:
         """Return the real expectation value <v|H|v>/<v|v>."""
         candidate = np.asarray(vector, dtype=complex).reshape(-1)
         norm_sq = float(np.vdot(candidate, candidate).real)
-        if not np.isfinite(norm_sq) or norm_sq == 0.0:
+        if np.isclose(norm_sq, 0.0):
             raise ValueError("cannot evaluate expectation of a zero vector")
         value = np.vdot(candidate, self.matvec(candidate)) / norm_sq
         return float(np.real_if_close(value))
@@ -58,7 +57,7 @@ class HamiltonianAction:
         candidate = np.asarray(vector, dtype=complex).reshape(-1)
         if candidate.size != self.dimension:
             raise ValueError("vector size does not match Hamiltonian sector dimension")
-        if is_zero_time(time_point):
+        if np.isclose(float(time_point), 0.0):
             return candidate.copy()
         evolved = expm_multiply(
             (-1j * float(time_point)) * self.linear_operator,

@@ -9,7 +9,6 @@ from functools import partial
 from typing import Any
 
 from shared.estimation import estimate_workload_breakdown
-from worker.chemistry.projected_execution import resolve_projected_execution_policy
 
 from .execution_segments import execution_duration_seconds
 from .result_normalization import WORKER_RUNTIME_BASIS
@@ -52,30 +51,17 @@ def dispatch_and_finalize_run(
     reconcile_reported_iterations = execution_dependencies["reconcile_reported_iterations"]
     uses_branch_matrix_elements = execution_dependencies["uses_branch_matrix_elements"]
     emit_fallback_completion_progress = execution_dependencies["emit_fallback_completion_progress"]
-    projected_branch_path = None
-    if started.algorithm in {"kqd", "qfd"}:
-        projected_branch_path = (
-            resolve_projected_execution_policy(
-                hamiltonian=prepared.hamiltonian_bundle,
-                backend_context=prepared.backend_context,
-            ).actual_path
-            == "branch_estimator"
-        )
     progress_total = estimate_total_iterations(
         started.algorithm,
         started.algorithm_config,
         num_qubits=prepared.hamiltonian_bundle.num_qubits,
         backend_target=started.backend_target,
-        noise_profile_enabled=prepared.backend_context.noise_profile is not None,
-        projected_branch_path=projected_branch_path,
     )
     workload_fields = estimate_workload_breakdown(
         algorithm=started.algorithm,
         config_payload=started.algorithm_config,
         num_qubits=prepared.hamiltonian_bundle.num_qubits,
         backend_target=started.backend_target,
-        noise_profile_enabled=prepared.backend_context.noise_profile is not None,
-        projected_branch_path=projected_branch_path,
     )
 
     with session_factory() as db:

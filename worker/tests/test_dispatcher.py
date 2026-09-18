@@ -11,26 +11,11 @@ from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 
 from shared.contracts.identifiers import RunAlgorithm
-from worker.adapters.base import (
-    AdapterCapabilities,
-    BackendAdapter,
-    BackendExecutionContext,
-)
+from worker.adapters.base import AdapterCapabilities, BackendAdapter, BackendExecutionContext
 from worker.chemistry.backend_selector import select_backend
-from worker.chemistry.types import (
-    KQDResult,
-    QFDResult,
-    QSEResult,
-    SKQDResult,
-    SQDResult,
-)
+from worker.chemistry.types import KQDResult, QFDResult, QSEResult, SKQDResult, SQDResult
 from worker.exceptions import BackendError
-from worker.jobs.dispatcher import (
-    PrimitiveRequirement,
-    algorithm_definitions,
-    dispatch_algorithm,
-    supported_algorithms,
-)
+from worker.jobs.dispatcher import dispatch_algorithm, supported_algorithms
 
 
 def _dummy_hamiltonian() -> object:
@@ -92,22 +77,6 @@ class _MatrixElementBackend(BackendAdapter):
 
 def test_supported_algorithms_matches_shared_contract() -> None:
     assert supported_algorithms() == {algorithm.value for algorithm in RunAlgorithm}
-
-
-def test_algorithm_registry_exposes_runtime_metadata_for_each_algorithm() -> None:
-    definitions = algorithm_definitions()
-
-    assert set(definitions) == {algorithm.value for algorithm in RunAlgorithm}
-    assert all(definition.algorithm == algorithm for algorithm, definition in definitions.items())
-    assert definitions["vqe"].config_namespace == "vqe"
-    assert definitions["vqe"].config_resolver(
-        {"advanced_config": {"algorithm": "vqe", "max_iterations": 3}}
-    ) == {"algorithm": "vqe", "max_iterations": 3}
-    assert definitions["vqe"].primitive_requirement is PrimitiveRequirement.ESTIMATOR
-    assert (
-        definitions["sqd"].primitive_requirement
-        is PrimitiveRequirement.SAMPLER_AND_OPTIONAL_ESTIMATOR
-    )
 
 
 def test_dispatch_vqe_with_statevector_backend() -> None:
@@ -453,17 +422,12 @@ def test_dispatch_kqd_uses_estimator_for_large_aer_matrix_elements(monkeypatch) 
             matrix_element_summary={"matrix_element_strategy": "branch_estimator"},
         )
 
-    monkeypatch.setattr("worker.chemistry.algorithms.kqd.definition.run_kqd", _fake_run_kqd)
+    monkeypatch.setattr("worker.jobs.dispatcher.run_kqd", _fake_run_kqd)
 
     result = dispatch_algorithm(
         algorithm="kqd",
         backend=backend,
-        config_snapshot={
-            "algorithm": "kqd",
-            "krylov_dim": 2,
-            "time_step": 0.1,
-            "evolution_method": "trotter",
-        },
+        config_snapshot={"algorithm": "kqd", "krylov_dim": 2, "time_step": 0.1},
         hamiltonian_bundle=_large_pauli_hamiltonian(),
         backend_context=BackendExecutionContext(backend_target="aer_simulator"),
     )
@@ -492,17 +456,12 @@ def test_dispatch_kqd_uses_estimator_for_noisy_small_aer_matrix_elements(monkeyp
             matrix_element_summary={"matrix_element_strategy": "branch_estimator"},
         )
 
-    monkeypatch.setattr("worker.chemistry.algorithms.kqd.definition.run_kqd", _fake_run_kqd)
+    monkeypatch.setattr("worker.jobs.dispatcher.run_kqd", _fake_run_kqd)
 
     result = dispatch_algorithm(
         algorithm="kqd",
         backend=backend,
-        config_snapshot={
-            "algorithm": "kqd",
-            "krylov_dim": 2,
-            "time_step": 0.1,
-            "evolution_method": "trotter",
-        },
+        config_snapshot={"algorithm": "kqd", "krylov_dim": 2, "time_step": 0.1},
         hamiltonian_bundle=_dummy_hamiltonian(),
         backend_context=BackendExecutionContext(
             backend_target="aer_simulator",
@@ -534,7 +493,7 @@ def test_dispatch_qfd_uses_estimator_for_large_aer_matrix_elements(monkeypatch) 
             matrix_element_summary={"matrix_element_strategy": "branch_estimator"},
         )
 
-    monkeypatch.setattr("worker.chemistry.algorithms.qfd.definition.run_qfd", _fake_run_qfd)
+    monkeypatch.setattr("worker.jobs.dispatcher.run_qfd", _fake_run_qfd)
 
     result = dispatch_algorithm(
         algorithm="qfd",
@@ -567,7 +526,7 @@ def test_dispatch_qfd_uses_estimator_for_noisy_small_aer_matrix_elements(monkeyp
             matrix_element_summary={"matrix_element_strategy": "branch_estimator"},
         )
 
-    monkeypatch.setattr("worker.chemistry.algorithms.qfd.definition.run_qfd", _fake_run_qfd)
+    monkeypatch.setattr("worker.jobs.dispatcher.run_qfd", _fake_run_qfd)
 
     result = dispatch_algorithm(
         algorithm="qfd",

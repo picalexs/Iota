@@ -8,12 +8,9 @@ from typing import Any
 import numpy as np
 from qiskit.quantum_info import Statevector
 
-IDEAL_SECTOR_LEAKAGE_TOLERANCE = 1e-10
-STATEVECTOR_DIAGNOSTIC_QUBIT_CAP = 20
-
 logger = logging.getLogger(__name__)
 
-_BLOCH_QUBIT_CAP = STATEVECTOR_DIAGNOSTIC_QUBIT_CAP
+_BLOCH_QUBIT_CAP = 20
 _DM_QUBIT_CAP = 6  # 2^6 = 64 -> 64x64 density matrix, manageable JSON payload
 
 
@@ -88,26 +85,6 @@ def sector_diagnostics_from_ansatz(
     ):
         raise ValueError("VQE sector diagnostics received an invalid electron sector")
 
-    target = {
-        "num_spatial_orbitals": num_spatial_orbitals,
-        "num_electrons_alpha": num_electrons_alpha,
-        "num_electrons_beta": num_electrons_beta,
-    }
-    if int(ansatz.num_qubits) > STATEVECTOR_DIAGNOSTIC_QUBIT_CAP:
-        is_number_preserving = str(getattr(ansatz, "name", "")).lower() == "numberpreserving"
-        return {
-            "sector_target": target,
-            "ideal_sector_probability": None,
-            "ideal_sector_leakage": None,
-            "ideal_sector_leakage_tolerance": IDEAL_SECTOR_LEAKAGE_TOLERANCE,
-            "ideal_ansatz_sector_valid": True if is_number_preserving else None,
-            "sector_diagnostic_source": (
-                "number_preserving_ansatz_invariant"
-                if is_number_preserving
-                else "statevector_qubit_cap"
-            ),
-        }
-
     bound = ansatz.assign_parameters(np.asarray(parameter_values, dtype=float))
     amplitudes = np.asarray(Statevector(bound).data, dtype=complex)
     probabilities = np.abs(amplitudes) ** 2
@@ -121,11 +98,13 @@ def sector_diagnostics_from_ansatz(
 
     leakage = max(0.0, min(1.0, 1.0 - valid_probability))
     return {
-        "sector_target": target,
+        "sector_target": {
+            "num_spatial_orbitals": num_spatial_orbitals,
+            "num_electrons_alpha": num_electrons_alpha,
+            "num_electrons_beta": num_electrons_beta,
+        },
         "ideal_sector_probability": valid_probability,
         "ideal_sector_leakage": leakage,
-        "ideal_sector_leakage_tolerance": IDEAL_SECTOR_LEAKAGE_TOLERANCE,
-        "ideal_ansatz_sector_valid": leakage <= IDEAL_SECTOR_LEAKAGE_TOLERANCE,
         "sector_diagnostic_source": "ideal_statevector_from_ansatz",
     }
 
@@ -151,8 +130,6 @@ def should_compute_statevector_data(backend: Any, config: dict[str, Any]) -> boo
 __all__ = [
     "bloch_vectors_from_statevector",
     "compute_quantum_state_data",
-    "IDEAL_SECTOR_LEAKAGE_TOLERANCE",
-    "STATEVECTOR_DIAGNOSTIC_QUBIT_CAP",
     "sector_diagnostics_from_ansatz",
     "should_compute_statevector_data",
 ]

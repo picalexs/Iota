@@ -228,50 +228,6 @@ def refine_backend_metadata_from_result(
 
     metrics = result.get("algorithm_metrics")
     summary = metrics.get("matrix_element_summary") if isinstance(metrics, dict) else None
-    if (
-        algorithm == "kqd"
-        and isinstance(summary, dict)
-        and summary.get("matrix_element_strategy") == "dense_classical"
-        and summary.get("implemented_evolution_method") == "exact_matrix_evolution"
-    ):
-        metadata = dict(backend_metadata)
-        metadata.pop("transpilation_summary", None)
-        requested_backend_name = metadata.pop("resolved_backend_name", None)
-        requested_optimization_level = metadata.pop("optimization_level", None)
-        requested_noise_summary = metadata.pop("noise_summary", None)
-        for key in ("job_id", "job_ids", "pub_count"):
-            metadata.pop(key, None)
-        if requested_backend_name is not None:
-            metadata["requested_resolved_backend_name"] = requested_backend_name
-        if requested_optimization_level is not None:
-            metadata["requested_optimization_level"] = requested_optimization_level
-        if requested_noise_summary is not None:
-            metadata["requested_noise_summary"] = requested_noise_summary
-        metadata.update(
-            {
-                "execution_mode": "exact_matrix_evolution",
-                "actual_path_class": "dense_classical",
-                "actual_execution_target": "local_classical",
-                "resolved_backend_name": None,
-                "optimization_level": None,
-                "aer_simulator_used": False,
-                "backend_primitives_used": False,
-                "primitive_family": None,
-                "noise_summary": {"enabled": False},
-                "shots": None,
-                "effective_shots": None,
-                "effective_estimator_precision": None,
-                "measurement_mode": "exact",
-                "uncertainty_policy": "exact_local_computation",
-                "simulator_method": None,
-                "actual_noise_applied": False,
-                "backend_note": (
-                    "KQD exact matrix-spectrum evolution runs locally; the requested "
-                    "backend was not invoked."
-                ),
-            }
-        )
-        return metadata
     if isinstance(summary, dict) and summary.get("matrix_element_strategy") == "sector_matrix_free":
         return {
             **backend_metadata,

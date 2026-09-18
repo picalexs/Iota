@@ -107,7 +107,7 @@ describe("manual-mode-config helpers", () => {
 
   it("loads config metadata from the API and falls back to local defaults on failure", async () => {
     vi.mocked(fetchRunConfigMetadata).mockResolvedValueOnce({
-      catalog_version: "2026-09-16-v22",
+      catalog_version: "2026-09-11-v21",
       algorithms: ["vqe", "qse", "kqd", "qfd", "sqd", "skqd"],
       backend_targets: ["statevector", "aer_simulator", "ibm_runtime"],
       easy_goals: ["fastest", "balanced", "best_accuracy"],
@@ -155,8 +155,6 @@ describe("manual-mode-config helpers", () => {
     const freshManualMode = await import("./manual-mode-config");
     const fallback = await freshManualMode.loadRunFormConfigMetadata();
     expect(fallback.ansatzes.length).toBeGreaterThan(0);
-    expect(fallback.defaults.ansatz_name).toBe("NumberPreserving");
-    expect(fallback.defaults.qse_reference_ansatz_name).toBe("NumberPreserving");
     expect(fallback.ansatzes.find((entry) => entry.id === "NumberPreserving")).toMatchObject({
       metadata: {
         canonical_worker_id: "numberpreserving",

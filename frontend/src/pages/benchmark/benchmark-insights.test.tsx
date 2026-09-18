@@ -1029,9 +1029,6 @@ describe("BenchmarkInsights", () => {
     await expect((blob as Blob).text()).resolves.toContain(
       '"runtime_minutes","abs_error_mha","energy_ha"',
     );
-    await expect((blob as Blob).text()).resolves.toContain(
-      '"reported_energy_source","reported_energy_is_valid","projected_solve_is_diagnostic","scientific_converged"',
-    );
   });
 
   it("downloads the visible scatter SVG as a styled snapshot of the current panel", async () => {

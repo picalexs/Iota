@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from worker.chemistry.algorithms.sqd import workflow as sqd_solver
+from worker.chemistry import sqd_solver
 from worker.chemistry.algorithms.sqd.sampling import (
     aggregate_bitstring_frequencies,
     bitstring_from_row,
@@ -16,7 +16,6 @@ from worker.chemistry.algorithms.sqd.sampling import (
     resolve_measurement_register,
     summarize_bitstring_distribution,
 )
-from worker.chemistry.algorithms.sqd.sampling_execution import _ensure_measurements
 
 
 def test_bitstrings_to_matrix_normalizes_spaced_shot_values() -> None:
@@ -28,22 +27,6 @@ def test_bitstrings_to_matrix_normalizes_spaced_shot_values() -> None:
 def test_bitstrings_to_matrix_rejects_width_mismatch() -> None:
     with pytest.raises(ValueError, match="width"):
         bitstrings_to_matrix(["01"], num_bits=3)
-
-
-def test_bitstrings_to_matrix_rejects_non_binary_characters() -> None:
-    with pytest.raises(ValueError, match="binary"):
-        bitstrings_to_matrix(["0x1"], num_bits=3)
-
-
-def test_sqd_sampling_circuit_rejects_nonterminal_measurements() -> None:
-    from qiskit import QuantumCircuit
-
-    circuit = QuantumCircuit(2, 2)
-    circuit.measure([0, 1], [0, 1])
-    circuit.x(0)
-
-    with pytest.raises(ValueError, match="terminal"):
-        _ensure_measurements(circuit, num_bits=2)
 
 
 class _MeasurementRegister:

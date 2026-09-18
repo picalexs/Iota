@@ -97,7 +97,6 @@ class TrackingPrimitive:
         run_timeout_error_factory: PrimitiveTimeoutFactory | None = None,
         run_label: str | None = None,
         run_failure_observer: PrimitiveRunFailureObserver | None = None,
-        allow_sampler_submission_retries: bool = True,
     ) -> None:
         self._primitive = primitive
         self._job_ids = job_ids
@@ -110,7 +109,6 @@ class TrackingPrimitive:
         self._run_timeout_error_factory = run_timeout_error_factory
         self._run_label = run_label
         self._run_failure_observer = run_failure_observer
-        self.allow_sampler_submission_retries = allow_sampler_submission_retries
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._primitive, name)

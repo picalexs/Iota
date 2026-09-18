@@ -17,7 +17,6 @@ import type {
   SQDAdvancedConfig,
   VQEAdvancedConfig,
 } from "@/types/run";
-import type { BenchmarkBackendMode } from "@/types/benchmark";
 
 export type BenchmarkVariantMode = "simple" | "advanced";
 
@@ -28,12 +27,6 @@ export interface BenchmarkAlgorithmVariant {
   label: string;
   easyGoal: EasyGoal | null;
   advancedConfig: AdvancedConfig | null;
-}
-
-export function kqdRequiresBranchEstimatorForBackendMode(
-  backendMode: BenchmarkBackendMode,
-): boolean {
-  return backendMode === "ibm_runtime" || backendMode === "aer_simulator_backend_noise";
 }
 
 let benchmarkVariantCounter = 0;
@@ -89,16 +82,9 @@ function applyRecommendedPatch(
   algorithm: RunAlgorithm,
   chemicalAccuracyHa: number,
   configMetadata?: RunConfigMetadataResponse | null,
-  requiresBranchEstimator = false,
 ) {
   const goal = goalForChemicalAccuracyTarget(chemicalAccuracyHa);
-  const patch = buildRecommendedAdvancedPatch(
-    algorithm,
-    goal,
-    null,
-    configMetadata,
-    requiresBranchEstimator,
-  );
+  const patch = buildRecommendedAdvancedPatch(algorithm, goal, null, configMetadata);
   switch (patch.field) {
     case "advanced_vqe":
       values.advanced_vqe = patch.value as SimulationRunFormData["advanced_vqe"];
@@ -310,7 +296,7 @@ function applyQseAdvancedConfig(
     provided_sector_rows: mapQseProvidedSectorRows(config, values),
     excitation_level: config.excitation_level,
     max_subspace_dim: config.max_subspace_dim ?? null,
-    vqe_reference_ansatz_name: config.vqe_reference_ansatz_name ?? "NumberPreserving",
+    vqe_reference_ansatz_name: config.vqe_reference_ansatz_name ?? "EfficientSU2",
     vqe_reference_optimizer_name: config.vqe_reference_optimizer_name ?? "COBYLA",
     vqe_reference_max_iterations: config.vqe_reference_max_iterations ?? null,
     vqe_reference_reps: config.vqe_reference_reps ?? null,
@@ -388,18 +374,11 @@ export function createAdvancedBenchmarkVariant(
   algorithm: RunAlgorithm,
   chemicalAccuracyHa: number,
   configMetadata?: RunConfigMetadataResponse | null,
-  requiresBranchEstimator = false,
 ): BenchmarkAlgorithmVariant {
   const values = cloneInitialValues();
   values.algorithm = algorithm;
   values.mode = "advanced";
-  applyRecommendedPatch(
-    values,
-    algorithm,
-    chemicalAccuracyHa,
-    configMetadata,
-    requiresBranchEstimator,
-  );
+  applyRecommendedPatch(values, algorithm, chemicalAccuracyHa, configMetadata);
   const advancedConfig = buildAdvancedConfigFromFormValues(values);
   return {
     id: createVariantId(),

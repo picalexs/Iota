@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from worker.chemistry.algorithms.qfd import workflow as qfd_solver
+from worker.chemistry import qfd_solver
 from worker.chemistry.algorithms.qfd.config import QFDConfig, resolve_qfd_config
 
 
@@ -29,11 +27,6 @@ def test_resolve_qfd_config_applies_defaults_and_bounds() -> None:
         residual_tolerance=0.001,
     )
 
-
-def test_resolve_qfd_config_accepts_execution_path_default() -> None:
-    result = resolve_qfd_config({}, default_num_time_points=7)
-
-    assert result.num_time_points == 7
 
 def test_resolve_qfd_config_validates_original_symmetric_grid() -> None:
     result = resolve_qfd_config(
@@ -62,22 +55,6 @@ def test_resolve_qfd_config_rejects_even_original_grid() -> None:
         )
 
 
-def test_resolve_qfd_config_rejects_undefined_custom_grid_variant() -> None:
-    with pytest.raises(ValueError, match="qfd_variant must be one of"):
-        resolve_qfd_config({"qfd_variant": "qfd_custom_grid"})
-
-
-def test_resolve_qfd_config_rejects_unknown_time_grid_type() -> None:
-    with pytest.raises(ValueError, match="time_grid_type must be one of"):
-        resolve_qfd_config({"time_grid_type": "typo"})
-
-
 def test_qfd_solver_exposes_the_resolved_config_boundary() -> None:
     assert qfd_solver.QFDConfig is QFDConfig
     assert qfd_solver.resolve_qfd_config is resolve_qfd_config
-
-
-@pytest.mark.parametrize("field", ["kappa", "max_time", "residual_tolerance"])
-def test_resolve_qfd_config_rejects_explicit_non_positive_values(field: str) -> None:
-    with pytest.raises(ValueError, match="finite and positive"):
-        resolve_qfd_config({field: 0})

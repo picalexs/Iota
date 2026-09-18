@@ -118,20 +118,12 @@ behavior when Redis or the worker is absent.
   around the ordered run story.
 - `worker/jobs/dispatcher.py`: registry-based algorithm dispatcher with the
   enabled algorithm set (`vqe`, `sqd`, `kqd`, `qfd`, `qse`, `skqd`) that
-  derives its public keys from `shared.contracts.identifiers.RunAlgorithm`,
-  exposes typed `AlgorithmDefinition` metadata, and receives a prebuilt
-  chemistry Hamiltonian bundle from `execute_run`.
-- `worker/chemistry/projected_execution.py`: canonical KQD/QFD projected-path
-  policy and QSE measurement policy. It records the requested target, actual
-  path, primitive requirement, and selection reason before execution.
-- `docs/worker-chemistry.md`: algorithm ownership, registration, provenance,
-  and test guidance for worker chemistry changes.
+  derives its public keys from `shared.contracts.identifiers.RunAlgorithm` and
+  receives a prebuilt chemistry Hamiltonian bundle from `execute_run`.
 - `worker/jobs/callbacks.py`: RQ callback implementations and bounded
   database-write retry policy.
-  - `on_job_success` validates the result object and its finite energy and
-    iteration fields before it sets `COMPLETED`. A missing or malformed result
-    sets `FAILED` with the public error code `invalid_result`; it never marks a
-    run complete without a persisted result row.
+  - `on_job_success` sets `COMPLETED`, persists normalized result payloads, and
+    emits result/status events.
   - `on_job_failure` sets `FAILED`, stores sanitized error metadata (no
     traceback), classifies worker time-limit expirations as timeout-specific
     public error payloads, and emits error/status events.
@@ -203,10 +195,7 @@ behavior when Redis or the worker is absent.
     optimizer-native step counts remain in
     `algorithm_metrics.optimizer_iterations`;
   - QSE honors `reference_method` semantics (`hf`, `vqe`, `provided_state`, and
-    `provided_sector`) on local exact and sector paths. Measured QSE on noisy
-    Aer or IBM Runtime supports `reference_method="hf"` only because its
-    measured circuit prepares the Hartree-Fock reference state. QSE supports
-    `provided_state_vector` for small dense
+    `provided_sector`), supports `provided_state_vector` for small dense
     references and sparse `provided_sector_amplitudes` for determinant-sector
     references, accepts JSON-safe complex coefficients for both the full-state
     and determinant-sector reference inputs, carries VQE reference depth through
@@ -228,22 +217,20 @@ behavior when Redis or the worker is absent.
     `worker/chemistry/algorithms/qse/sector.py`; basis construction lives in
     `worker/chemistry/algorithms/qse/basis.py`; QSE helper ownership has no
     flat compatibility modules;
-    `worker/chemistry/algorithms/qse/workflow.py` retains small injected reference and basis adapters plus orchestration;
+    `qse_solver.py` retains private compatibility aliases and orchestration;
   - KQD reference and representative evolution circuit artifacts live in
-    `worker/chemistry/algorithms/kqd/circuit_artifacts.py`; `worker/chemistry/algorithms/kqd/workflow.py`
+    `worker/chemistry/algorithms/kqd/circuit_artifacts.py`; `kqd_solver.py`
     retains injected private wrappers for compatibility;
   - KQD dense and fixed-sector Krylov basis construction, time evolution,
     projected progress estimates, and progress payloads live in
-    `worker/chemistry/algorithms/kqd/basis.py`; `worker/chemistry/algorithms/kqd/workflow.py` retains injected
+    `worker/chemistry/algorithms/kqd/basis.py`; `kqd_solver.py` retains injected
     private wrappers for compatibility;
   - KQD branch, sector, and dense resource selection lives in
-    `worker/chemistry/algorithms/kqd/execution.py`; `worker/chemistry/algorithms/kqd/workflow.py` retains
+    `worker/chemistry/algorithms/kqd/execution.py`; `kqd_solver.py` retains
     injected private wrappers for compatibility;
   - KQD result and completion-payload construction lives in
-    `worker/chemistry/algorithms/kqd/results.py`; `worker/chemistry/algorithms/kqd/workflow.py` retains
+    `worker/chemistry/algorithms/kqd/results.py`; `kqd_solver.py` retains
     injected private wrappers for compatibility;
-    KQD dense metadata now reports exact matrix evolution only for the exact
-    method and reports `dense_matrix_trotter` for the local Trotter method;
   - SKQD Krylov diagnostics are generated from projected Hamiltonian subspaces
     instead of synthetic arithmetic decrement ladders, use SQD selected
     bitstrings or an HF sector fallback as the seed, and normalize those seed
@@ -262,21 +249,16 @@ behavior when Redis or the worker is absent.
     cumulative work separately as `overall_iterations`, so the worker does not
     double-count the preceding SQD phase; the advanced contract's `time_step`
     sets the seeded evolution schedule used to generate the Krylov extension and
-    is echoed in diagnostics; sample-union `subspace_saturated` is diagnostic
-    only, and SKQD reports scientific convergence only after full selected-CI
-    sector recovery. Direct sample-union runs set the extension status to
-    `not_applicable`. Legacy extension runs record the seed source; a
-    probability-only seed does not preserve relative phases and must not be
-    treated as paper-faithful hardware SKQD evidence;
+    is echoed in diagnostics;
   - `worker/chemistry/algorithms/skqd/extension.py` owns dense and fixed-sector
     Krylov extension construction and progress payloads;
     `worker/chemistry/algorithms/skqd/execution.py` owns SQD-seed resolution
-    and dense or fixed-sector extension dispatch; `worker/chemistry/algorithms/skqd/workflow.py` retains
-    final result orchestration;
+    and dense or fixed-sector extension dispatch; `skqd_solver.py` retains the
+    compatibility wrapper and final result orchestration;
   - `worker/chemistry/algorithms/skqd/distributions.py` owns computational-basis
     state-distribution diagnostics. `worker/chemistry/algorithms/skqd/results.py`
     owns SQD-core summaries, solution selection, and completion-payload records;
-    `worker/chemistry/algorithms/skqd/workflow.py` retains extension orchestration and completion-event
+    `skqd_solver.py` retains extension orchestration and completion-event
     emission;
   - dense operator matrices resolved from `SparsePauliOp` are cached through a
     bounded LRU helper in `worker/chemistry/operator_matrices.py` to avoid
@@ -293,114 +275,122 @@ behavior when Redis or the worker is absent.
     submission, accumulation, progress, and compatibility aliases;
   - `worker/chemistry/algorithms/kqd/config.py` owns bounded KQD
     Krylov/timestep, evolution-method, and residual-tolerance settings;
-    `worker/chemistry/algorithms/kqd/workflow.py` retains projected execution and explicit injected adapters;
+    `kqd_solver.py` retains private compatibility aliases while retaining
+    projected execution;
   - `worker/chemistry/projected_execution.py` owns shared KQD/QFD branch,
-    fixed-sector, and dense resource selection. `worker/chemistry/algorithms/kqd/workflow.py` retains solver
-    orchestration;
+    fixed-sector, and dense resource selection. `kqd_solver.py` retains the
+    compatibility wrapper and solver orchestration;
   - `worker/chemistry/algorithms/kqd/results.py` owns KQD overlap metrics,
-    public result construction, and completed-progress payloads; `worker/chemistry/algorithms/kqd/workflow.py`
+    public result construction, and completed-progress payloads; `kqd_solver.py`
     retains the projected-path orchestration;
   - `worker/chemistry/algorithms/qfd/config.py` owns bounded QFD time-grid,
-    Trotter, and projected-solve tolerance settings; `worker/chemistry/algorithms/qfd/workflow.py` keeps the
+    Trotter, and projected-solve tolerance settings; `qfd_solver.py` keeps the
     resolved configuration explicit before selecting its execution path;
   - `worker/chemistry/algorithms/qfd/execution.py` constructs the typed QFD
     execution plan and prepares its reusable spectrum through the shared
-    resource selection; `worker/chemistry/algorithms/qfd/workflow.py` retains solver orchestration and explicit injected adapters;
+    resource selection; `qfd_solver.py` retains the compatibility wrapper and
+    solver orchestration;
   - `worker/chemistry/algorithms/qfd/results.py` owns QFD public result
-    construction and completed-progress payloads; `worker/chemistry/algorithms/qfd/workflow.py` retains
-    numerical-path orchestration;
+    construction and completed-progress payloads; `qfd_solver.py` retains the
+    compatibility wrapper and numerical-path orchestration;
   - `worker/chemistry/algorithms/qfd/states.py` owns dense and fixed-sector
     time-grid state construction, projected progress estimates, and progress
-    payloads; `worker/chemistry/algorithms/qfd/workflow.py` retains explicit state and progress adapters;
+    payloads; `qfd_solver.py` retains compatibility wrappers;
   - `worker/chemistry/algorithms/qse/results.py` owns QSE public result
     construction and completed-progress payloads;
-    `worker/chemistry/algorithms/qse/workflow.py` retains reference resolution and
+    `qse_solver.py` retains reference resolution, compatibility aliases, and
     result/progress handoff; dense and fixed-sector numerical-path orchestration
     lives in `worker/chemistry/algorithms/qse/execution.py`;
   - `worker/chemistry/reference_states.py` owns computational-zero and
-    Jordan-Wigner Hartree-Fock reference-state construction. Use these helpers
-    for new reference-state logic;
+    Jordan-Wigner Hartree-Fock reference-state construction. The historical
+    `eigensolver.py` exports remain compatibility aliases;
   - ansatz and optimizer registries that back the VQE configuration path and the
     backend `/api/runs/config-metadata` selector metadata;
   - VQE option caps, defaults, optimizer limits, and parameter-bound
     resolution live in `worker/chemistry/algorithms/vqe/config.py`;
-    `worker/chemistry/algorithms/vqe/workflow.py` retains objective and optimizer execution with explicit injected seams;
+    `vqe_solver.py` keeps private compatibility aliases while retaining
+    objective and optimizer execution;
   - VQE explicit-point validation, bound clipping, seeded candidate generation,
     and lowest-energy candidate selection live in
-    `worker/chemistry/algorithms/vqe/initial_point.py`; `worker/chemistry/algorithms/vqe/workflow.py` retains
-    explicit initial-point injection seams;
+    `worker/chemistry/algorithms/vqe/initial_point.py`; `vqe_solver.py` retains
+    private compatibility seams;
   - VQE progress-event construction lives in
     `worker/chemistry/algorithms/vqe/callbacks.py`; telemetry owns evaluation
     state and calls this boundary;
   - VQE ansatz, reported, and optimizer-final circuit-artifact composition
     lives in `worker/chemistry/algorithms/vqe/circuit_artifacts.py`;
-    `worker/chemistry/algorithms/vqe/workflow.py` injects the artifact builder;
+    `vqe_solver.py` keeps the private compatibility alias;
   - VQE objective evaluation counts, function-evaluation caps, best-observed
     point tracking, convergence traces, and progress-event coordination live in
-    `worker/chemistry/algorithms/vqe/telemetry.py`; `worker/chemistry/algorithms/vqe/workflow.py` supplies the
-    numerical evaluator through an explicit seam;
+    `worker/chemistry/algorithms/vqe/telemetry.py`; `vqe_solver.py` supplies the
+    numerical evaluator and keeps private compatibility aliases;
   - Qiskit V2 estimator PUB construction and scalar expectation extraction live
-    in `worker/chemistry/algorithms/vqe/objective.py`; `worker/chemistry/algorithms/vqe/workflow.py` supplies the
-    objective evaluator through an explicit seam;
+    in `worker/chemistry/algorithms/vqe/objective.py`; `vqe_solver.py` keeps the
+    private objective aliases for existing importers;
   - The bounded SPSA update loop and stable energy-window convergence check live
-    in `worker/chemistry/algorithms/vqe/spsa.py`; `worker/chemistry/algorithms/vqe/workflow.py` keeps private
-    the optimizer connection;
+    in `worker/chemistry/algorithms/vqe/spsa.py`; `vqe_solver.py` keeps private
+    aliases for existing importers;
   - SciPy result normalization and the function-evaluation-limit fallback live
     in `worker/chemistry/algorithms/vqe/scipy.py`; stationary warm-start
     detection and alternate-start retry policy live in
     `worker/chemistry/algorithms/vqe/retry.py`;
-    `worker/chemistry/algorithms/vqe/workflow.py` keeps the `minimize` injection seam and orchestration;
+    `vqe_solver.py` keeps the `minimize` compatibility seam and orchestration;
   - Parameterless, evaluation-limit, energy-provenance, and canonical VQE
     result assembly lives in `worker/chemistry/algorithms/vqe/results.py`;
-    `worker/chemistry/algorithms/vqe/workflow.py` adapts inputs and injects state-data and
+    `vqe_solver.py` retains compatibility wrappers and injects state-data and
     artifact helpers;
   - Bounded Bloch-vector and density-matrix payload calculation for ideal
     statevector runs lives in
     `worker/chemistry/algorithms/vqe/state_data.py`;
   - `worker/chemistry/algorithms/skqd/config.py` owns SKQD Krylov bounds,
-    tolerance/time defaults, and nested SQD option assembly; `worker/chemistry/algorithms/skqd/workflow.py`
-    retains extension execution and explicit injected adapters;
+    tolerance/time defaults, and nested SQD option assembly; `skqd_solver.py`
+    retains private compatibility aliases while retaining extension execution;
   - SQD Hamiltonian-input validation, bounded runtime-option resolution,
     selected-CI limit resolution, and the immutable options record live in
-    `worker/chemistry/algorithms/sqd/config.py`; `worker/chemistry/algorithms/sqd/workflow.py` retains
-    sampling/recovery orchestration and explicit sampler seams;
+    `worker/chemistry/algorithms/sqd/config.py`; `sqd_solver.py` retains
+    private compatibility aliases while retaining
+    sampling/recovery orchestration;
   - SQD circuit-preview artifacts and final result-payload normalization live
-    in `worker/chemistry/algorithms/sqd/results.py`; `worker/chemistry/algorithms/sqd/workflow.py` retains
-    the recovery loop and result handoff;
+    in `worker/chemistry/algorithms/sqd/results.py`; `sqd_solver.py` retains
+    private compatibility aliases while retaining the
+    recovery loop;
   - SQD selected-CI batch execution, carryover diagnostics, and selected-CI
     progress events live in
-    `worker/chemistry/algorithms/sqd/recovery.py`; `worker/chemistry/algorithms/sqd/workflow.py` retains
+    `worker/chemistry/algorithms/sqd/recovery.py`; `sqd_solver.py` retains
+    private compatibility aliases while retaining
     outer-loop state;
   - The SQD Hartree-Fock reference circuit, sampler retries, control-flow
     propagation, and one iteration's recovery-input preparation live in
-    `worker/chemistry/algorithms/sqd/sampling_execution.py`; `worker/chemistry/algorithms/sqd/workflow.py`
+    `worker/chemistry/algorithms/sqd/sampling_execution.py`; `sqd_solver.py`
     keeps a thin wrapper so existing sampler
     monkeypatch seams remain valid;
   - Recovery-trace construction and end-of-iteration progress payloads live in
-    `worker/chemistry/algorithms/sqd/progress.py`; `worker/chemistry/algorithms/sqd/workflow.py` retains
-    the outer recovery state;
+    `worker/chemistry/algorithms/sqd/progress.py`; `sqd_solver.py` retains
+    private compatibility aliases while retaining the
+    outer recovery state;
   - The mutable SQD recovery-state record, dependency loading, setup logging,
     and initial-state construction live in
     `worker/chemistry/algorithms/sqd/state.py`;
   - One SQD sampling/recovery iteration, state updates, delta calculation,
     best-observation tracking, and trace recording live in
-    `worker/chemistry/algorithms/sqd/iteration.py`; `worker/chemistry/algorithms/sqd/workflow.py` keeps an
-    injected iteration adapter;
+    `worker/chemistry/algorithms/sqd/iteration.py`; `sqd_solver.py` keeps an
+    injected compatibility wrapper;
   - The bounded SQD recovery loop and convergence stop condition live in
-    `worker/chemistry/algorithms/sqd/controller.py`; `worker/chemistry/algorithms/sqd/workflow.py` keeps the
-    public resolver, result handoff, and injection points;
+    `worker/chemistry/algorithms/sqd/controller.py`; `sqd_solver.py` keeps the
+    public resolver, result handoff, and compatibility
+    injection points;
   - Pure SQD sampler payload/register discovery, bitstring normalization,
     frequency aggregation, and distribution diagnostics live in
-    `worker/chemistry/algorithms/sqd/sampling.py`; `worker/chemistry/algorithms/sqd/workflow.py` keeps
-    the sampling integration seam;
+    `worker/chemistry/algorithms/sqd/sampling.py`; `sqd_solver.py` keeps
+    private compatibility aliases;
   - Pure SQD recovery deltas and convergence gates live in
     `worker/chemistry/algorithms/sqd/convergence.py`; the solver keeps resolved
     options and progress orchestration at its
-    workflow boundary;
+    compatibility boundary;
   - Pure SQD selected-CI determinant limits, weighted selection, carryover,
     postselection, and selected-CI fraction helpers live in
     `worker/chemistry/algorithms/sqd/selection.py`; the solver keeps legacy
-    selection integration at the workflow boundary;
+    private aliases for existing callers;
   - backend selection and shared dataclasses;
   - PySCF/ffsim molecule and Hamiltonian builders used by both execute-run
     runtime setup and chemistry pipeline tests; the Hamiltonian builder
@@ -636,7 +626,7 @@ worker continues running (it will retry on the next scheduled cycle).
 **Example startup log:**
 
 ```log
-2026-02-24 10:15:30 - worker.main - INFO - Worker initialized for queue 'quantum'
+2026-02-24 10:15:30 - worker.main - INFO - Worker scaffold initialized for queue 'quantum'
 2026-02-24 10:15:30 - worker.main - INFO - Queue 'quantum' depth: 0
 2026-02-24 10:16:30 - worker.main - INFO - Queue 'quantum' depth: 0
 ```

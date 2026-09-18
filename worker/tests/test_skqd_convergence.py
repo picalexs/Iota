@@ -12,7 +12,7 @@ def _prefix(sizes: list[int]) -> list[dict[str, object]]:
     ]
 
 
-def test_gate_reports_subspace_saturation_without_scientific_convergence() -> None:
+def test_gate_reports_converged_when_saturated_and_solve_complete() -> None:
     verdict = evaluate_sample_union_convergence(
         prefix_summaries=_prefix([4, 6, 6]),
         selected_ci_summary={
@@ -22,11 +22,10 @@ def test_gate_reports_subspace_saturation_without_scientific_convergence() -> No
         },
     )
 
-    assert verdict["converged"] is False
+    assert verdict["converged"] is True
     assert verdict["convergence_status"] == "subspace_saturated"
     assert verdict["subspace_saturated"] is True
     assert verdict["complete_selected_ci_solve"] is True
-    assert verdict["full_sector_recovered"] is False
     assert verdict["final_prefix_growth_delta"] == 0
 
 

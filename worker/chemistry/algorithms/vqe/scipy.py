@@ -39,7 +39,7 @@ def run_scipy_vqe_optimizer(
             x0=initial_point,
             method=optimizer.scipy_method,
             options=optimizer.options or {"maxiter": optimizer.max_iterations},
-            bounds=parameter_bounds,
+            bounds=parameter_bounds if optimizer.scipy_method in {"SLSQP", "L-BFGS-B"} else None,
         )
         optimal_point = np.asarray(scipy_result.x, dtype=float)
         final_energy = float(scipy_result.fun)

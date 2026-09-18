@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.chemistry.circuit_artifacts import prepare_hf_reference_bits
-from worker.chemistry.time_evolution import is_zero_time
 
 _AER_BOOLEAN_OPTIONS = {
     "batched_shots_gpu",
@@ -45,14 +44,14 @@ def build_branch_state_circuit(
     circuit.h(ancilla)
 
     synthesis = LieTrotter(reps=int(trotter_steps))
-    if not is_zero_time(left_time):
+    if not np.isclose(left_time, 0.0):
         left_gate = PauliEvolutionGate(
             pauli_hamiltonian,
             time=float(left_time),
             synthesis=synthesis,
         )
         circuit.append(left_gate.control(1, ctrl_state=0), [ancilla, *system_qubits])
-    if not is_zero_time(right_time):
+    if not np.isclose(right_time, 0.0):
         right_gate = PauliEvolutionGate(
             pauli_hamiltonian,
             time=float(right_time),
@@ -95,14 +94,15 @@ def transpile_aer_circuit(
     *,
     context: Any,
     noise_model: Any | None = None,
-    noise_options: Mapping[str, Any] | None = None,
 ) -> Any:
     """Transpile a circuit to the local Aer simulator instruction set."""
     from qiskit import transpile
-    simulator_options = dict(noise_options or {})
+    from qiskit_aer import AerSimulator
+
+    simulator_options = aer_simulator_options(context)
     if noise_model is not None:
         simulator_options["noise_model"] = noise_model
-    simulator = build_aer_simulator(context, extra_options=simulator_options)
+    simulator = AerSimulator(**simulator_options)
     transpile_options: dict[str, Any] = {"optimization_level": optimization_level(context)}
     seed_transpiler = backend_option_int(context, "seed_transpiler")
     if seed_transpiler is not None:
@@ -110,22 +110,7 @@ def transpile_aer_circuit(
     return transpile(circuit, simulator, **transpile_options)
 
 
-def build_aer_simulator(
-    context: Any | None,
-    *,
-    extra_options: Mapping[str, Any] | None = None,
-) -> Any:
-    """Create the shared Aer simulator used by worker execution paths."""
-    from qiskit_aer import AerSimulator
-
-    return AerSimulator(**aer_simulator_options(context, extra_options=extra_options))
-
-
-def aer_simulator_options(
-    context: Any | None,
-    *,
-    extra_options: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
+def aer_simulator_options(context: Any | None) -> dict[str, Any]:
     """Return validated Aer simulator options from a backend context.
 
     The options are explicit so a benchmark can opt into GPU execution or
@@ -133,26 +118,26 @@ def aer_simulator_options(
     backend fields stay out of the Aer constructor.
     """
     method = str(getattr(context, "simulator_method", None) or "automatic")
-    options: dict[str, Any] = {"method": method}
+    options: dict[str, Any] = {} if method == "automatic" else {"method": method}
     backend_options = getattr(context, "backend_options", None)
-    if isinstance(backend_options, dict):
-        device = backend_options.get("device")
-        if isinstance(device, str) and device.upper() in {"CPU", "GPU"}:
-            options["device"] = device.upper()
+    if not isinstance(backend_options, dict):
+        return options
 
-        for key in _AER_BOOLEAN_OPTIONS:
-            value = backend_options.get(key)
-            if isinstance(value, bool):
-                options[key] = value
+    device = backend_options.get("device")
+    if isinstance(device, str) and device.upper() in {"CPU", "GPU"}:
+        options["device"] = device.upper()
 
-        for key in _AER_INTEGER_OPTIONS:
-            value = backend_options.get(key)
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                continue
-            options[key] = max(1, min(int(value), 1024))
+    for key in _AER_BOOLEAN_OPTIONS:
+        value = backend_options.get(key)
+        if isinstance(value, bool):
+            options[key] = value
 
-    if extra_options:
-        options.update(extra_options)
+    for key in _AER_INTEGER_OPTIONS:
+        value = backend_options.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        options[key] = max(1, min(int(value), 1024))
+
     return options
 
 

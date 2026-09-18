@@ -30,7 +30,6 @@ import {
 interface BenchmarkVariantEditorProps {
   variant: BenchmarkAlgorithmVariant;
   chemicalAccuracyHa: number;
-  requiresBranchEstimator: boolean;
   disabled?: boolean;
   autoCollapse?: boolean;
   onChange: (variant: BenchmarkAlgorithmVariant) => void;
@@ -109,12 +108,10 @@ function BenchmarkVariantModeToggle({
 function BenchmarkVariantAlgorithmPanel({
   algorithm,
   metadata,
-  requiresBranchEstimator,
   onResetRecommended,
 }: Readonly<{
   algorithm: RunAlgorithm;
   metadata: RunConfigMetadataResponse | null;
-  requiresBranchEstimator: boolean;
   onResetRecommended: () => void;
 }>) {
   switch (algorithm) {
@@ -123,12 +120,7 @@ function BenchmarkVariantAlgorithmPanel({
     case "sqd":
       return <SQDPanel onResetRecommended={onResetRecommended} />;
     case "kqd":
-      return (
-        <KQDPanel
-          requiresBranchEstimator={requiresBranchEstimator}
-          onResetRecommended={onResetRecommended}
-        />
-      );
+      return <KQDPanel onResetRecommended={onResetRecommended} />;
     case "qfd":
       return <QFDPanel onResetRecommended={onResetRecommended} />;
     case "qse":
@@ -141,7 +133,6 @@ function BenchmarkVariantAlgorithmPanel({
 export function BenchmarkVariantEditor({
   variant,
   chemicalAccuracyHa,
-  requiresBranchEstimator,
   disabled = false,
   autoCollapse = false,
   onChange,
@@ -241,12 +232,7 @@ export function BenchmarkVariantEditor({
 
   function handleResetRecommended() {
     const nextValues = buildBenchmarkVariantFormValues(
-      createAdvancedBenchmarkVariant(
-        variant.algorithm,
-        chemicalAccuracyHa,
-        configMetadata,
-        requiresBranchEstimator,
-      ),
+      createAdvancedBenchmarkVariant(variant.algorithm, chemicalAccuracyHa, configMetadata),
     );
     nextValues.mode = "advanced";
     form.reset(nextValues);
@@ -354,7 +340,6 @@ export function BenchmarkVariantEditor({
                 <BenchmarkVariantAlgorithmPanel
                   algorithm={variant.algorithm}
                   metadata={configMetadata}
-                  requiresBranchEstimator={requiresBranchEstimator}
                   onResetRecommended={handleResetRecommended}
                 />
               </div>

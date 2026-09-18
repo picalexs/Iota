@@ -123,40 +123,19 @@ def build_skqd_extension_diagnostics(
     sampling_time_step: float,
 ) -> dict[str, Any]:
     """Build SKQD extension diagnostics from the completed Krylov extension."""
-    if extension.sqd_seed is not None:
-        reference_policy = "sqd_selected_ci_coefficients"
-    elif extension.seed_source in {"hf_reference", "hf_sector_reference"}:
-        reference_policy = "hartree_fock_fallback"
-    else:
-        reference_policy = "unavailable"
     diagnostics = {
-        "algorithm_variant": "local_statevector_krylov_extension",
-        "reference_policy": reference_policy,
         "krylov_extension_dim": float(krylov_extension_dim),
         "time_step": sampling_time_step,
         "operator_dimension": float(plan.operator_dimension),
         "basis_rank": float(extension.basis_rank),
         "sqd_iterations": float(sqd_result.primary_iterations or 0),
-        "seeded_from_sqd_occupancies": extension.seed_source.endswith("_occupancies"),
+        "seeded_from_sqd_occupancies": extension.sqd_seed is not None,
         "seeded_from_sqd": extension.sqd_seed is not None,
         "seed_source": extension.seed_source,
-        "seed_fallback_reason": getattr(extension, "seed_fallback_reason", None),
         "sqd_converged": bool(sqd_result.converged),
         "execution_mode": plan.execution_mode,
         **extension.residual_diagnostics,
     }
-    sqd_package = getattr(sqd_result, "sci_result_package", None)
-    if isinstance(sqd_package, dict):
-        seed_iteration_key = (
-            "best_iteration"
-            if extension.seed_source.startswith("sqd_best_")
-            else "iterations"
-            if extension.seed_source.startswith("sqd_final_")
-            else None
-        )
-        seed_iteration = sqd_package.get(seed_iteration_key) if seed_iteration_key else None
-        if isinstance(seed_iteration, int) and not isinstance(seed_iteration, bool):
-            diagnostics["sqd_seed_iteration"] = float(seed_iteration)
     if plan.sector_action is not None:
         diagnostics["sector_dimension"] = float(plan.sector_action.dimension)
         diagnostics["num_spatial_orbitals"] = float(plan.sector_action.norb)
