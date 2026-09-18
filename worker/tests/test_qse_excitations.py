@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from worker.chemistry.algorithms.qse.basis import accept_basis_candidate
 from worker.chemistry.algorithms.qse.excitations import (
     apply_fermionic_excitation,
     apply_fermionic_ladder,
@@ -11,7 +12,6 @@ from worker.chemistry.algorithms.qse.excitations import (
     fermionic_excitation_specs,
     same_spin_count,
 )
-from worker.chemistry.algorithms.qse.basis import accept_basis_candidate
 
 
 def test_apply_fermionic_ladder_enforces_occupancy_and_jordan_wigner_sign() -> None:

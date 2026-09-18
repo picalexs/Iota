@@ -13,8 +13,8 @@ from worker.adapters.base import BackendExecutionContext
 from worker.adapters.result_adapter import normalize_result
 from worker.chemistry.algorithms.vqe import workflow as vqe_solver
 from worker.chemistry.algorithms.vqe.state_data import sector_diagnostics_from_ansatz
-from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.algorithms.vqe.workflow import run_vqe
+from worker.chemistry.ansatz_registry import build_ansatz
 
 
 class _FakeEstimatorJob:

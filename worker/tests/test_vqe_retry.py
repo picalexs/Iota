@@ -2,12 +2,12 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from worker.chemistry.optimizer_registry import OptimizerConfig
 from worker.chemistry.algorithms.vqe.retry import (
     run_scipy_vqe_with_retry,
     should_retry_stationary_warm_start,
     warm_start_retry_indices,
 )
+from worker.chemistry.optimizer_registry import OptimizerConfig
 
 
 def test_should_retry_stationary_warm_start_requires_an_alternate_gradient_start() -> None:

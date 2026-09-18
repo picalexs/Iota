@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from worker.chemistry.algorithms.sqd.config import resolve_sqd_options
 from worker.chemistry.algorithms.sqd import progress as sqd_progress
 from worker.chemistry.algorithms.sqd import recovery as sqd_recovery
-from worker.chemistry.algorithms.sqd.config import resolve_sqd_options
 from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 
 

@@ -13,8 +13,8 @@ from worker.chemistry.algorithms.skqd.sampling import (
     sample_krylov_state_sources,
     sample_sector_krylov_states,
 )
-from worker.chemistry.hamiltonian_action import build_hamiltonian_action
 from worker.chemistry.hamiltonian_action import HamiltonianAction
+from worker.chemistry.hamiltonian_action import build_hamiltonian_action
 
 
 def test_sample_krylov_state_sources_samples_every_index_and_keeps_provenance() -> None:
@@ -323,7 +323,7 @@ def test_sampler_workflow_allows_large_circuits_on_ibm_runtime(
         del backend
         circuit = kwargs["sampling_circuit_factory"]()
         calls.append(circuit)
-        return np.asarray([[True] * 16], dtype=bool).repeat(2, axis=0), circuit
+        return np.asarray([[True] * 16], dtype=bool).repeat(8, axis=0), circuit
 
     monkeypatch.setattr(workflow, "sample_bitstring_matrix", fake_sample_bitstring_matrix)
 

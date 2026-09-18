@@ -231,7 +231,7 @@ class TestExecuteRunHappyPath:
         assert result["algorithm"] == "kqd"
         assert result["iterations"] >= 1
         assert "ritz_values" in result["algorithm_metrics"]
-        assert result["backend_execution"]["execution_mode"] == "dense_classical"
+        assert result["backend_execution"]["execution_mode"] == "exact_matrix_evolution"
         assert result["backend_execution"]["backend_primitives_used"] is False
 
         payloads = _all_event_payloads(sessions)
