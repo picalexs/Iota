@@ -95,12 +95,6 @@ export function RuntimeScatterPanel({
     familyOptions.length > 1 ||
     algorithmOptions.length > 1 ||
     moleculeOptions.length > 1;
-  let pointLabelHint = "";
-  if (!showLabels) {
-    pointLabelHint = " Point labels are hidden";
-  } else if (metrics.reduceInlineLabels) {
-    pointLabelHint = " Dense charts trim inline labels automatically";
-  }
   return (
     <div
       ref={panelRef}
@@ -117,9 +111,7 @@ export function RuntimeScatterPanel({
         <div>
           <h2 className="text-sm font-semibold">Accuracy vs runtime</h2>
           <p className="text-xs text-muted-foreground">
-            Log runtime and error axes. Lower-left is better. Marker shape and color track family;
-            the target line marks chemical accuracy.
-            {pointLabelHint}
+            Hover a point for molecule and run details.
           </p>
         </div>
         <div className="flex items-center gap-2">

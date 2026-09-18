@@ -61,6 +61,10 @@ function renderBenchmarkResultsTable(
       entry: BenchmarkEntry,
       action: "pause" | "resume" | "restart" | "retry" | "cancel",
     ) => void;
+    onMoleculeAction?: (
+      entries: readonly BenchmarkEntry[],
+      action: "pause" | "resume" | "restart" | "retry" | "cancel",
+    ) => void;
   } = {},
 ) {
   const rootRoute = createRootRoute();
@@ -73,6 +77,7 @@ function renderBenchmarkResultsTable(
         selectedBasis="sto-3g"
         chemicalAccuracyHa={0.0016}
         onRunAction={options.onRunAction}
+        onMoleculeAction={options.onMoleculeAction}
         onBeforeOpenRun={options.onBeforeOpenRun}
       />
     ),
@@ -96,21 +101,16 @@ describe("BenchmarkResultsTable", () => {
     const formula = await screen.findByText(
       "1-(4-amino-3,5-dichlorophenyl)-2-(tert-butylamino)ethanol;hydrochloride",
     );
-    const name = screen.getByText("Clenbuterol clorhidrate");
-
     expect(formula).toHaveAttribute(
       "title",
       "1-(4-amino-3,5-dichlorophenyl)-2-(tert-butylamino)ethanol;hydrochloride",
     );
     expect(formula).toHaveClass("truncate");
-    expect(name).toHaveAttribute("title", "Clenbuterol clorhidrate");
-    expect(name).toHaveClass("truncate");
+    expect(screen.queryByText("Clenbuterol clorhidrate")).not.toBeInTheDocument();
     expect(formula.parentElement).toHaveClass("min-w-0", "flex-1", "items-end");
-    expect(screen.getByText(/HF:/).parentElement).toHaveClass(
-      "items-end",
-      "md:shrink-0",
-      "md:justify-end",
-    );
+    expect(screen.getByText(/HF:/).parentElement).toHaveClass("items-center", "md:shrink-0");
+    expect(screen.queryByText("sto-3g")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Corr:/)).not.toBeInTheDocument();
     expect(
       screen.queryByText(
         "14-electron triple bond. Strong multireference character. Hardest benchmark.",
@@ -118,14 +118,14 @@ describe("BenchmarkResultsTable", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows chemical accuracy yes or no instead of a convergence column", async () => {
+  it("shows chemical accuracy as a symbol and error instead of a convergence column", async () => {
     renderBenchmarkResultsTable();
 
     expect(await screen.findByText("Chemical accurate")).toBeInTheDocument();
     expect(screen.queryByText("Converged")).not.toBeInTheDocument();
     expect(screen.queryByText("Verdict")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Chemically accurate")).toBeInTheDocument();
-    expect(screen.getByText("Yes")).toBeInTheDocument();
+    expect(screen.queryByText("Yes")).not.toBeInTheDocument();
     expect(screen.getByText("1.50 mHa")).toBeInTheDocument();
   });
 
@@ -149,8 +149,58 @@ describe("BenchmarkResultsTable", () => {
     expect(
       await screen.findByLabelText("Chemical accuracy unavailable: benchmark row cancelled"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Unscored")).toBeInTheDocument();
+    expect(screen.queryByText("Unscored")).not.toBeInTheDocument();
     expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+  });
+
+  it("applies molecule actions to all runs in the molecule group", async () => {
+    const user = userEvent.setup();
+    const onMoleculeAction = vi.fn();
+    const grouped = buildGroupedRows();
+    const group = grouped[0];
+    const firstRow = group?.rows[0];
+    if (!group || !firstRow) throw new Error("Expected a benchmark group");
+
+    group.rows = [
+      { ...firstRow, status: "running" },
+      { ...firstRow, id: "n2:sqd", algorithm: "sqd", status: "running" },
+    ];
+    renderBenchmarkResultsTable({ grouped, onMoleculeAction });
+
+    await user.click(await screen.findByRole("button", { name: /molecule actions for/i }));
+    await user.click(screen.getByRole("button", { name: "Cancel runs" }));
+    await user.click(screen.getByRole("button", { name: "Cancel runs" }));
+
+    expect(onMoleculeAction).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "n2:vqe" }),
+        expect.objectContaining({ id: "n2:sqd" }),
+      ]),
+      "cancel",
+    );
+  });
+
+  it("does not navigate when a row action cancels a run", async () => {
+    const user = userEvent.setup();
+    const onRunAction = vi.fn();
+    const onBeforeOpenRun = vi.fn();
+
+    renderBenchmarkResultsTable({
+      grouped: buildGroupedRows({ status: "running" }),
+      onRunAction,
+      onBeforeOpenRun,
+    });
+
+    await user.click(await screen.findByRole("button", { name: /run actions for vqe/i }));
+    await user.click(screen.getByRole("button", { name: "Cancel run" }));
+    await user.click(screen.getByRole("button", { name: "Yes, cancel" }));
+
+    expect(onRunAction).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "running" }),
+      "cancel",
+    );
+    expect(onBeforeOpenRun).not.toHaveBeenCalled();
+    expect(screen.queryByText("Run detail")).not.toBeInTheDocument();
   });
 
   it("gives benchmark result panels a subtle surfaced outline", async () => {

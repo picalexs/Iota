@@ -1,4 +1,4 @@
-import { type KeyboardEvent } from "react";
+import { type KeyboardEvent, type MouseEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2, Clock, Loader2, Pause, XCircle } from "lucide-react";
 import {
@@ -16,6 +16,7 @@ import { isTimedOutFailureMessage } from "@/lib/run-failure";
 import { cn } from "@/lib/utils";
 import type { BenchmarkEntry } from "./benchmark-utils";
 import { assessBenchmarkEntry } from "./benchmark-utils";
+import { BenchmarkMoleculeActions } from "./benchmark-molecule-actions";
 import {
   BenchmarkResultRowActions,
   type BenchmarkResultsRowAction,
@@ -29,6 +30,11 @@ interface BenchmarkResultsTableProps {
   chemicalAccuracyHa: number;
   pendingAction?: BenchmarkResultsRowAction | null;
   onRunAction?: (entry: BenchmarkEntry, action: BenchmarkResultsRowAction) => void | Promise<void>;
+  onMoleculeAction?: (
+    entries: readonly BenchmarkEntry[],
+    action: BenchmarkResultsRowAction,
+  ) => void | Promise<void>;
+  getMoleculeActionEntries?: (presetKey: string) => readonly BenchmarkEntry[];
   onBeforeOpenRun?: () => void;
 }
 
@@ -41,17 +47,19 @@ function StatusIndicator({
   iconClassName,
   ariaLabel = label,
   spin = false,
+  showLabel = true,
 }: {
   icon: typeof CheckCircle2;
   label: string;
   iconClassName: string;
   ariaLabel?: string;
   spin?: boolean;
+  showLabel?: boolean;
 }) {
   return (
     <div aria-label={ariaLabel} className="inline-flex items-center gap-1.5">
       <Icon className={cn("h-4 w-4", iconClassName, spin && "animate-spin")} />
-      <span className="text-xs text-muted-foreground">{label}</span>
+      {showLabel ? <span className="text-xs text-muted-foreground">{label}</span> : null}
     </div>
   );
 }
@@ -185,7 +193,8 @@ function ChemicalAccuracyCell({
     return (
       <StatusIndicator
         icon={AlertCircle}
-        label="Unscored"
+        label=""
+        showLabel={false}
         ariaLabel="Chemical accuracy unavailable: benchmark row cancelled"
         iconClassName="text-muted-foreground"
       />
@@ -200,11 +209,12 @@ function ChemicalAccuracyCell({
       <div className="flex items-center gap-3">
         <StatusIndicator
           icon={AlertCircle}
-          label="Unknown"
+          label=""
+          showLabel={false}
           iconClassName="text-muted-foreground"
           ariaLabel="Chemical accuracy unknown"
         />
-        <span className="text-[10px] text-muted-foreground">No FCI/Exact reference</span>
+        <span className="text-xs text-muted-foreground">-</span>
       </div>
     );
   }
@@ -213,14 +223,16 @@ function ChemicalAccuracyCell({
       {assessment.verdict === "accurate" ? (
         <StatusIndicator
           icon={CheckCircle2}
-          label="Yes"
+          label=""
+          showLabel={false}
           iconClassName="text-success"
           ariaLabel="Chemically accurate"
         />
       ) : (
         <StatusIndicator
           icon={XCircle}
-          label="No"
+          label=""
+          showLabel={false}
           iconClassName="text-destructive"
           ariaLabel="Not chemically accurate"
         />
@@ -284,6 +296,13 @@ function runRowClassName({
   );
 }
 
+function isRowInteractiveTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    target.closest("button, a, [role='dialog'], [data-radix-popper-content-wrapper]") !== null
+  );
+}
+
 function BenchmarkResultRow({
   entry,
   chemicalAccuracyHa,
@@ -305,7 +324,13 @@ function BenchmarkResultRow({
     onOpenRun(runId);
   };
 
+  const handleRowClickEvent = (event: MouseEvent<HTMLTableRowElement>) => {
+    if (isRowInteractiveTarget(event.target)) return;
+    handleRowClick();
+  };
+
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
+    if (isRowInteractiveTarget(event.target)) return;
     if (!runId) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -317,7 +342,7 @@ function BenchmarkResultRow({
       key={entry.id}
       className={runRowClassName({ entry, chemicalAccuracyHa, rowClickable })}
       tabIndex={rowClickable ? 0 : undefined}
-      onClick={handleRowClick}
+      onClick={handleRowClickEvent}
       onKeyDown={handleRowKeyDown}
     >
       <TableCell>
@@ -382,15 +407,20 @@ function BenchmarkResultRow({
 function BenchmarkResultGroup({
   preset,
   rows,
-  selectedBasis,
   chemicalAccuracyHa,
   pendingAction = null,
   onRunAction,
+  onMoleculeAction,
+  getMoleculeActionEntries,
   onOpenRun,
 }: BenchmarkGroupedRows &
   Pick<
     BenchmarkResultsTableProps,
-    "selectedBasis" | "chemicalAccuracyHa" | "pendingAction" | "onRunAction"
+    | "chemicalAccuracyHa"
+    | "pendingAction"
+    | "onRunAction"
+    | "onMoleculeAction"
+    | "getMoleculeActionEntries"
   > & {
     onOpenRun: OpenRunHandler;
   }) {
@@ -406,22 +436,18 @@ function BenchmarkResultGroup({
           >
             {preset.formula}
           </span>
-          <span
-            title={preset.name}
-            className="max-w-[16rem] shrink-0 truncate text-sm text-muted-foreground"
-          >
-            {preset.name}
-          </span>
-          <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-            {selectedBasis}
-          </span>
         </div>
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-1 text-xs text-muted-foreground md:shrink-0 md:justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground md:shrink-0">
           {displayRefs.hf !== 0 && <span>HF: {displayRefs.hf.toFixed(5)} Ha</span>}
           {displayRefs.fci !== null && <span>Ref: {displayRefs.fci.toFixed(5)} Ha</span>}
-          {displayRefs.fci !== null && displayRefs.hf !== 0 && (
-            <span>Corr: {((displayRefs.fci - displayRefs.hf) * 1000).toFixed(1)} mHa</span>
-          )}
+          {onMoleculeAction ? (
+            <BenchmarkMoleculeActions
+              entries={getMoleculeActionEntries?.(preset.key) ?? rows}
+              moleculeLabel={preset.formula || preset.name}
+              pendingAction={pendingAction}
+              onAction={onMoleculeAction}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -457,10 +483,11 @@ function BenchmarkResultGroup({
 
 export function BenchmarkResultsTable({
   grouped,
-  selectedBasis,
   chemicalAccuracyHa,
   pendingAction = null,
   onRunAction,
+  onMoleculeAction,
+  getMoleculeActionEntries,
   onBeforeOpenRun,
 }: BenchmarkResultsTableProps) {
   const navigate = useNavigate();
@@ -484,10 +511,11 @@ export function BenchmarkResultsTable({
           <BenchmarkResultGroup
             key={group.preset.key}
             {...group}
-            selectedBasis={selectedBasis}
             chemicalAccuracyHa={chemicalAccuracyHa}
             pendingAction={pendingAction}
             onRunAction={onRunAction}
+            onMoleculeAction={onMoleculeAction}
+            getMoleculeActionEntries={getMoleculeActionEntries}
             onOpenRun={openRun}
           />
         ),

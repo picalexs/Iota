@@ -552,7 +552,7 @@ describe("BenchmarkInsights", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Target 1.6 mHa").length).toBeGreaterThan(0);
-    expect(screen.getByText(/log runtime and error axes/i)).toBeInTheDocument();
+    expect(screen.getByText(/hover a point for molecule and run details/i)).toBeInTheDocument();
     expect(screen.getByText("runtime")).toBeInTheDocument();
     expect(screen.queryByText(/algorithm snapshot/i)).not.toBeInTheDocument();
   });
@@ -700,7 +700,7 @@ describe("BenchmarkInsights", () => {
     expect(tooltip).toHaveStyle({ transform: "translate(-100%, 0)" });
   });
 
-  it("keeps scatter labels visible for every point and shortens long molecule names", async () => {
+  it("hides inline scatter labels and keeps molecule details in hover tooltips", async () => {
     const rootRoute = createRootRoute();
     const benchmarkRoute = createRoute({
       getParentRoute: () => rootRoute,
@@ -718,29 +718,12 @@ describe("BenchmarkInsights", () => {
       name: /benchmark accuracy versus runtime scatter plot/i,
     });
 
-    const scatterLabelTexts = Array.from(container.querySelectorAll("svg text"))
-      .map((node) => node.textContent?.trim())
-      .filter(Boolean);
     const visibleScatterLabels = Array.from(container.querySelectorAll('svg text[opacity="0.82"]'))
       .map((node) => node.textContent?.trim())
       .filter(Boolean);
 
-    expect(visibleScatterLabels).toContain("BeH₂ KQD");
-    expect(scatterLabelTexts).not.toContain("BeH₂ KQD · default");
-
-    const compactQseLabel = scatterLabelTexts.find(
-      (text) => text.endsWith(" QSE") && text.startsWith("1-("),
-    );
-    expect(compactQseLabel).toBeTruthy();
-    expect(compactQseLabel).toContain("…");
-    expect(compactQseLabel!.length).toBeLessThan(26);
-
-    const compactSkqdLabel = scatterLabelTexts.find(
-      (text) => text.endsWith(" SKQD") && text.startsWith("1-("),
-    );
-    expect(compactSkqdLabel).toBeTruthy();
-    expect(compactSkqdLabel).toContain("…");
-    expect(scatterLabelTexts.every((text) => !text.includes("EfficientSU2"))).toBe(true);
+    expect(visibleScatterLabels).toHaveLength(0);
+    expect(screen.queryByText("BeH₂ KQD")).not.toBeInTheDocument();
   });
 
   it("reduces inline scatter labels automatically on dense charts", async () => {
@@ -751,7 +734,7 @@ describe("BenchmarkInsights", () => {
       name: /benchmark accuracy versus runtime scatter plot/i,
     });
 
-    expect(screen.getByText(/dense charts trim inline labels automatically/i)).toBeInTheDocument();
+    expect(screen.getByText(/hover a point for molecule and run details/i)).toBeInTheDocument();
 
     const points = Array.from(container.querySelectorAll("[data-scatter-point]"));
     expect(points).toHaveLength(15);
@@ -759,7 +742,7 @@ describe("BenchmarkInsights", () => {
     const visibleLabels = Array.from(container.querySelectorAll('svg text[opacity="0.82"]'))
       .map((node) => node.textContent?.trim())
       .filter(Boolean);
-    expect(visibleLabels.length).toBeLessThan(points.length);
+    expect(visibleLabels).toHaveLength(0);
 
     const firstPoint = points.at(0);
     expect(firstPoint).toBeDefined();
@@ -770,10 +753,7 @@ describe("BenchmarkInsights", () => {
     await user.hover(firstPoint);
 
     expect(await screen.findByText(/H2 · /i)).toBeInTheDocument();
-    const hoveredLabels = Array.from(container.querySelectorAll('svg text[opacity="0.96"]'))
-      .map((node) => node.textContent?.trim())
-      .filter(Boolean);
-    expect(hoveredLabels.length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('svg text[opacity="0.96"]')).toHaveLength(0);
   });
 
   it("toggles inline scatter labels and keeps the fullscreen chart in sync", async () => {
@@ -784,17 +764,15 @@ describe("BenchmarkInsights", () => {
       name: /benchmark accuracy versus runtime scatter plot/i,
     });
 
-    expect(container.querySelectorAll('svg text[opacity="0.82"]').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('svg text[opacity="0.82"]')).toHaveLength(0);
 
     await user.click(
       screen.getByRole("button", {
-        name: /hide point labels on accuracy-vs-runtime chart/i,
+        name: /show point labels on accuracy-vs-runtime chart/i,
       }),
     );
 
-    expect(screen.getByText(/point labels are hidden/i)).toBeInTheDocument();
-    expect(container.querySelectorAll('svg text[opacity="0.82"]')).toHaveLength(0);
-    expect(container.querySelectorAll('svg text[opacity="0.96"]')).toHaveLength(0);
+    expect(container.querySelectorAll('svg text[opacity="0.82"]').length).toBeGreaterThan(0);
 
     await user.click(
       screen.getByRole("button", {
@@ -805,19 +783,19 @@ describe("BenchmarkInsights", () => {
     const dialog = await screen.findByRole("dialog", { name: /accuracy vs runtime/i });
     expect(
       within(dialog).getByRole("button", {
-        name: /show point labels on accuracy-vs-runtime chart/i,
+        name: /hide point labels on accuracy-vs-runtime chart/i,
       }),
     ).toBeInTheDocument();
-    expect(dialog.querySelectorAll('svg text[opacity="0.82"]')).toHaveLength(0);
+    expect(dialog.querySelectorAll('svg text[opacity="0.82"]').length).toBeGreaterThan(0);
 
     await user.click(
       within(dialog).getByRole("button", {
-        name: /show point labels on accuracy-vs-runtime chart/i,
+        name: /hide point labels on accuracy-vs-runtime chart/i,
       }),
     );
 
     await waitFor(() => {
-      expect(dialog.querySelectorAll('svg text[opacity="0.82"]').length).toBeGreaterThan(0);
+      expect(dialog.querySelectorAll('svg text[opacity="0.82"]')).toHaveLength(0);
     });
   });
 
