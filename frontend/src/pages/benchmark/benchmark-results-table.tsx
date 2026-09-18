@@ -151,8 +151,11 @@ function executionPathLabel(entry: BenchmarkEntry): string {
     dense_classical: "Local dense classical",
     sector_matrix_free: "Local matrix-free",
   };
-  if (metadata?.actualPathClass && pathLabels[metadata.actualPathClass]) {
-    return pathLabels[metadata.actualPathClass];
+  const pathLabel = metadata?.actualPathClass
+    ? pathLabels[metadata.actualPathClass]
+    : undefined;
+  if (pathLabel) {
+    return pathLabel;
   }
   switch (metadata?.actualExecutionTarget) {
     case "aer_simulator":
