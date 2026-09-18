@@ -260,7 +260,42 @@ async function createBenchmarkMolecule(preset: MoleculePreset): Promise<UUID> {
   return readMoleculeId(created, "Molecule creation");
 }
 
-export async function acquireMolecule(preset: MoleculePreset): Promise<MoleculeAcquisitionResult> {
+const moleculeAcquisitionCache = new Map<string, Promise<MoleculeAcquisitionResult>>();
+const MAX_MOLECULE_ACQUISITION_CACHE_ENTRIES = 128;
+
+function moleculeAcquisitionCacheKey(preset: MoleculePreset): string {
+  return JSON.stringify({
+    key: preset.key,
+    name: preset.name,
+    formula: preset.formula,
+    atoms: preset.atoms,
+    charge: preset.charge,
+    multiplicity: preset.multiplicity,
+    active_space: preset.active_space,
+  });
+}
+
+/** Clear in-flight and completed acquisition results after preset data changes. */
+export function clearMoleculeAcquisitionCache(): void {
+  moleculeAcquisitionCache.clear();
+}
+
+function cacheMoleculeAcquisition(
+  cacheKey: string,
+  acquisitionPromise: Promise<MoleculeAcquisitionResult>,
+): void {
+  if (moleculeAcquisitionCache.size >= MAX_MOLECULE_ACQUISITION_CACHE_ENTRIES) {
+    const oldestKey = moleculeAcquisitionCache.keys().next().value;
+    if (oldestKey !== undefined && oldestKey !== cacheKey) {
+      moleculeAcquisitionCache.delete(oldestKey);
+    }
+  }
+  moleculeAcquisitionCache.set(cacheKey, acquisitionPromise);
+}
+
+async function acquireMoleculeUncached(
+  preset: MoleculePreset,
+): Promise<MoleculeAcquisitionResult> {
   const cache = loadMoleculeCache();
   const attempts: MoleculeAcquisitionAttempt[] = [];
   const cached = isCustomBenchmarkPreset(preset)
@@ -302,6 +337,21 @@ export async function acquireMolecule(preset: MoleculePreset): Promise<MoleculeA
     const kind = recordFailure(attempts, error);
     throw new MoleculeAcquisitionError(preset, kind, attempts, error);
   }
+}
+
+export async function acquireMolecule(preset: MoleculePreset): Promise<MoleculeAcquisitionResult> {
+  const cacheKey = moleculeAcquisitionCacheKey(preset);
+  const cachedPromise = moleculeAcquisitionCache.get(cacheKey);
+  if (cachedPromise) return cachedPromise;
+
+  const acquisitionPromise = acquireMoleculeUncached(preset).catch((error: unknown) => {
+    if (moleculeAcquisitionCache.get(cacheKey) === acquisitionPromise) {
+      moleculeAcquisitionCache.delete(cacheKey);
+    }
+    throw error;
+  });
+  cacheMoleculeAcquisition(cacheKey, acquisitionPromise);
+  return acquisitionPromise;
 }
 
 /** Compatibility helper for callers that only need the database identifier. */
