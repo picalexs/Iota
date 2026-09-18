@@ -48,6 +48,36 @@ def test_validate_config_happy_path_returns_estimate(
     assert data["estimate"]["source"] in {"config_projection", "heuristic", "telemetry"}
 
 
+def test_validate_config_rejects_automatic_active_space_beyond_sto3g_capacity(
+    client: ASGISyncTestClient,
+    test_db,
+    sample_molecule: Molecule,
+):
+    sample_molecule.atoms = [
+        {"symbol": "F", "x": -0.7, "y": 0.0, "z": 0.0},
+        {"symbol": "O", "x": 0.7, "y": 0.0, "z": 0.0},
+        {"symbol": "H", "x": 1.0, "y": 0.6, "z": -0.6},
+    ]
+    sample_molecule.active_space = {
+        "n_electrons": 8,
+        "n_orbitals": 8,
+        "method": "automatic_frontier_estimate",
+    }
+    test_db.commit()
+
+    response = client.post(VALIDATE_CONFIG_API_PATH, json=_base_payload(sample_molecule))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valid"] is False
+    error = next(
+        error
+        for error in data["errors"]
+        if error["field"] == "molecule.active_space.n_orbitals"
+    )
+    assert "maximum 6" in error["message"]
+
+
 def test_validate_config_rejects_malformed_request(
     client: ASGISyncTestClient,
 ):

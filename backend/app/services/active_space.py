@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from app.core.active_space_capacity import minimum_basis_active_orbital_limit
 from app.models.molecule import Molecule
 
 _VALENCE_ELECTRONS: dict[str, int] = {
@@ -253,6 +254,16 @@ def derive_active_space_from_atoms(
     else:
         active_orbitals = total_valence_orbitals
         method = "automatic_valence"
+
+    capacity = minimum_basis_active_orbital_limit(
+        atoms,
+        active_electrons=active_electrons,
+        charge=charge,
+    )
+    if capacity is not None:
+        active_orbitals = min(active_orbitals, capacity)
+        if active_orbitals <= 0:
+            return None
 
     active_electrons = _normalize_active_electrons(
         active_electrons,
