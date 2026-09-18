@@ -234,6 +234,34 @@ def test_normalize_reports_stabilized_branch_energy_as_diagnostic() -> None:
     assert "reported_energy_invalid_reason" not in provenance
 
 
+@pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
+def test_normalize_reports_rank_reduced_exact_energy_as_diagnostic(algorithm: str) -> None:
+    normalized = normalize_result_for_persistence(
+        {
+            "algorithm": algorithm,
+            "energy": -1.1372744055,
+            "primary_energy": -1.1372744055,
+            "algorithm_metrics": {
+                "matrix_element_summary": {"matrix_element_strategy": "dense_classical"},
+                "stability_summary": {
+                    "stability_state": "stabilized",
+                    "dropped_rank": 1,
+                    "retained_rank": 7,
+                    "relative_projected_ritz_residual": 1e-15,
+                },
+            },
+        }
+    )
+
+    provenance = normalized[-1]
+    assert provenance["reported_energy"] == pytest.approx(-1.1372744055)
+    assert provenance["reported_energy_is_valid"] is True
+    assert provenance["reported_energy_source"] == "stabilized_projected_diagnostic"
+    assert provenance["projected_solve_is_diagnostic"] is True
+    assert provenance["scientific_converged"] is False
+    assert "reported_energy_invalid_reason" not in provenance
+
+
 def test_normalize_rejects_stabilized_branch_energy_with_nonfinite_residual() -> None:
     normalized = normalize_result_for_persistence(
         {

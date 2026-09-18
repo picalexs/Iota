@@ -19,7 +19,7 @@ def test_exact_generalized_eigenproblem_drops_duplicate_metric_modes() -> None:
     assert eigenvalues == pytest.approx([-0.375])
     assert diagnostics["retained_rank"] == 1
     assert diagnostics["dropped_rank"] == 1
-    assert diagnostics["stability_state"] == "invalid"
+    assert diagnostics["stability_state"] == "stabilized"
     assert diagnostics["regularization"] == pytest.approx(0.0)
 
 

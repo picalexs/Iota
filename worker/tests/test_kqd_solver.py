@@ -302,7 +302,7 @@ def test_run_kqd_does_not_mark_singular_dense_projection_converged(
     )
 
     assert result.converged is False
-    assert result.stability_summary["stability_state"] == "invalid"
+    assert result.stability_summary["stability_state"] == "stabilized"
     assert result.stability_summary["termination_reason"] == "projected_metric_rank_reduced"
 
 
