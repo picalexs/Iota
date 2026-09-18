@@ -11,10 +11,10 @@ from qiskit.quantum_info import SparsePauliOp
 from worker.adapters.aer_adapter import AerAdapter
 from worker.adapters.base import BackendExecutionContext
 from worker.adapters.result_adapter import normalize_result
+from worker.chemistry.algorithms.kqd.definition import run_kqd_algorithm
 from worker.chemistry.algorithms.kqd.workflow import (
     _build_krylov_basis,
     _build_sector_krylov_basis,
-    _projected_matrix_converged,
     run_kqd,
 )
 from worker.chemistry.eigensolver import (
@@ -23,6 +23,7 @@ from worker.chemistry.eigensolver import (
 )
 from worker.chemistry.hamiltonian_action import build_hamiltonian_action
 from worker.chemistry.overlap import build_overlap_matrix
+from worker.chemistry.projected_subspace import projected_matrix_converged
 from worker.chemistry.sector_basis import hartree_fock_sector_state
 from worker.jobs.dispatcher import dispatch_algorithm
 
@@ -365,12 +366,16 @@ def test_run_kqd_ibm_context_uses_estimator_matrix_elements(
         result.matrix_element_summary["execution_selection_reason"]
         == "requested_ibm_runtime_requires_branch_estimator"
     )
-    assert result.matrix_element_summary["residual_kind"] == "projected_generalized_eigenpair"
+    assert result.matrix_element_summary["residual_kind"] == "projected_gevp_equation"
+    assert result.converged is False
+    assert result.matrix_element_summary["projected_solver_converged"] is True
     assert "max_standard_error" in result.matrix_element_summary
     assert result.orthogonality_metrics["relative_ritz_residual"] >= 0.0
     assert result.stability_summary["stability_state"] in {"stable", "stabilized"}
     assert result.raw_ritz_values
     assert events[-1]["time_evolution_backend"] == "hardware_branch_estimator"
+    assert events[-1]["scientific_converged"] is None
+    assert events[-1]["termination_reason"] == "full_space_residual_unavailable"
 
 
 def test_run_kqd_returns_stabilized_noisy_projected_solve_as_diagnostic(
@@ -435,21 +440,21 @@ def test_run_kqd_returns_stabilized_noisy_projected_solve_as_diagnostic(
 
 
 def test_projected_matrix_converged_requires_stable_overlap_gate() -> None:
-    assert _projected_matrix_converged(
+    assert projected_matrix_converged(
         {
             "stability_state": "stable",
             "overlap_condition": 128.0,
             "overlap_min_eigenvalue": 1e-3,
         }
     )
-    assert not _projected_matrix_converged(
+    assert not projected_matrix_converged(
         {
             "stability_state": "stabilized",
             "overlap_condition": 128.0,
             "overlap_min_eigenvalue": 1e-3,
         }
     )
-    assert not _projected_matrix_converged(
+    assert not projected_matrix_converged(
         {
             "stability_state": "stable",
             "overlap_condition": 128.0,
@@ -492,6 +497,56 @@ def test_run_kqd_large_ideal_aer_uses_sector_projection_without_dense_resolution
     assert result.matrix_element_summary["sector_dimension"] > 0
 
 
+def test_kqd_exact_ideal_aer_uses_sector_evolution_without_an_estimator() -> None:
+    class _Backend:
+        def create_estimator(self, _context: object) -> object:
+            raise AssertionError("eligible ideal Aer KQD must stay on the local sector path")
+
+    result = run_kqd_algorithm(
+        _Backend(),
+        {
+            "algorithm": "kqd",
+            "advanced_config": {
+                "algorithm": "kqd",
+                "krylov_dim": 2,
+                "time_step": 0.1,
+                "evolution_method": "exact",
+                "trotter_steps": 1,
+            },
+        },
+        _sector_hamiltonian(norb=7, n_alpha=2, n_beta=2),
+        None,
+        BackendExecutionContext(backend_target="aer_simulator"),
+    )
+
+    assert result.matrix_element_summary["matrix_element_strategy"] == "sector_matrix_free"
+    assert result.matrix_element_summary["implemented_evolution_method"] == "sector_expm_multiply"
+
+
+def test_kqd_exact_ideal_aer_rejects_branch_fallback_before_estimator_creation() -> None:
+    class _Backend:
+        def create_estimator(self, _context: object) -> object:
+            raise AssertionError("unsupported KQD must fail before estimator creation")
+
+    hamiltonian = _sector_hamiltonian(norb=7, n_alpha=2, n_beta=2)
+    hamiltonian.dense_operator_matrix = np.eye(1)
+
+    with pytest.raises(ValueError, match="supports evolution_method='trotter' only"):
+        run_kqd_algorithm(
+            _Backend(),
+            {
+                "algorithm": "kqd",
+                "advanced_config": {
+                    "algorithm": "kqd",
+                    "evolution_method": "exact",
+                },
+            },
+            hamiltonian,
+            None,
+            BackendExecutionContext(backend_target="aer_simulator"),
+        )
+
+
 def test_run_kqd_aer_state_propagation_matches_statevector() -> None:
     hamiltonian = _single_qubit_x_hamiltonian()
     config = {
@@ -518,6 +573,28 @@ def test_run_kqd_aer_state_propagation_matches_statevector() -> None:
 
     assert aer_result.primary_energy == pytest.approx(statevector_result.primary_energy, abs=1e-6)
     assert aer_result.orthogonality_metrics["basis_rank"] == pytest.approx(2.0)
+
+
+def test_run_kqd_local_trotter_reports_the_implemented_evolution() -> None:
+    result = run_kqd(
+        hamiltonian=_single_qubit_x_hamiltonian(),
+        backend=None,
+        config={
+            "algorithm": "kqd",
+            "advanced_config": {
+                "algorithm": "kqd",
+                "krylov_dim": 2,
+                "time_step": 0.1,
+                "evolution_method": "trotter",
+                "trotter_steps": 1,
+            },
+        },
+    )
+
+    assert result.matrix_element_summary["requested_evolution_method"] == "trotter"
+    assert result.matrix_element_summary["implemented_evolution_method"] == (
+        "dense_matrix_trotter"
+    )
 
 
 def test_run_kqd_small_noisy_aer_uses_estimator_matrix_elements(
@@ -587,9 +664,8 @@ def test_run_kqd_custom_aer_noise_returns_finite_reported_or_diagnostic_result()
     assert np.isfinite(result.primary_energy)
     assert result.matrix_element_summary["matrix_element_strategy"] == "branch_estimator"
     assert result.matrix_element_summary["overlap_diagonal_normalized"] is True
-    if result.stability_summary["stability_state"] == "stabilized":
-        assert result.converged is False
-        assert result.stability_summary["diagnostic_only"] is True
+    assert result.converged is False
+    assert isinstance(result.matrix_element_summary["projected_solver_converged"], bool)
 
 
 def test_run_kqd_branch_rejects_exact_evolution_claim() -> None:
@@ -611,6 +687,27 @@ def test_run_kqd_branch_rejects_exact_evolution_claim() -> None:
                 backend_target="aer_simulator",
                 noise_profile={"source": "backend_derived", "reference_backend": "ibm_kyiv"},
             ),
+        )
+
+
+def test_kqd_runner_rejects_unsupported_ibm_evolution_before_primitive_creation() -> None:
+    class _Backend:
+        def create_estimator(self, _context: object) -> object:
+            raise AssertionError("unsupported KQD config must fail before primitive creation")
+
+    with pytest.raises(ValueError, match="supports evolution_method='trotter' only"):
+        run_kqd_algorithm(
+            _Backend(),
+            {
+                "algorithm": "kqd",
+                "advanced_config": {
+                    "algorithm": "kqd",
+                    "evolution_method": "exact",
+                },
+            },
+            _single_qubit_x_hamiltonian(),
+            None,
+            BackendExecutionContext(backend_target="ibm_runtime"),
         )
 
 

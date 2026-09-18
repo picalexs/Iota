@@ -151,6 +151,15 @@ def _build_vqe_reference_state_and_artifacts(
     vqe_result: Any,
     vqe_cost: dict[str, Any],
 ) -> tuple[np.ndarray, list[dict[str, Any]]]:
+    optimal_parameters = np.asarray(vqe_result.optimal_parameters, dtype=float).reshape(-1)
+    if optimal_parameters.size != ansatz.num_parameters:
+        raise ValueError(
+            "QSE VQE reference parameter count does not match the ansatz "
+            f"(expected {ansatz.num_parameters}, received {optimal_parameters.size})"
+        )
+    if not np.all(np.isfinite(optimal_parameters)):
+        raise ValueError("QSE VQE reference parameters must be finite")
+
     if ansatz.num_parameters == 0:
         state = Statevector.from_instruction(ansatz).data
         reference_artifact = next(
@@ -164,19 +173,10 @@ def _build_vqe_reference_state_and_artifacts(
         )
         return np.asarray(state, dtype=complex), artifacts
 
-    optimal_parameters = np.asarray(vqe_result.optimal_parameters, dtype=float)
-    if optimal_parameters.size < ansatz.num_parameters:
-        padded = np.zeros(ansatz.num_parameters, dtype=float)
-        if optimal_parameters.size:
-            padded[: optimal_parameters.size] = optimal_parameters
-        optimal_parameters = padded
-    elif optimal_parameters.size > ansatz.num_parameters:
-        optimal_parameters = optimal_parameters[: ansatz.num_parameters]
-
     state = Statevector.from_instruction(ansatz.assign_parameters(optimal_parameters.tolist())).data
     state = np.asarray(state, dtype=complex)
     norm = float(np.linalg.norm(state))
-    if np.isclose(norm, 0.0):
+    if not np.isfinite(norm) or norm == 0.0:
         raise ValueError("QSE VQE reference solve produced a zero-norm state")
     reference_artifact = next(
         (artifact for artifact in vqe_result.circuit_artifacts if artifact.get("role") == "final"),
@@ -246,7 +246,6 @@ def build_vqe_reference_state(
             "optimizer_name": optimizer_name,
             "max_iterations": reference_iterations,
             "reps": reference_reps,
-            "convergence_threshold": float(resolved_config.get("regularization") or 1e-6),
             "initial_point_strategy": "zero_plus_seeded_random",
             "initial_point_candidates": 2,
         },
@@ -296,7 +295,7 @@ def resolve_reference_state(
     if reference_method == "hf":
         reference_state = build_hf_reference_state_fn(hamiltonian, fallback_dim=vector_size)
         norm = float(np.linalg.norm(reference_state))
-        if np.isclose(norm, 0.0):
+        if not np.isfinite(norm) or norm == 0.0:
             raise ValueError("QSE HF reference state has zero norm")
         return reference_method, reference_state / norm, hf_reference_artifacts_fn(hamiltonian)
 
@@ -351,7 +350,7 @@ def resolve_sector_reference_state(
     if reference_method == "hf":
         reference_state = hartree_fock_sector_state_fn(action.norb, action.nelec)
         norm = float(np.linalg.norm(reference_state))
-        if np.isclose(norm, 0.0):
+        if not np.isfinite(norm) or norm == 0.0:
             raise ValueError("QSE HF sector reference state has zero norm")
         return reference_method, reference_state / norm, hf_reference_artifacts_fn(hamiltonian)
 

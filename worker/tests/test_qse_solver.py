@@ -7,11 +7,11 @@ import pytest
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.result_adapter import normalize_result
+from worker.chemistry.algorithms.qse.basis import real_scalar
 from worker.chemistry.algorithms.qse.config import QSEConfig, resolve_qse_config
+from worker.chemistry.algorithms.qse.sector import sector_excitation_specs
 from worker.chemistry.algorithms.qse.workflow import (
     _build_excitation_basis,
-    _real_scalar,
-    _sector_excitation_specs,
     run_qse,
 )
 from worker.chemistry.backend_selector import select_backend
@@ -118,7 +118,7 @@ def test_qse_sector_excitation_specs_prioritize_coupled_doubles() -> None:
     )
     action = cast(HamiltonianAction, _CoupledSectorAction(int(np.argmax(np.abs(target_state)))))
 
-    specs = _sector_excitation_specs(reference, action, excitation_level="singles_doubles")
+    specs = sector_excitation_specs(reference, action, excitation_level="singles_doubles")
 
     assert specs[0] == ("double", (2, 6), (0, 4))
 
@@ -140,6 +140,7 @@ def test_qse_vqe_reference_treats_null_options_as_defaults() -> None:
                 "vqe_reference_max_iterations": 8,
                 "vqe_reference_reps": 1,
                 "max_subspace_dim": 2,
+                "regularization": 1e-4,
             },
         },
     )
@@ -153,6 +154,12 @@ def test_qse_vqe_reference_treats_null_options_as_defaults() -> None:
     assert metrics["circuit_artifacts"][0]["phase"] == "reference"
     assert metrics["circuit_artifacts"][0]["representative"] is True
     assert metrics["execution_mode"] == "dense_exact_emulation"
+    assert metrics["regularization"] == pytest.approx(1e-4)
+    assert metrics["requested_regularization"] == pytest.approx(1e-4)
+    assert metrics["regularization_scope"] == "basis_progress_estimates_only"
+    assert metrics["conditioning_summary"]["regularization"] == pytest.approx(0.0)
+    assert metrics["final_metric_diagonal_shift"] == pytest.approx(0.0)
+    assert metrics["regularization_may_change_reported_energy"] is False
     assert metrics["conditioning_summary"]["reference_state_execution"] == "exact_emulation"
     assert metrics["conditioning_summary"]["termination_reason"] in {
         "converged",
@@ -192,7 +199,7 @@ def test_qse_hf_reference_emits_reference_circuit_artifact() -> None:
 
 
 def test_qse_real_scalar_accepts_numerical_imaginary_residue() -> None:
-    assert _real_scalar(1.25 + 1e-9j, label="test energy") == pytest.approx(1.25)
+    assert real_scalar(1.25 + 1e-9j, label="test energy") == pytest.approx(1.25)
 
 
 def test_qse_reference_energy_tolerates_complex_matrix_residue() -> None:
@@ -280,6 +287,34 @@ def test_qse_sector_wrapper_preserves_completion_metadata_and_result_fields() ->
     assert result.primary_energy == result.eigenvalues[0]
     assert result.overlap_condition >= 0.0
     assert result.relative_residual is not None
+
+
+def test_qse_sector_result_reports_actual_capped_excitation_pool() -> None:
+    """Sector-QSE results expose the excitations selected before solving."""
+    result = run_qse(
+        hamiltonian=_SectorHamiltonian(norb=4, n_alpha=2, n_beta=2),
+        backend=object(),
+        config={
+            "algorithm": "qse",
+            "advanced_config": {
+                "algorithm": "qse",
+                "reference_method": "hf",
+                "excitation_level": "singles_doubles",
+                "max_subspace_dim": 7,
+            },
+        },
+    )
+
+    basis_selection = result.matrix_element_summary["basis_selection"]
+    assert basis_selection["candidate_selection_policy"] == "reference_coupling_descending"
+    assert basis_selection["selected_specs_complete"] is True
+    assert basis_selection["actual_basis_dimension"] == 7
+    assert basis_selection["selected_excitation_counts"] == {
+        "reference": 1,
+        "single": 0,
+        "double": 6,
+    }
+    assert len(basis_selection["selected_excitation_specs"]) == 7
 
 
 def test_qse_provided_state_accepts_complex_json_scalars() -> None:

@@ -30,6 +30,7 @@ from worker.chemistry.circuit_artifacts import prepare_hf_reference_bits
 from worker.chemistry.reference_descriptor import build_reference_descriptor
 from worker.chemistry.reference_states import build_hf_reference_state_with_source
 from worker.chemistry.sector_basis import hartree_fock_sector_state
+from worker.chemistry.time_evolution import is_zero_time
 from worker.exceptions import RunExcludedError
 
 
@@ -75,7 +76,10 @@ def execute_sample_union_workflow(
     options = resolve_sqd_options(skqd_config.sqd_config, hamiltonian)
     rng = np.random.default_rng(skqd_config.seed)
     if plan.sector_action is not None:
-        spectral_width, spectral_source = estimate_action_spectral_width(plan.sector_action)
+        spectral_width, spectral_source = estimate_action_spectral_width(
+            plan.sector_action,
+            pauli_hamiltonian=getattr(hamiltonian, "pauli_hamiltonian", None),
+        )
         time_step, time_step_metadata = resolve_sampling_time_step(
             skqd_config,
             spectral_width=spectral_width,
@@ -230,19 +234,22 @@ def execute_sampler_sample_union_workflow(
     )
 
     trotter_order = int(getattr(skqd_config, "trotter_order", 2))
-    trotter_reps = int(skqd_config.trotter_steps)
+    trotter_steps_per_interval = int(skqd_config.trotter_steps)
     if trotter_order <= 1:
-        synthesis: Any = LieTrotter(reps=trotter_reps)
         synthesis_name = "lie_trotter_first_order"
     else:
-        synthesis = SuzukiTrotter(order=trotter_order, reps=trotter_reps)
         synthesis_name = f"suzuki_trotter_order_{trotter_order}"
 
-    def factory_for_time(time_point: float):
+    def factory_for_time(krylov_index: int, time_point: float):
         def build_circuit(**_kwargs: Any) -> QuantumCircuit:
             circuit = QuantumCircuit(num_qubits)
             prepare_hf_reference_bits(circuit, hamiltonian, num_qubits=num_qubits)
-            if not np.isclose(time_point, 0.0):
+            if not is_zero_time(time_point):
+                repetitions = max(krylov_index, 1) * trotter_steps_per_interval
+                if trotter_order <= 1:
+                    synthesis: Any = LieTrotter(reps=repetitions)
+                else:
+                    synthesis = SuzukiTrotter(order=trotter_order, reps=repetitions)
                 circuit.append(
                     PauliEvolutionGate(
                         pauli_hamiltonian,
@@ -260,6 +267,16 @@ def execute_sampler_sample_union_workflow(
 
     samples_by_state: list[SKQDKrylovSample] = []
     circuit_metadata: list[dict[str, Any]] = []
+    work_ledger: dict[str, Any] = {
+        "ledger_version": 1,
+        "counting_scope": "worker_observed",
+        "sampler_run_attempts": 0,
+        "sampler_successful_runs": 0,
+        "sampler_retry_count": 0,
+        "sampler_requested_shots_total": 0,
+        "sampler_returned_raw_sample_rows": 0,
+        "sampler_retained_sample_rows": 0,
+    }
     for krylov_index in range(skqd_config.krylov_extension_dim):
         time_point = float(krylov_index * sampling_time_step)
         samples, _circuit = sample_bitstring_matrix(
@@ -267,14 +284,24 @@ def execute_sampler_sample_union_workflow(
             num_bits=num_qubits,
             total_samples=skqd_config.samples_per_state,
             rng=np.random.default_rng(skqd_config.seed + krylov_index),
-            sampling_circuit_factory=factory_for_time(time_point),
+            sampling_circuit_factory=factory_for_time(krylov_index, time_point),
             return_circuit=True,
+            work_ledger=work_ledger,
+            retry_with_increased_shots=False,
         )
+        samples = np.asarray(samples, dtype=bool)
+        if samples.shape[0] < skqd_config.samples_per_state:
+            raise RuntimeError(
+                f"SKQD sampler returned {samples.shape[0]} rows for Krylov state "
+                f"{krylov_index}; requested {skqd_config.samples_per_state}"
+            )
+        samples = samples[: skqd_config.samples_per_state]
+        work_ledger["sampler_retained_sample_rows"] += int(samples.shape[0])
         samples_by_state.append(
             SKQDKrylovSample(
                 krylov_index=krylov_index,
                 time_point=time_point,
-                bitstring_matrix=np.asarray(samples, dtype=bool),
+                bitstring_matrix=samples,
             )
         )
         circuit_metadata.append(
@@ -286,6 +313,11 @@ def execute_sampler_sample_union_workflow(
                     int(_circuit.depth())
                     if callable(getattr(_circuit, "depth", None))
                     else None
+                ),
+                "trotter_repetitions": (
+                    max(krylov_index, 1) * trotter_steps_per_interval
+                    if not is_zero_time(time_point)
+                    else 0
                 ),
                 "operation_names": sorted(
                     {
@@ -313,7 +345,8 @@ def execute_sampler_sample_union_workflow(
         backend_target=getattr(backend_context, "backend_target", None),
         ansatz_name="hartree_fock",
     )
-    return merge_krylov_samples(samples_by_state), {
+    sample_union = merge_krylov_samples(samples_by_state, work_ledger=work_ledger)
+    return sample_union, {
         "algorithm_variant": "skqd_sample_union",
         "sampling_mode": "sample_union_sampler",
         "sampling_source": "sampler_krylov_circuits",
@@ -327,11 +360,14 @@ def execute_sampler_sample_union_workflow(
         "samples_per_state": skqd_config.samples_per_state,
         "seed": skqd_config.seed,
         "trotter_steps": skqd_config.trotter_steps,
+        "trotter_steps_per_krylov_interval": trotter_steps_per_interval,
         "trotter_order": trotter_order,
         "trotter_synthesis": synthesis_name,
+        "trotter_step_policy": "fixed_delta_t",
         "time_step": sampling_time_step,
         "krylov_time_step_policy": time_step_metadata,
         "krylov_circuit_metadata": circuit_metadata,
+        "work_ledger": dict(sample_union.work_ledger),
     }
 
 

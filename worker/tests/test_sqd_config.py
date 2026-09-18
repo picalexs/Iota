@@ -48,6 +48,26 @@ def test_resolve_sqd_options_applies_runtime_bounds_and_hamiltonian_defaults() -
     assert options.hamiltonian_constant == -0.25
     assert options.seed == 0
     assert options.sci_solver_options == {"max_cycle": 80}
+    assert options.target_spin_sq == 0.0
+
+
+def test_resolve_sqd_options_does_not_impose_singlet_on_open_shell_defaults() -> None:
+    options = sqd_config.resolve_sqd_options(
+        {"algorithm": "sqd"},
+        _hamiltonian(num_elec_a=2, num_elec_b=1),
+    )
+
+    assert options.open_shell is True
+    assert options.target_spin_sq is None
+
+
+def test_resolve_sqd_options_preserves_explicit_open_shell_spin_target() -> None:
+    options = sqd_config.resolve_sqd_options(
+        {"algorithm": "sqd", "spin_sq_target": 0.75},
+        _hamiltonian(num_elec_a=2, num_elec_b=1),
+    )
+
+    assert options.target_spin_sq == 0.75
 
 
 def test_resolve_sqd_options_maps_backend_sample_budget_when_unspecified() -> None:
@@ -90,5 +110,27 @@ def test_resolve_sqd_options_rejects_asymmetric_symmetrized_limits() -> None:
                 "symmetrize_spin": True,
                 "max_dim": [2, 3],
             },
+            _hamiltonian(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("spin_sq_target", float("nan")),
+        ("spin_sq_target", -1.0),
+        ("energy_tol", float("inf")),
+        ("energy_tol", -1.0),
+        ("occupancies_tol", float("nan")),
+        ("carryover_threshold", -float("inf")),
+    ],
+)
+def test_resolve_sqd_options_rejects_non_finite_tolerances(
+    field: str,
+    value: float,
+) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        sqd_config.resolve_sqd_options(
+            {"algorithm": "sqd", field: value},
             _hamiltonian(),
         )

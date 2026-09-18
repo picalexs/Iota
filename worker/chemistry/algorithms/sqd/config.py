@@ -8,7 +8,12 @@ from typing import Any, cast
 import numpy as np
 
 from worker.chemistry.algorithms.sqd.selection import resolve_selected_ci_limits
-from worker.chemistry.solver_utils import bounded_int, resolve_algorithm_config
+from worker.chemistry.solver_utils import (
+    bounded_int,
+    nonnegative_float,
+    positive_float,
+    resolve_algorithm_config,
+)
 
 _DEFAULT_MIN_SELECTED_CONFIGURATIONS = 2
 _DEFAULT_CARRYOVER_THRESHOLD = 1e-4
@@ -30,7 +35,7 @@ class SQDOptions:
     norb: int
     num_elec_a: int
     num_elec_b: int
-    target_spin_sq: float
+    target_spin_sq: float | None
     energy_tol: float
     occupancies_tol: float
     carryover_threshold: float
@@ -130,14 +135,30 @@ def resolve_sqd_options(
     ):
         raise ValueError("SQD symmetrize_spin requires identical alpha and beta max_dim limits")
 
-    target_spin_sq = float(resolved.get("spin_sq_target") or 0.0)
-    energy_tol = float(resolved.get("energy_tol") or 1e-5)
-    occupancies_tol = float(resolved.get("occupancies_tol") or 1e-5)
-    raw_carryover_threshold = resolved.get("carryover_threshold")
-    carryover_threshold = (
-        float(raw_carryover_threshold)
-        if raw_carryover_threshold is not None
-        else _DEFAULT_CARRYOVER_THRESHOLD
+    open_shell = num_elec_a != num_elec_b
+    target_spin_sq = (
+        None
+        if open_shell and resolved.get("spin_sq_target") is None
+        else nonnegative_float(
+            resolved.get("spin_sq_target"),
+            default=0.0,
+            name="SQD spin_sq_target",
+        )
+    )
+    energy_tol = positive_float(
+        resolved.get("energy_tol"),
+        default=1e-5,
+        name="SQD energy_tol",
+    )
+    occupancies_tol = positive_float(
+        resolved.get("occupancies_tol"),
+        default=1e-5,
+        name="SQD occupancies_tol",
+    )
+    carryover_threshold = nonnegative_float(
+        resolved.get("carryover_threshold"),
+        default=_DEFAULT_CARRYOVER_THRESHOLD,
+        name="SQD carryover_threshold",
     )
     min_selected_configurations = bounded_int(
         resolved.get("min_selected_configurations"),
@@ -180,5 +201,5 @@ def resolve_sqd_options(
         selected_ci_limits=selected_ci_limits,
         selected_ci_limit_summary=selected_ci_limit_summary,
         sci_solver_options=sci_solver_options,
-        open_shell=num_elec_a != num_elec_b,
+        open_shell=open_shell,
     )

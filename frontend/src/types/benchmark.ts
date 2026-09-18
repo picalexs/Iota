@@ -9,6 +9,7 @@ import type {
   RunAlgorithm,
   UUID,
 } from "@/types/run";
+import type { RunExecutionMetadata } from "@/lib/results/execution-metadata";
 
 export type BenchmarkVariantMode = "simple" | "advanced";
 
@@ -44,6 +45,7 @@ export interface BenchmarkEntry {
   errorMessage: string | null;
   classicalRefs: { hf: number; fci: number } | null;
   elapsedSeconds: number | null;
+  executionMetadata?: RunExecutionMetadata | null;
   latestEventSequence: number;
 }
 
@@ -56,6 +58,7 @@ export interface BenchmarkEntryUpdate {
   classicalRefs: { hf: number; fci: number } | null;
   errorMessage: string | null;
   elapsedSeconds: number | null;
+  executionMetadata?: RunExecutionMetadata | null;
   latestEventSequence: number;
 }
 

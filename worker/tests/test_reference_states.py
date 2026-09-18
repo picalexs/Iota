@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from qiskit.quantum_info import SparsePauliOp
 
 from worker.chemistry.eigensolver import build_hf_reference_state as legacy_build_hf_reference_state
 from worker.chemistry.eigensolver import build_reference_state as legacy_build_reference_state
@@ -31,6 +32,36 @@ def test_hf_reference_state_falls_back_to_qubit_dimension() -> None:
     state = build_hf_reference_state(SimpleNamespace(num_qubits=2))
 
     assert state.tolist() == [1.0 + 0.0j, 0.0j, 0.0j, 0.0j]
+
+
+def test_hf_reference_state_uses_pauli_width_when_bundle_lacks_num_qubits() -> None:
+    hamiltonian = SimpleNamespace(
+        pauli_hamiltonian=SparsePauliOp.from_list([("IIII", 1.0)]),
+        num_spatial_orbitals=2,
+        num_electrons_alpha=1,
+        num_electrons_beta=1,
+    )
+
+    state, source = build_hf_reference_state_with_source(hamiltonian)
+
+    assert source == "hartree_fock"
+    assert state.shape == (16,)
+    assert state[5] == 1.0
+
+
+def test_hf_reference_state_falls_back_when_pauli_width_conflicts_with_orbitals() -> None:
+    hamiltonian = SimpleNamespace(
+        pauli_hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+        num_spatial_orbitals=2,
+        num_electrons_alpha=1,
+        num_electrons_beta=1,
+    )
+
+    state, source = build_hf_reference_state_with_source(hamiltonian)
+
+    assert source == "computational_basis_fallback"
+    assert state.shape == (2,)
+    assert state[0] == 1.0
 
 
 def test_hf_reference_state_uses_explicit_fallback_dimension() -> None:

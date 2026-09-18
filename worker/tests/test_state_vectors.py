@@ -33,7 +33,10 @@ def test_normalize_state_vector_rejects_zero_and_wrong_size() -> None:
         )
 
 
-def test_kqd_keeps_legacy_reference_normalization_alias() -> None:
-    from worker.chemistry.algorithms.kqd import workflow as kqd_solver
+def test_normalize_state_vector_keeps_small_nonzero_state() -> None:
+    normalized = normalize_state_vector(
+        np.array([1e-13, 0.0], dtype=complex),
+        error_message="state must be non-zero",
+    )
 
-    assert kqd_solver._normalize_krylov_reference_state is normalize_state_vector
+    np.testing.assert_allclose(normalized, [1.0, 0.0])

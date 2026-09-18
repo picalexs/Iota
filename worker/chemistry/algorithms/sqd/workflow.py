@@ -1,4 +1,4 @@
-"""SQD solver scaffold."""
+"""SQD workflow orchestration."""
 
 from __future__ import annotations
 
@@ -127,8 +127,11 @@ def _run_sqd_sampling_iteration(
     avg_occupancies: tuple[np.ndarray, np.ndarray],
     progress_callback: ProgressCallback | None,
     sampling_circuit_factory: Any | None = None,
+    work_ledger: dict[str, int] | None = None,
+    measured_bitstring_matrix: np.ndarray | None = None,
+    measured_circuit: Any | None = None,
 ) -> _SQDIterationSampling:
-    """Preserve the legacy sampling seam while delegating to the focused module."""
+    """Adapt sampling inputs to the focused sampling module."""
     return run_sqd_sampling_iteration(
         iteration=iteration,
         backend=backend,
@@ -139,6 +142,9 @@ def _run_sqd_sampling_iteration(
         progress_callback=progress_callback,
         sample_bitstrings=_sample_bitstring_matrix,
         sampling_circuit_factory=sampling_circuit_factory,
+        work_ledger=work_ledger,
+        measured_bitstring_matrix=measured_bitstring_matrix,
+        measured_circuit=measured_circuit,
     )
 
 
@@ -197,7 +203,7 @@ def _execute_sqd_iteration(
     progress_callback: ProgressCallback | None,
     sampling_circuit_factory: Any | None = None,
 ) -> _SQDIterationOutcome:
-    """Preserve the legacy iteration seam while delegating to its module."""
+    """Adapt iteration inputs to the focused iteration module."""
     return execute_sqd_iteration(
         iteration=iteration,
         backend=backend,

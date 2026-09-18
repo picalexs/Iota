@@ -2,11 +2,30 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
 
 _MIN_STABLE_ENERGY_POINTS = 5
+
+
+def _spsa_float_option(
+    options: dict[str, Any],
+    name: str,
+    *,
+    default: float,
+    allow_zero: bool = False,
+) -> float:
+    """Resolve one finite SPSA option with its protocol-specific lower bound."""
+    try:
+        value = float(options.get(name, default))
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"SPSA {name} must be finite") from exc
+    if not math.isfinite(value) or (value < 0.0 if allow_zero else value <= 0.0):
+        bound = "non-negative" if allow_zero else "positive"
+        raise ValueError(f"SPSA {name} must be finite and {bound}")
+    return value
 
 
 def is_delta_converged(
@@ -37,10 +56,15 @@ def run_spsa(
 ) -> tuple[np.ndarray, int, bool, dict[str, Any]]:
     """Run a lightweight SPSA loop against the objective callback."""
     spsa_options = dict(options or {})
-    learning_rate = float(spsa_options.get("learning_rate", 0.1))
-    perturbation = float(spsa_options.get("perturbation", 0.05))
+    learning_rate = _spsa_float_option(spsa_options, "learning_rate", default=0.1)
+    perturbation = _spsa_float_option(spsa_options, "perturbation", default=0.05)
     blocking = bool(spsa_options.get("blocking", False))
-    allowed_increase = float(spsa_options.get("allowed_increase", 0.0))
+    allowed_increase = _spsa_float_option(
+        spsa_options,
+        "allowed_increase",
+        default=0.0,
+        allow_zero=True,
+    )
 
     rng = np.random.default_rng(seed)
     theta = initial_point.copy()
@@ -48,8 +72,10 @@ def run_spsa(
     best_energy = objective(theta)
     accepted_energy_trace = [float(best_energy)]
     accepted_steps = 0
+    optimizer_iterations = 0
 
     for step in range(max_iterations):
+        optimizer_iterations += 1
         ck = perturbation / float((step + 1) ** 0.101)
         ak = learning_rate / float((step + 1) ** 0.602)
         delta = rng.choice(np.array([-1.0, 1.0]), size=theta.shape[0])
@@ -76,7 +102,7 @@ def run_spsa(
         if is_delta_converged(accepted_energy_trace, threshold=threshold):
             break
 
-    iterations = max(len(convergence_trace), accepted_steps, 1)
+    iterations = max(len(convergence_trace), optimizer_iterations, 1)
     converged = is_delta_converged(accepted_energy_trace, threshold=threshold)
     diagnostics = {
         "optimizer_kind": "spsa",
@@ -84,7 +110,8 @@ def run_spsa(
         "accepted_energy_trace": accepted_energy_trace,
         "function_evaluations": len(convergence_trace),
         "objective_evaluations": len(convergence_trace),
-        "optimizer_iterations": accepted_steps,
+        "optimizer_iterations": optimizer_iterations,
+        "optimizer_iteration_attempts": optimizer_iterations,
         "convergence_threshold": threshold,
     }
     return best_theta, iterations, converged, diagnostics

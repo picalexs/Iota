@@ -14,7 +14,12 @@ from worker.chemistry.algorithms.qfd.execution import (
     QFDExecutionPlan,
     prepare_qfd_execution,
 )
-from worker.chemistry.algorithms.qfd.grid import build_qfd_time_grid, qfd_grid_metadata
+from worker.chemistry.algorithms.qfd.grid import (
+    build_qfd_time_grid,
+    qfd_grid_metadata,
+    qfd_spectral_width_bound,
+    resolve_qfd_symmetric_kappa,
+)
 from worker.chemistry.algorithms.qfd.results import (
     build_qfd_completion_payload,
     build_qfd_result,
@@ -41,6 +46,7 @@ from worker.chemistry.hamiltonian_action import (
 )
 from worker.chemistry.matrix_elements import (
     estimate_projected_matrices_with_branch_estimator,
+    hardware_projected_dimension_limit,
 )
 from worker.chemistry.overlap import build_overlap_matrix, overlap_metrics
 from worker.chemistry.progress import ProgressCallback
@@ -50,7 +56,6 @@ from worker.chemistry.projected_execution import (
     backend_label,
     can_use_sector_action,
     num_qubits,
-    num_spatial_orbitals,
     should_use_branch_matrix_elements,
     validate_branch_estimator_feasibility,
 )
@@ -75,23 +80,12 @@ logger = logging.getLogger(__name__)
 _NO_QFD_FILTER_EIGENVALUES = "QFD projected solve produced no filter eigenvalues"
 
 
-# Re-export private names for existing solver tests and importers.
-_num_qubits = num_qubits
-_num_spatial_orbitals = num_spatial_orbitals
-_can_use_sector_action = can_use_sector_action
-_should_use_branch_matrix_elements = should_use_branch_matrix_elements
-_backend_label = backend_label
-
-
-_QFDExecutionPlan = QFDExecutionPlan
-
-
 def _build_hf_reference_state_with_source(
     hamiltonian: object,
     *,
     fallback_dim: int | None = None,
 ) -> tuple[np.ndarray, str]:
-    """Keep the legacy patchable HF helper while persisting its source."""
+    """Build the HF reference and preserve its source metadata."""
     return build_hf_reference_state(
         hamiltonian,
         fallback_dim=fallback_dim,
@@ -128,11 +122,11 @@ def _build_sector_qfd_states(
     reference_state: np.ndarray,
     time_grid: np.ndarray,
     *,
-    max_time: float,
+    max_time: float | None,
     time_grid_type: str,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy sector-state helper import-compatible."""
+    """Adapt sector-state inputs to the state builder."""
     return build_sector_qfd_states(
         action,
         reference_state,
@@ -152,18 +146,18 @@ def _prepare_qfd_execution(
     backend: object | None,
     backend_context: Any | None,
     execution_policy: ProjectedExecutionPolicy | None = None,
-) -> _QFDExecutionPlan:
+) -> QFDExecutionPlan:
     """Resolve the QFD execution path and any reusable dense evolution data."""
     return prepare_qfd_execution(
         hamiltonian=hamiltonian,
         backend=backend,
         backend_context=backend_context,
-        should_use_branch_matrix_elements_fn=_should_use_branch_matrix_elements,
-        can_use_sector_action_fn=_can_use_sector_action,
+        should_use_branch_matrix_elements_fn=should_use_branch_matrix_elements,
+        can_use_sector_action_fn=can_use_sector_action,
         build_hamiltonian_action_fn=build_hamiltonian_action,
         resolve_operator_matrix_fn=resolve_operator_matrix,
-        num_qubits_fn=_num_qubits,
-        backend_label_fn=_backend_label,
+        num_qubits_fn=num_qubits,
+        backend_label_fn=backend_label,
         prepare_dense_spectrum_fn=_prepare_dense_qfd_spectrum,
         execution_policy=execution_policy,
     )
@@ -194,10 +188,10 @@ def _solve_qfd_branch_path(
     *,
     hamiltonian: object,
     backend: object | None,
-    plan: _QFDExecutionPlan,
+    plan: QFDExecutionPlan,
     time_grid: np.ndarray,
     num_time_points: int,
-    max_time: float,
+    max_time: float | None,
     time_grid_type: str,
     trotter_steps: int,
     residual_tolerance: float,
@@ -223,7 +217,7 @@ def _solve_qfd_branch_path(
     overlap = estimate.overlap
     reference_state, reference_source = _build_hf_reference_state_with_source(
         hamiltonian,
-        fallback_dim=2 ** max(0, _num_qubits(hamiltonian)),
+        fallback_dim=2 ** max(0, num_qubits(hamiltonian)),
     )
     reference_descriptor = build_reference_descriptor(
         state=reference_state,
@@ -251,7 +245,7 @@ def _solve_qfd_branch_path(
     stabilized = solve_stabilized_generalized_eigenproblem(
         projected_hamiltonian,
         overlap,
-        max_standard_error=estimate.summary.get("max_standard_error"),
+        max_standard_error=estimate.summary.get("max_overlap_standard_error"),
     )
     if stabilized.eigenvalues.size == 0:
         raise ValueError(_NO_QFD_FILTER_EIGENVALUES)
@@ -281,15 +275,17 @@ def _solve_qfd_branch_path(
         **diagnostics,
         **grid_metadata,
         "time_points": float(num_time_points),
-        "max_time": float(max_time),
+        "max_time": max_time,
     }
-    converged = _projected_matrix_converged(diagnostics) and (
+    projected_solver_converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
+    matrix_element_summary["projected_solver_converged"] = bool(projected_solver_converged)
     matrix_element_summary["convergence_basis"] = (
-        "projected_overlap_condition_and_generalized_residual"
+        "projected_solver_only_full_space_residual_unavailable"
     )
-    matrix_element_summary["residual_kind"] = "projected_generalized_eigenpair"
+    matrix_element_summary["residual_kind"] = "projected_gevp_equation"
+    converged = False
     qfd_elapsed = time.monotonic() - t_start
     matrix_element_summary["timing_breakdown"] = {
         "matrix_element_estimation_seconds": projected_solve_started - t_start,
@@ -330,7 +326,7 @@ def _solve_qfd_sector_path(
     *,
     sector_action: HamiltonianAction,
     time_grid: np.ndarray,
-    max_time: float,
+    max_time: float | None,
     time_grid_type: str,
     residual_tolerance: float,
     t_start: float,
@@ -373,14 +369,14 @@ def _solve_qfd_sector_path(
         **diagnostics,
         **grid_metadata,
         "time_points": float(len(states)),
-        "max_time": float(max_time),
+        "max_time": max_time,
         "sector_dimension": float(sector_action.dimension),
     }
     residual_diagnostics, _ = sector_action.residual_diagnostics(
         states_matrix,
         residual_tolerance=residual_tolerance,
     )
-    converged = _projected_matrix_converged(diagnostics) and (
+    converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
     matrix_element_summary = {
@@ -446,11 +442,11 @@ def _build_dense_qfd_states(
     evolution_context: _QFDDenseEvolutionContext,
     time_grid: np.ndarray,
     num_time_points: int,
-    max_time: float,
+    max_time: float | None,
     time_grid_type: str,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Keep the legacy dense-state helper import-compatible."""
+    """Adapt dense-state inputs to the state builder."""
     return build_dense_qfd_states(
         evolution_context=evolution_context,
         time_grid=time_grid,
@@ -469,7 +465,7 @@ def _evolve_dense_qfd_state(
     evolution_context: _QFDDenseEvolutionContext,
     time_point: float,
 ) -> np.ndarray:
-    """Keep the legacy dense-state evolution helper import-compatible."""
+    """Adapt dense evolution inputs to the state builder."""
     return evolve_dense_qfd_state(
         evolution_context=evolution_context,
         time_point=time_point,
@@ -482,7 +478,7 @@ def _dense_qfd_partial_energy(
     operator: np.ndarray,
     dense_states: list[np.ndarray],
 ) -> float | None:
-    """Keep the legacy dense partial-energy helper import-compatible."""
+    """Adapt dense partial-energy inputs to the state builder."""
     return dense_qfd_partial_energy(
         operator,
         dense_states,
@@ -499,12 +495,12 @@ def _emit_dense_qfd_progress(
     total_iterations: int,
     partial_energy: float | None,
     time_point: float,
-    max_time: float,
+    max_time: float | None,
     time_grid_type: str,
     use_aer: bool,
     trotter_steps: int,
 ) -> None:
-    """Keep the legacy dense progress helper import-compatible."""
+    """Adapt dense progress inputs to the state builder."""
     emit_dense_qfd_progress(
         progress_callback=progress_callback,
         index=index,
@@ -522,10 +518,10 @@ def _solve_qfd_dense_path(
     *,
     hamiltonian: object,
     operator: np.ndarray,
-    plan: _QFDExecutionPlan,
+    plan: QFDExecutionPlan,
     time_grid: np.ndarray,
     num_time_points: int,
-    max_time: float,
+    max_time: float | None,
     time_grid_type: str,
     trotter_steps: int,
     residual_tolerance: float,
@@ -570,14 +566,14 @@ def _solve_qfd_dense_path(
         **diagnostics,
         **grid_metadata,
         "time_points": float(num_time_points),
-        "max_time": float(max_time),
+        "max_time": max_time,
     }
     residual_diagnostics = projected_ritz_diagnostics(
         operator,
         states_matrix,
         residual_tolerance=residual_tolerance,
     )
-    converged = _projected_matrix_converged(diagnostics) and (
+    converged = projected_matrix_converged(diagnostics) and (
         residual_diagnostics["relative_ritz_residual"] <= residual_tolerance
     )
     matrix_element_summary = {
@@ -668,7 +664,24 @@ def run_qfd(
 ) -> QFDResult:
     """Run a deterministic filter-diagonalization workflow."""
     resolved = resolve_algorithm_config(config, "qfd")
-    qfd_config: QFDConfig = resolve_qfd_config(resolved)
+    uses_branch_estimator = (
+        execution_policy.actual_path == "branch_estimator"
+        if execution_policy is not None
+        else should_use_branch_matrix_elements(
+            hamiltonian=hamiltonian,
+            backend=backend,
+            backend_context=backend_context,
+        )
+    )
+    qfd_config: QFDConfig = resolve_qfd_config(
+        resolved,
+        default_num_time_points=7 if uses_branch_estimator else 16,
+    )
+    if uses_branch_estimator and qfd_config.num_time_points > hardware_projected_dimension_limit():
+        raise ValueError(
+            "QFD branch matrix-element execution supports at most "
+            f"{hardware_projected_dimension_limit()} time points per run"
+        )
 
     t_start = time.monotonic()
     plan = _prepare_qfd_execution(
@@ -677,13 +690,37 @@ def run_qfd(
         backend_context=backend_context,
         execution_policy=execution_policy,
     )
+    kappa_diagnostics: dict[str, object] = {}
+    if qfd_config.qfd_variant == "qfd_original_symmetric":
+        raw_kappa = resolved.get("kappa")
+        if raw_kappa is None:
+            raw_kappa = resolved.get("spectral_scale")
+        spectral_width_bound, bound_source = qfd_spectral_width_bound(
+            operator_matrix=plan.operator,
+            pauli_hamiltonian=getattr(hamiltonian, "pauli_hamiltonian", None),
+            eigenvalues=plan.eigenvalues,
+        )
+        effective_kappa, kappa_diagnostics = resolve_qfd_symmetric_kappa(
+            qfd_config.kappa if raw_kappa is not None else None,
+            spectral_width_bound=spectral_width_bound,
+            bound_source=bound_source,
+        )
+        qfd_config = replace(qfd_config, kappa=effective_kappa)
+    requested_kappa = resolved.get("kappa")
+    if requested_kappa is None:
+        requested_kappa = resolved.get("spectral_scale")
+    is_symmetric_grid = qfd_config.qfd_variant == "qfd_original_symmetric"
+    applied_max_time = None if is_symmetric_grid else qfd_config.max_time
+    applied_time_grid_type = "symmetric_kappa" if is_symmetric_grid else qfd_config.time_grid_type
     logger.info(
-        "QFD setup: hilbert_dim=%d num_time_points=%d max_time=%.4f grid=%s "
+        "QFD setup: hilbert_dim=%d num_time_points=%d requested_max_time=%.4f "
+        "requested_grid=%s applied_grid=%s "
         "trotter_steps=%d time_evolution_backend=%s",
         plan.dimension,
         qfd_config.num_time_points,
         qfd_config.max_time,
         qfd_config.time_grid_type,
+        applied_time_grid_type,
         qfd_config.trotter_steps,
         plan.time_evolution_backend,
     )
@@ -706,6 +743,23 @@ def run_qfd(
         qfd_variant=qfd_config.qfd_variant,
         kappa=qfd_config.kappa,
     )
+    grid_metadata["kappa"] = qfd_config.kappa if is_symmetric_grid else None
+    grid_metadata["requested_grid_parameters"] = {
+        "num_time_points": qfd_config.num_time_points,
+        "max_time": qfd_config.max_time,
+        "time_grid_type": qfd_config.time_grid_type,
+        "kappa": float(requested_kappa) if requested_kappa is not None else None,
+    }
+    grid_metadata["applied_grid_parameters"] = {
+        "num_time_points": qfd_config.num_time_points,
+        "max_time": applied_max_time,
+        "time_grid_type": applied_time_grid_type,
+        "kappa": qfd_config.kappa if is_symmetric_grid else None,
+    }
+    grid_metadata["inactive_requested_grid_fields"] = (
+        ["max_time", "time_grid_type"] if is_symmetric_grid else ["kappa"]
+    )
+    grid_metadata.update(kappa_diagnostics)
     if plan.use_branch_matrix_elements:
         result = _solve_qfd_branch_path(
             hamiltonian=hamiltonian,
@@ -713,8 +767,8 @@ def run_qfd(
             plan=plan,
             time_grid=time_grid,
             num_time_points=qfd_config.num_time_points,
-            max_time=qfd_config.max_time,
-            time_grid_type=qfd_config.time_grid_type,
+            max_time=applied_max_time,
+            time_grid_type=applied_time_grid_type,
             trotter_steps=qfd_config.trotter_steps,
             residual_tolerance=qfd_config.residual_tolerance,
             t_start=t_start,
@@ -726,8 +780,8 @@ def run_qfd(
         result = _solve_qfd_sector_path(
             sector_action=plan.sector_action,
             time_grid=time_grid,
-            max_time=qfd_config.max_time,
-            time_grid_type=qfd_config.time_grid_type,
+            max_time=applied_max_time,
+            time_grid_type=applied_time_grid_type,
             residual_tolerance=qfd_config.residual_tolerance,
             t_start=t_start,
             progress_callback=progress_callback,
@@ -743,8 +797,8 @@ def run_qfd(
             plan=plan,
             time_grid=time_grid,
             num_time_points=qfd_config.num_time_points,
-            max_time=qfd_config.max_time,
-            time_grid_type=qfd_config.time_grid_type,
+            max_time=applied_max_time,
+            time_grid_type=applied_time_grid_type,
             trotter_steps=qfd_config.trotter_steps,
             residual_tolerance=qfd_config.residual_tolerance,
             t_start=t_start,
@@ -794,6 +848,3 @@ def _emit_qfd_completion(
             qfd_variant=qfd_variant,
         ),
     )
-
-
-_projected_matrix_converged = projected_matrix_converged

@@ -91,6 +91,9 @@ def test_validate_run_request_accepts_kqd_aer_without_noise_profile() -> None:
     assert response.valid is True
     assert response.errors == []
     assert any("AerSimulator" in warning for warning in response.warnings)
+    assert any("local exact matrix evolution" in warning for warning in response.warnings)
+    assert any("trotter_steps is ignored" in warning for warning in response.warnings)
+    assert not any("synthesizes Pauli-evolution circuits" in warning for warning in response.warnings)
 
 
 def test_validate_run_request_allows_large_kqd_ideal_aer_sector_path() -> None:

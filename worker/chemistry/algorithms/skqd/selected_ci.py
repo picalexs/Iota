@@ -251,6 +251,7 @@ def solve_sample_union_selected_ci(
             if len(sample_union.samples_by_state) == 1
             else "multi_state_sample_union"
         ),
+        "work_ledger": dict(sample_union.work_ledger),
     }
     return SKQDSelectedCIOutcome(
         energy=float(energy),

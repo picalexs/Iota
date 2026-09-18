@@ -3,13 +3,17 @@
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 from qiskit import QuantumCircuit
+from qiskit.circuit import Parameter
 
 from worker.chemistry.algorithms.qse.reference_policy import (
+    _build_vqe_reference_state_and_artifacts,
     build_vqe_reference_state,
     resolve_reference_state,
     resolve_sector_reference_state,
 )
+from worker.chemistry.algorithms.vqe.config import resolve_vqe_config
 
 
 def test_build_vqe_reference_state_uses_injected_runtime_seams() -> None:
@@ -67,6 +71,62 @@ def test_build_vqe_reference_state_uses_injected_runtime_seams() -> None:
         "best_observed_energy": -1.2,
         "final_energy": -1.1,
     }
+
+
+def test_qse_vqe_reference_tolerance_is_independent_of_regularization() -> None:
+    observed_thresholds: list[float] = []
+
+    def fake_run_vqe(**kwargs: object) -> SimpleNamespace:
+        observed_thresholds.append(resolve_vqe_config(kwargs["config"]).convergence_threshold)
+        return SimpleNamespace(
+            optimal_parameters=np.array([], dtype=float),
+            optimizer_diagnostics={},
+            circuit_artifacts=[],
+        )
+
+    for regularization in (1e-8, 1e-3):
+        build_vqe_reference_state(
+            hamiltonian=object(),
+            backend=object(),
+            vector_size=2,
+            resolved_config={"regularization": regularization, "vqe_reference_reps": 1},
+            progress_callback=None,
+            run_vqe_fn=fake_run_vqe,
+            build_ansatz_fn=lambda **_kwargs: QuantumCircuit(1),
+        )
+
+    default_vqe_threshold = resolve_vqe_config({}).convergence_threshold
+    assert observed_thresholds == [default_vqe_threshold, default_vqe_threshold]
+
+
+def test_qse_vqe_reference_rejects_parameter_count_mismatch() -> None:
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
+    for parameters in ([], [0.2, 0.4]):
+        with pytest.raises(ValueError, match="parameter count"):
+            _build_vqe_reference_state_and_artifacts(
+                ansatz=ansatz,
+                vqe_result=SimpleNamespace(
+                    optimal_parameters=np.asarray(parameters, dtype=float),
+                    circuit_artifacts=[],
+                ),
+                vqe_cost={},
+            )
+
+
+def test_qse_vqe_reference_rejects_non_finite_optimizer_parameters() -> None:
+    ansatz = QuantumCircuit(1)
+    ansatz.ry(Parameter("theta"), 0)
+
+    with pytest.raises(ValueError, match="finite"):
+        _build_vqe_reference_state_and_artifacts(
+            ansatz=ansatz,
+            vqe_result=SimpleNamespace(
+                optimal_parameters=np.asarray([np.nan]),
+                circuit_artifacts=[],
+            ),
+            vqe_cost={},
+        )
 
 
 def test_resolve_reference_state_normalizes_provided_state() -> None:

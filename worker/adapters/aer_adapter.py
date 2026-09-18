@@ -7,6 +7,7 @@ import weakref
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from worker.adapters.aer_noise import AerNoiseConfiguration, resolve_aer_noise_profile
 from worker.adapters.base import (
     AdapterCapabilities,
     BackendAdapter,
@@ -19,20 +20,8 @@ from worker.chemistry.matrix_element_circuits import (
     apply_layout_to_observable,
     transpile_aer_circuit,
 )
-from worker.exceptions import BackendError
 
 _DEFAULT_CONTEXT = BackendExecutionContext(backend_target="aer_simulator")
-_DEFAULT_NOISE_REFERENCE_BACKEND = "ibm_brisbane"
-_FAKE_BACKEND_ALIASES: dict[str, tuple[str, ...]] = {
-    # Phoenix is a Nighthawk-family backend.  Use the packaged Nighthawk
-    # snapshot when IBM account discovery is unavailable in a local worker.
-    "ibm_phoenix": ("FakeNighthawk",),
-    # Some current IBM hardware names do not ship a one-to-one fake backend.
-    # Keep noisy Aer local by falling back to the closest packaged Heron snapshot.
-    "ibm_boston": ("ibm_fez",),
-    "ibm_kingston": ("ibm_fez",),
-    "ibm_pittsburgh": ("ibm_fez",),
-}
 logger = logging.getLogger(__name__)
 
 
@@ -50,8 +39,7 @@ class AerAdapter(BackendAdapter):
         self._last_metadata: dict[str, Any] = {}
         self._cached_context_key: tuple[Any, ...] | None = None
         self._cached_backend_options: dict[str, Any] | None = None
-        self._cached_noise_model: Any | None = None
-        self._cached_noise_summary: dict[str, Any] | None = None
+        self._cached_noise_configuration: AerNoiseConfiguration | None = None
         self._cached_method: str | None = None
         self._transpile_cache: dict[
             tuple[int, tuple[Any, ...]], tuple[weakref.ReferenceType[Any], Any]
@@ -74,12 +62,16 @@ class AerAdapter(BackendAdapter):
             include_estimator_precision=True,
         )
         primitive = EstimatorV2(options=primitive_options)
-        noise_model = primitive_options["backend_options"].get("noise_model")
+        noise_options = _noise_options_from_backend_options(primitive_options["backend_options"])
         self._last_metadata = metadata
         return TrackingPrimitive(
             primitive,
             self._job_ids,
-            run_transform=self._build_estimator_run_transform(resolved, noise_model),
+            run_transform=self._build_estimator_run_transform(
+                resolved,
+                noise_options.get("noise_model"),
+                noise_options,
+            ),
             run_guard=resolved.primitive_run_guard,
             job_observer=self._build_job_observer(resolved),
         )
@@ -96,12 +88,16 @@ class AerAdapter(BackendAdapter):
             seed=resolved.backend_options.get("seed_simulator"),
             options=primitive_options,
         )
-        noise_model = primitive_options["backend_options"].get("noise_model")
+        noise_options = _noise_options_from_backend_options(primitive_options["backend_options"])
         self._last_metadata = metadata
         return TrackingPrimitive(
             primitive,
             self._job_ids,
-            run_transform=self._build_sampler_run_transform(resolved, noise_model),
+            run_transform=self._build_sampler_run_transform(
+                resolved,
+                noise_options.get("noise_model"),
+                noise_options,
+            ),
             run_guard=resolved.primitive_run_guard,
             job_observer=self._build_job_observer(resolved),
         )
@@ -110,6 +106,7 @@ class AerAdapter(BackendAdapter):
         self,
         context: BackendExecutionContext,
         noise_model: Any | None,
+        noise_options: Mapping[str, Any] | None = None,
     ) -> Callable[[tuple[Any, ...], dict[str, Any]], tuple[tuple[Any, ...], dict[str, Any]]]:
         def transform(
             args: tuple[Any, ...],
@@ -128,7 +125,12 @@ class AerAdapter(BackendAdapter):
                 if not _is_circuit_like(circuit):
                     transformed.append(pub)
                     continue
-                transpiled = self._transpile_cached(circuit, context, noise_model)
+                transpiled = self._transpile_cached(
+                    circuit,
+                    context,
+                    noise_model,
+                    noise_options=noise_options,
+                )
                 layout = getattr(transpiled, "layout", None)
                 if layout is not None:
                     observables = _apply_layout_to_observables(observables, layout)
@@ -141,6 +143,7 @@ class AerAdapter(BackendAdapter):
         self,
         context: BackendExecutionContext,
         noise_model: Any | None,
+        noise_options: Mapping[str, Any] | None = None,
     ) -> Callable[[tuple[Any, ...], dict[str, Any]], tuple[tuple[Any, ...], dict[str, Any]]]:
         def transform(
             args: tuple[Any, ...],
@@ -150,7 +153,13 @@ class AerAdapter(BackendAdapter):
             if pubs is None:
                 return args, kwargs
             transformed = [
-                self._transpile_sampler_pub_cached(pub, context, noise_model) for pub in pubs
+                self._transpile_sampler_pub_cached(
+                    pub,
+                    context,
+                    noise_model,
+                    noise_options=noise_options,
+                )
+                for pub in pubs
             ]
             return replace(transformed)
 
@@ -174,7 +183,7 @@ class AerAdapter(BackendAdapter):
             else {}
         )
         if not metadata:
-            _, _, noise_summary, method = self._resolve_execution_details(resolved)
+            _, noise_configuration, method = self._resolve_execution_details(resolved)
             metadata = {
                 "backend_target": self.capabilities.backend_target,
                 "requested_target": resolved.backend_target,
@@ -185,16 +194,16 @@ class AerAdapter(BackendAdapter):
                 "selection_policy": resolved.selection_policy,
                 "backend_primitives_used": True,
                 "primitive_family": "qiskit_aer",
-                "shots": resolved.shots,
+                "shots": None,
                 "requested_shots": _requested_shots(resolved),
-                "effective_shots": resolved.shots,
+                "effective_shots": None,
                 "requested_estimator_precision": _requested_estimator_precision(resolved),
                 "effective_estimator_precision": resolved.estimator_precision,
                 "measurement_mode": _measurement_mode(resolved.estimator_precision),
                 "uncertainty_policy": "aer_estimator_default_precision",
                 "simulator_method": method,
                 "optimization_level": resolved.optimization_level,
-                "noise_summary": noise_summary,
+                "noise_summary": noise_configuration.summary,
                 "transpilation_summary": {
                     "optimization_level": resolved.optimization_level,
                     "preview": "Aer adapter transpiles primitive circuits to Aer instructions",
@@ -245,11 +254,11 @@ class AerAdapter(BackendAdapter):
         *,
         include_estimator_precision: bool = False,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        backend_options, noise_model, noise_summary, method = self._resolve_execution_details(
-            context
+        _, noise_configuration, method = self._resolve_execution_details(context)
+        backend_options = aer_simulator_options(
+            context,
+            extra_options=noise_configuration.simulator_options(),
         )
-        if noise_model is not None:
-            backend_options["noise_model"] = noise_model
 
         primitive_options = {
             "backend_options": backend_options,
@@ -267,16 +276,16 @@ class AerAdapter(BackendAdapter):
             "selection_policy": context.selection_policy,
             "backend_primitives_used": True,
             "primitive_family": "qiskit_aer",
-            "shots": context.shots,
+            "shots": None if include_estimator_precision else context.shots,
             "requested_shots": _requested_shots(context),
-            "effective_shots": context.shots,
+            "effective_shots": None if include_estimator_precision else context.shots,
             "requested_estimator_precision": _requested_estimator_precision(context),
             "effective_estimator_precision": context.estimator_precision,
             "measurement_mode": _measurement_mode(context.estimator_precision),
             "uncertainty_policy": "aer_estimator_default_precision",
             "simulator_method": method,
             "optimization_level": context.optimization_level,
-            "noise_summary": noise_summary,
+            "noise_summary": noise_configuration.summary,
             "transpilation_summary": {
                 "optimization_level": context.optimization_level,
                 "preview": "Aer adapter transpiles primitive circuits to Aer instructions",
@@ -291,6 +300,8 @@ class AerAdapter(BackendAdapter):
         circuit: Any,
         context: BackendExecutionContext,
         noise_model: Any | None,
+        *,
+        noise_options: Mapping[str, Any] | None = None,
     ) -> Any:
         """Transpile each live circuit/context pair once per adapter.
 
@@ -306,11 +317,13 @@ class AerAdapter(BackendAdapter):
             return cached[1]
 
         self._transpile_cache_misses += 1
-        transpiled = transpile_aer_circuit(
-            circuit,
-            context=context,
-            noise_model=noise_model,
-        )
+        transpile_kwargs: dict[str, Any] = {
+            "context": context,
+            "noise_model": noise_model,
+        }
+        if noise_options:
+            transpile_kwargs["noise_options"] = noise_options
+        transpiled = transpile_aer_circuit(circuit, **transpile_kwargs)
         try:
 
             def remove_entry(
@@ -340,18 +353,30 @@ class AerAdapter(BackendAdapter):
         pub: Any,
         context: BackendExecutionContext,
         noise_model: Any | None,
+        *,
+        noise_options: Mapping[str, Any] | None = None,
     ) -> Any:
         """Transpile a sampler PUB through the same bounded cache."""
         if isinstance(pub, tuple):
             if not pub or not _is_circuit_like(pub[0]):
                 return pub
             return (
-                self._transpile_cached(pub[0], context, noise_model),
+                self._transpile_cached(
+                    pub[0],
+                    context,
+                    noise_model,
+                    noise_options=noise_options,
+                ),
                 *pub[1:],
             )
         if not _is_circuit_like(pub):
             return pub
-        return self._transpile_cached(pub, context, noise_model)
+        return self._transpile_cached(
+            pub,
+            context,
+            noise_model,
+            noise_options=noise_options,
+        )
 
     def _transpilation_cache_metadata(self) -> dict[str, Any]:
         return {
@@ -365,13 +390,13 @@ class AerAdapter(BackendAdapter):
     def _resolve_execution_details(
         self,
         context: BackendExecutionContext,
-    ) -> tuple[dict[str, Any], Any | None, dict[str, Any], str]:
+    ) -> tuple[dict[str, Any], AerNoiseConfiguration, str]:
         cache_key = _context_cache_key(context)
         if self._cached_context_key == cache_key:
             return (
                 dict(self._cached_backend_options or {}),
-                self._cached_noise_model,
-                dict(self._cached_noise_summary or {"enabled": False}),
+                self._cached_noise_configuration
+                or AerNoiseConfiguration(noise_model=None, summary={"enabled": False}),
                 str(self._cached_method or "automatic"),
             )
 
@@ -391,16 +416,15 @@ class AerAdapter(BackendAdapter):
         backend_options.pop("url", None)
         method = str(backend_options.pop("method", context.simulator_method) or "automatic")
         backend_options["method"] = method
-        noise_model, noise_summary = _build_noise_model(
+        noise_configuration = resolve_aer_noise_profile(
             context.noise_profile,
             context.backend_options,
         )
         self._cached_context_key = cache_key
         self._cached_backend_options = dict(backend_options)
-        self._cached_noise_model = noise_model
-        self._cached_noise_summary = dict(noise_summary)
+        self._cached_noise_configuration = noise_configuration
         self._cached_method = method
-        return backend_options, noise_model, noise_summary, method
+        return backend_options, noise_configuration, method
 
 
 def _extract_pubs(
@@ -459,173 +483,6 @@ def _transpile_sampler_pub(pub: Any, context: BackendExecutionContext, noise_mod
     return transpile_aer_circuit(pub, context=context, noise_model=noise_model)
 
 
-def _build_noise_model(
-    noise_profile: dict[str, Any] | None,
-    backend_options: dict[str, Any],
-) -> tuple[Any | None, dict[str, Any]]:
-    if not noise_profile:
-        return None, {"enabled": False}
-
-    source = str(noise_profile.get("source") or "").lower()
-    if source == "backend_derived":
-        return _backend_derived_noise_model(noise_profile, backend_options)
-    if source == "custom_preset":
-        return _custom_preset_noise_model(noise_profile)
-    raise BackendError(f"Unsupported Aer noise_profile source '{source}'")
-
-
-def _backend_derived_noise_model(
-    noise_profile: dict[str, Any],
-    backend_options: dict[str, Any],
-) -> tuple[Any, dict[str, Any]]:
-    from qiskit_aer.noise import NoiseModel
-
-    backend_name = str(noise_profile.get("reference_backend") or "").strip()
-    if not backend_name:
-        raise BackendError("backend_derived noise_profile requires reference_backend")
-
-    requested_backend_name = backend_name
-    if backend_name in {"aer_simulator", "aer_simulator_statevector"}:
-        backend_name = _DEFAULT_NOISE_REFERENCE_BACKEND
-    backend = _load_fake_backend(backend_name, backend_options)
-    noise_model = NoiseModel.from_backend(backend)
-    summary = {
-        "enabled": True,
-        "source": "backend_derived",
-        "reference_backend": backend_name,
-        "basis_gates": list(noise_model.basis_gates),
-    }
-    if (
-        requested_backend_name == "ibm_phoenix"
-        and backend.__class__.__name__ == "FakeNighthawk"
-    ):
-        summary.update(
-            {
-                "resolved_backend_name": "fake_nighthawk",
-                "fallback_reason": "live_backend_unavailable_packaged_fake_nighthawk",
-            }
-        )
-    if requested_backend_name != backend_name:
-        summary.update(
-            {
-                "requested_reference_backend": requested_backend_name,
-                "fallback_reason": (
-                    "aer_simulator_noise_reference_replaced_with_default_backend_profile"
-                ),
-            }
-        )
-    return noise_model, summary
-
-
-def _custom_preset_noise_model(noise_profile: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
-    from qiskit_aer.noise import NoiseModel, ReadoutError, depolarizing_error
-
-    preset = str(noise_profile.get("preset") or "").lower()
-    strength = max(0.0, min(float(noise_profile.get("strength") or 0.0), 1.0))
-    noise_model = NoiseModel()
-
-    if preset == "depolarizing_cx":
-        noise_model.add_all_qubit_quantum_error(depolarizing_error(strength, 2), ["cx"])
-    elif preset == "readout_bias":
-        error = ReadoutError([[1.0 - strength, strength], [strength, 1.0 - strength]])
-        noise_model.add_all_qubit_readout_error(error)
-    elif preset == "thermal_relaxation":
-        from qiskit_aer.noise import thermal_relaxation_error
-
-        t1 = max(1.0, 100.0 * (1.0 - strength))
-        t2 = max(1.0, 80.0 * (1.0 - strength))
-        gate_time = max(0.01, 0.1 + strength)
-        noise_model.add_all_qubit_quantum_error(
-            thermal_relaxation_error(t1, min(t1, t2), gate_time),
-            ["id", "sx", "x"],
-        )
-    else:
-        raise BackendError(f"Unsupported custom Aer noise preset '{preset}'")
-
-    return noise_model, {
-        "enabled": True,
-        "source": "custom_preset",
-        "preset": preset,
-        "strength": strength,
-        "basis_gates": list(noise_model.basis_gates),
-    }
-
-
-def _load_fake_backend(backend_name: str, backend_options: dict[str, Any]) -> Any:
-    """Resolve the noise-reference backend by what the backend actually is.
-
-    Prefers the packaged fake backend that matches the exact device, then the live
-    IBM account backend for hardware without a packaged fake, then a same-family fake
-    alias as an offline fallback.
-    """
-    import qiskit_ibm_runtime.fake_provider as fake_provider
-
-    exact = _fake_backend_from_provider(fake_provider, backend_name)
-    if exact is not None:
-        return exact
-
-    runtime_error: BackendError | None = None
-    try:
-        return _load_runtime_backend(backend_name, backend_options)
-    except Exception as exc:  # noqa: BLE001 - provider failures must reach offline fallback
-        runtime_error = BackendError(
-            f"Unable to load live backend '{backend_name}' for the Aer noise model: {exc}"
-        )
-
-    for alias_name in _FAKE_BACKEND_ALIASES.get(backend_name, ()):
-        aliased = _fake_backend_from_provider(fake_provider, alias_name)
-        if aliased is not None:
-            logger.info(
-                "Live fetch unavailable for %s; using closest packaged fake backend %s "
-                "for the Aer noise model",
-                backend_name,
-                alias_name,
-            )
-            return aliased
-
-    raise runtime_error
-
-
-def _fake_backend_from_provider(fake_provider: Any, backend_name: str) -> Any | None:
-    normalized = "".join(part.capitalize() for part in backend_name.replace("-", "_").split("_"))
-    providerless_name = (
-        backend_name.removeprefix("ibm_") if backend_name.startswith("ibm_") else backend_name
-    )
-    providerless = "".join(
-        part.capitalize() for part in providerless_name.replace("-", "_").split("_")
-    )
-    candidates = [
-        backend_name,
-        normalized,
-        f"Fake{normalized}",
-        f"Fake{normalized}V2",
-        providerless,
-        f"Fake{providerless}",
-        f"Fake{providerless}V2",
-    ]
-    for candidate in candidates:
-        backend_cls = getattr(fake_provider, candidate, None)
-        if callable(backend_cls):
-            return backend_cls()
-    return None
-
-
-def _load_runtime_backend(backend_name: str, backend_options: dict[str, Any]) -> Any:
-    from qiskit_ibm_runtime import QiskitRuntimeService
-
-    token = backend_options.get("token")
-    channel = backend_options.get("channel") or "ibm_quantum_platform"
-    instance = backend_options.get("instance")
-    if not token or not instance:
-        raise BackendError(
-            f"Unable to resolve backend '{backend_name}' for the Aer noise model; "
-            "save an active IBM profile in Settings before using backend-derived noise."
-        )
-
-    service = QiskitRuntimeService(channel=channel, token=token, instance=instance)
-    return service.backend(backend_name)
-
-
 def _context_cache_key(context: BackendExecutionContext) -> tuple[Any, ...]:
     return (
         context.backend_target,
@@ -639,6 +496,15 @@ def _context_cache_key(context: BackendExecutionContext) -> tuple[Any, ...]:
         _freeze_cache_value(context.backend_options),
         _freeze_cache_value(context.noise_profile),
     )
+
+
+def _noise_options_from_backend_options(options: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract noise-model options for the circuit transpilation boundary."""
+    return {
+        key: options[key]
+        for key in ("noise_model", "basis_gates", "coupling_map")
+        if key in options
+    }
 
 
 def _requested_shots(context: BackendExecutionContext) -> int:

@@ -187,20 +187,6 @@ def test_validate_branch_estimator_feasibility_keeps_algorithm_diagnostic(
         )
 
 
-def test_projected_solvers_keep_legacy_dimension_and_path_aliases() -> None:
-    assert kqd_solver._num_qubits is num_qubits
-    assert kqd_solver._num_spatial_orbitals is num_spatial_orbitals
-    assert kqd_solver._can_use_sector_action is can_use_sector_action
-    assert kqd_solver._should_use_branch_matrix_elements is should_use_branch_matrix_elements
-    assert kqd_solver._backend_label is backend_label
-
-    assert qfd_solver._num_qubits is num_qubits
-    assert qfd_solver._num_spatial_orbitals is num_spatial_orbitals
-    assert qfd_solver._can_use_sector_action is can_use_sector_action
-    assert qfd_solver._should_use_branch_matrix_elements is should_use_branch_matrix_elements
-    assert qfd_solver._backend_label is backend_label
-
-
 def test_validate_branch_estimator_feasibility_raises_run_excluded_with_reason() -> None:
     from worker.exceptions import RunExcludedError
 
