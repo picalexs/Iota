@@ -174,7 +174,7 @@ describe("BenchmarkSavedRunsList", () => {
     expect(screen.queryByText("Completed")).not.toBeInTheDocument();
   });
 
-  it("shows completed once the benchmark has no active rows left", () => {
+  it("shows partial once the benchmark has mixed terminal rows", () => {
     render(
       <BenchmarkSavedRunsList
         savedBenchmarkRuns={[
@@ -190,7 +190,7 @@ describe("BenchmarkSavedRunsList", () => {
       />,
     );
 
-    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.getByText("Partial")).toBeInTheDocument();
   });
 
   it("keeps a paused benchmark labeled as paused", () => {
