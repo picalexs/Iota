@@ -102,11 +102,31 @@ export interface BackendDerivedNoiseProfile {
   temperature_mk?: number | null;
 }
 
-export interface CustomPresetNoiseProfile {
+export interface DepolarizingCxNoiseProfile {
   source: "custom_preset";
-  preset: CustomNoisePreset;
+  preset: "depolarizing_cx";
   strength: number;
 }
+
+export interface ReadoutBiasNoiseProfile {
+  source: "custom_preset";
+  preset: "readout_bias";
+  p01: number;
+  p10: number;
+}
+
+export interface ThermalRelaxationNoiseProfile {
+  source: "custom_preset";
+  preset: "thermal_relaxation";
+  t1_us: number;
+  t2_us: number;
+  gate_time_us: number;
+}
+
+export type CustomPresetNoiseProfile =
+  | DepolarizingCxNoiseProfile
+  | ReadoutBiasNoiseProfile
+  | ThermalRelaxationNoiseProfile;
 
 export type NoiseProfile = BackendDerivedNoiseProfile | CustomPresetNoiseProfile;
 

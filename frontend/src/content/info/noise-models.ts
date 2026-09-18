@@ -23,7 +23,7 @@ export const NOISE_MODEL_INFO: Record<NoiseModelId, InfoEntry> = {
       },
       {
         heading: "Configuration",
-        body: "The depolarizing error probability is set via the noise_level parameter (0.0 = noiseless, 0.01 = 1% per CX gate, typical range 0.001–0.05). Single-qubit gate errors can optionally be included at a fixed fraction of the two-qubit error rate.",
+        body: "Set the strength field to the depolarizing error probability for each CX gate. A value of 0 disables this preset. The worker does not add hidden single-qubit errors.",
       },
       {
         heading: "When to use it in Quantum Studio",
@@ -79,7 +79,7 @@ export const NOISE_MODEL_INFO: Record<NoiseModelId, InfoEntry> = {
       },
       {
         heading: "Gate-time model",
-        body: "Thermal relaxation is applied per gate proportional to the gate's execution time. Longer gates (e.g. CX, ~300 ns) accumulate more decoherence than single-qubit gates (~50 ns). Idle qubits also accumulate decoherence during the time other qubits execute gates, making circuit depth and parallelism critical.",
+        body: "Set T1, T2, and gate_time_us in microseconds. The worker applies the thermal channel to id, sx, and x, and applies the tensor-product channel to CX. It requires T2 ≤ 2·T1.",
       },
       {
         heading: "Effect on VQE",
@@ -134,7 +134,7 @@ export const NOISE_MODEL_INFO: Record<NoiseModelId, InfoEntry> = {
     sections: [
       {
         heading: "Readout confusion matrix",
-        body: "Each qubit has a 2×2 readout assignment matrix: P(0|0) is the probability of correctly reading |0⟩, and P(1|1) the probability of correctly reading |1⟩. Asymmetry (P(1|0) ≠ P(0|1)) arises from the different decay rates of the two states and from threshold voltage imperfections in the discriminator circuit.",
+        body: "Set p01 to P(1|0) and p10 to P(0|1). Aer receives the assignment matrix [[1-p01, p01], [p10, 1-p10]], with rows for the true value and columns for the recorded value.",
       },
       {
         heading: "Typical magnitudes",
@@ -188,11 +188,11 @@ export const NOISE_MODEL_INFO: Record<NoiseModelId, InfoEntry> = {
     sections: [
       {
         heading: "Automatic calibration import",
-        body: "When backend_derived is selected, Quantum Studio resolves a concrete IBM reference backend and constructs a Qiskit noise model from that backend's exposed properties. That can include per-gate error data, qubit-specific T1 and T2 values, and readout assignment behavior, depending on what the backend reports.",
+        body: "When backend_derived is selected, Quantum Studio loads the named IBM backend through the active IBM Runtime profile. Aer builds a noise model from the backend properties. The worker fails the run if it cannot load the requested backend.",
       },
       {
         heading: "Fidelity to real hardware",
-        body: "Because the noise model is constructed from measured device properties rather than a simplified preset, simulations with backend_derived are significantly more predictive of actual hardware results than generic depolarizing or thermal models. However, calibration drift means the model represents the device at calibration time, not at execution time.",
+        body: "The model uses calibration data exposed by the selected backend at load time. Calibration drift can make the local model differ from later hardware execution. The run metadata records the requested and resolved backend names, version, topology, and model fingerprint.",
       },
       {
         heading: "Computational cost",

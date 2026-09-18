@@ -166,14 +166,46 @@ def test_initial_estimate_scales_with_backend_and_active_space() -> None:
 
     assert estimate is not None
     assert estimate["source"] == "config_projection"
+    assert estimate["estimated_total_iterations"] == 8
+    assert estimate["estimated_primary_iterations"] == 8
+    assert "estimated_matrix_element_pairs" not in estimate
+    assert estimate["estimated_total_work_units"] == 8
+    assert estimate["work_unit_policy"] == "algorithm_native_iterations"
+    assert estimate["estimated_total_seconds"] is None
+    assert estimate["estimated_remaining_seconds"] is None
+    assert estimate["confidence"] is None
+
+
+def test_noisy_aer_initial_estimate_counts_projected_branch_work() -> None:
+    run_in = RunCreate.model_validate(
+        {
+            "molecule_id": uuid4(),
+            "algorithm": RunAlgorithm.KQD,
+            "mode": RunMode.ADVANCED,
+            "backend_target": BackendTarget.AER_SIMULATOR,
+            "noise_profile": {
+                "source": "custom_preset",
+                "preset": "depolarizing_cx",
+                "strength": 0.001,
+            },
+            "advanced_config": {
+                "algorithm": RunAlgorithm.KQD,
+                "krylov_dim": 8,
+                "time_step": 0.1,
+                "evolution_method": "trotter",
+                "trotter_steps": 4,
+            },
+        }
+    )
+
+    estimate = build_initial_estimate_for_run_request(run_in=run_in, molecule=_h2_molecule())
+
+    assert estimate is not None
     assert estimate["estimated_total_iterations"] == 44
     assert estimate["estimated_primary_iterations"] == 8
     assert estimate["estimated_matrix_element_pairs"] == 36
     assert estimate["estimated_total_work_units"] == 44
     assert estimate["work_unit_policy"] == "projected_state_pairs_plus_projected_solve"
-    assert estimate["estimated_total_seconds"] is None
-    assert estimate["estimated_remaining_seconds"] is None
-    assert estimate["confidence"] is None
 
 
 def test_build_initial_estimate_for_persisted_run_reconstructs_easy_contract(
@@ -213,7 +245,8 @@ def test_build_initial_estimate_for_persisted_run_reconstructs_easy_contract(
 
     assert estimate is not None
     assert estimate["algorithm"] == "kqd"
-    assert estimate["estimated_total_iterations"] == 44
+    assert estimate["estimated_total_iterations"] == 8
+    assert "estimated_matrix_element_pairs" not in estimate
     assert estimate["estimated_total_seconds"] is None
 
 

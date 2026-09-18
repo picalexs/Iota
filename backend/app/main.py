@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
@@ -139,6 +140,11 @@ def create_app() -> FastAPI:
         allow_credentials=settings.cors_allow_credentials,
         allow_methods=settings.cors_allow_methods,
         allow_headers=settings.cors_allow_headers,
+    )
+
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=settings.trusted_hosts,
     )
 
     app.add_middleware(RequestLoggingMiddleware)

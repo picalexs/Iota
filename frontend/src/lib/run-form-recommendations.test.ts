@@ -5,6 +5,7 @@ import {
   buildRecommendedAdvancedPatch,
   getChemicalAccuracyTargetOptions,
   goalForChemicalAccuracyTarget,
+  kqdUsesKnownBranchEstimatorPath,
 } from "./run-form-recommendations";
 
 describe("goalForChemicalAccuracyTarget", () => {
@@ -118,7 +119,7 @@ describe("buildRecommendedAdvancedPatch", () => {
       reference_method: "hf",
       excitation_level: "singles",
       max_subspace_dim: 4,
-      vqe_reference_ansatz_name: "EfficientSU2",
+      vqe_reference_ansatz_name: "NumberPreserving",
     });
   });
 
@@ -149,7 +150,11 @@ describe("buildRecommendedAdvancedPatch", () => {
       reps: 2,
       initial_point_candidates: 4,
     });
-    expect(kqd.value).toMatchObject({ krylov_dim: 4, time_step: 0.35 });
+    expect(kqd.value).toMatchObject({
+      krylov_dim: 4,
+      time_step: 0.35,
+      evolution_method: "exact",
+    });
     expect(qfdFastest.value).toMatchObject({
       num_time_points: 4,
       max_time: 0.5,
@@ -164,10 +169,29 @@ describe("buildRecommendedAdvancedPatch", () => {
       reference_method: "hf",
       excitation_level: "singles_doubles",
       max_subspace_dim: 8,
-      vqe_reference_ansatz_name: "EfficientSU2",
+      vqe_reference_ansatz_name: "NumberPreserving",
       vqe_reference_optimizer_name: "COBYLA",
       vqe_reference_max_iterations: 256,
       vqe_reference_reps: 1,
     });
+  });
+
+  it("uses Trotter for KQD recommendations that require an estimator circuit", () => {
+    const metadata: Pick<RunConfigMetadataResponse, "recommendations"> = {
+      recommendations: {
+        kqd: { fastest: { evolution_method: "exact" } },
+      },
+    };
+
+    const patch = buildRecommendedAdvancedPatch("kqd", "fastest", null, metadata, true);
+
+    expect(patch.value).toMatchObject({
+      evolution_method: "trotter",
+      trotter_steps: 1,
+    });
+    expect(kqdUsesKnownBranchEstimatorPath("ibm_runtime", false)).toBe(true);
+    expect(kqdUsesKnownBranchEstimatorPath("aer_simulator", true)).toBe(true);
+    expect(kqdUsesKnownBranchEstimatorPath("aer_simulator", false)).toBe(false);
+    expect(kqdUsesKnownBranchEstimatorPath("statevector", true)).toBe(false);
   });
 });

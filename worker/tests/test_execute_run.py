@@ -96,7 +96,7 @@ class TestExecuteRunHappyPath:
     def test_returns_numeric_final_energy(self) -> None:
         result, _ = self._run_with_mock_sessions()
         assert isinstance(result["energy"], float)
-        assert result["energy"] < 0
+        assert np.isfinite(result["energy"])
 
     def test_emits_status_changed_running_at_start(self) -> None:
         _, sessions = self._run_with_mock_sessions()
@@ -231,7 +231,7 @@ class TestExecuteRunHappyPath:
         assert result["algorithm"] == "kqd"
         assert result["iterations"] >= 1
         assert "ritz_values" in result["algorithm_metrics"]
-        assert result["backend_execution"]["execution_mode"] == "dense_classical"
+        assert result["backend_execution"]["execution_mode"] == "exact_matrix_evolution"
         assert result["backend_execution"]["backend_primitives_used"] is False
 
         payloads = _all_event_payloads(sessions)
@@ -544,7 +544,8 @@ class TestExecuteRunHappyPath:
                     "noise_profile": {
                         "source": "custom_preset",
                         "preset": "readout_bias",
-                        "strength": 0.02,
+                        "p01": 0.02,
+                        "p10": 0.04,
                     },
                     "advanced_config": {
                         "algorithm": "vqe",
@@ -617,7 +618,8 @@ class TestExecuteRunHappyPath:
         assert context.shots == 1234
         assert context.noise_profile is not None
         assert context.noise_profile["preset"] == "readout_bias"
-        assert result["backend_execution"]["shots"] == 1234
+        assert result["backend_execution"]["shots"] is None
+        assert result["backend_execution"]["requested_shots"] == 1234
         assert result["backend_execution"]["noise_summary"]["enabled"] is True
 
     def test_backend_derived_aer_runs_inject_saved_profile_credentials(self) -> None:

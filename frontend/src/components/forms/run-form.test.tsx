@@ -142,7 +142,9 @@ describe("RunForm shell", () => {
 
     await user.click(noiseToggle);
     expect(
-      screen.getByText(/the run stays local on aer while the noise model mirrors/i),
+      screen.getByText(
+        /the run stays local on aer while the noise model uses a live calibration snapshot/i,
+      ),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /manual/i }));

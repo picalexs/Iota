@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 from qiskit import QuantumCircuit
 
-from worker.chemistry import vqe_solver
 from worker.chemistry.algorithms.vqe import state_data as vqe_state_data
-from worker.chemistry.vqe_solver import _compute_quantum_state_data
+from worker.chemistry.algorithms.vqe import workflow as vqe_solver
+from worker.chemistry.algorithms.vqe.workflow import _compute_quantum_state_data
 
 
 def test_vqe_state_data_includes_bloch_vectors_for_larger_circuits() -> None:

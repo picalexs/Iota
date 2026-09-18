@@ -91,16 +91,19 @@ class Settings(BaseSettings):
 
     # CORS (flexible: accepts comma-separated string or JSON list)
     cors_origins: str | list[str] = _default_cors_origins()
-    cors_allow_credentials: bool = True
-    cors_allow_methods: str | list[str] = "*"
-    cors_allow_headers: str | list[str] = "*"
+    cors_allow_credentials: bool = False
+    cors_allow_methods: str | list[str] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    cors_allow_headers: str | list[str] = "Content-Type,Authorization,X-Local-Operator-Token"
+
+    # Host header allowlist. Production deployments must set their public host.
+    trusted_hosts: str | list[str] = "localhost,127.0.0.1"
 
     local_credentials_keys: str | None = None
     local_credentials_key_file: str | None = None
 
     # Feature flags
     skip_pubchem_sync: bool = False
-    allow_insecure_defaults: bool = True
+    allow_insecure_defaults: bool = False
     docs_enabled: bool | None = None
     quantum_job_timeout_seconds: int = 3600
     backend_catalog_cache_seconds: int = 600
@@ -154,6 +157,14 @@ class Settings(BaseSettings):
             if v == "*":
                 return ["*"]
             return [header.strip() for header in v.split(",") if header.strip()]
+        return v
+
+    @field_validator("trusted_hosts", mode="before")
+    @classmethod
+    def parse_trusted_hosts(cls, v: str | list[str]) -> list[str]:
+        """Parse trusted Host header values from a comma-separated string."""
+        if isinstance(v, str):
+            return [host.strip() for host in v.split(",") if host.strip()]
         return v
 
     @model_validator(mode="after")

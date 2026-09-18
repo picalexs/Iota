@@ -20,6 +20,7 @@ from worker.chemistry.projected_subspace import (
 )
 from worker.chemistry.time_evolution import (
     exact_time_evolution_state_from_spectrum,
+    is_zero_time,
     prepare_exact_time_evolution,
 )
 
@@ -54,7 +55,7 @@ def build_krylov_extension(
 
     for step in range(target_rank):
         current_time = float(step * time_step)
-        if np.isclose(current_time, 0.0):
+        if is_zero_time(current_time):
             candidate = np.asarray(reference_state, dtype=complex)
         else:
             candidate = evolve_state_fn(
@@ -101,7 +102,7 @@ def build_krylov_extension(
     if raw_eigenvectors.size:
         ground_state = orthonormal_basis @ raw_eigenvectors[:, order[0]]
         ground_norm = float(np.linalg.norm(ground_state))
-        if not np.isclose(ground_norm, 0.0):
+        if np.isfinite(ground_norm) and ground_norm != 0.0:
             ground_state = ground_state / ground_norm
     residual_diagnostics = projected_ritz_diagnostics_fn(
         operator,
@@ -132,7 +133,7 @@ def build_sector_krylov_extension(
         current_time = float(step * time_step)
         candidate = (
             reference_state.copy()
-            if np.isclose(current_time, 0.0)
+            if is_zero_time(current_time)
             else action.time_evolve(reference_state, time_point=current_time)
         )
         basis_vector, candidate_norm = orthonormalize_fn(candidate, basis)
@@ -193,7 +194,8 @@ def emit_skqd_krylov_progress(
         "energy": energy,
         "total_iterations": total_iterations,
         "candidate_norm": candidate_norm,
-        "seeded_from_sqd_occupancies": seeded_from_sqd,
+        "seeded_from_sqd": seeded_from_sqd,
+        "seeded_from_sqd_occupancies": False,
     }
     if execution_mode is not None:
         payload["execution_mode"] = execution_mode

@@ -10,7 +10,7 @@ from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.base import BackendExecutionContext
 from worker.chemistry.algorithms.vqe.config import select_vqe_execution_policy
-from worker.chemistry.vqe_solver import run_vqe
+from worker.chemistry.algorithms.vqe.workflow import run_vqe
 
 
 class _FakeEstimatorJob:

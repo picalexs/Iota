@@ -16,7 +16,7 @@ def normalize_state_vector(
     if expected_size is not None and vector.size != expected_size:
         raise ValueError("state vector dimension does not match the expected size")
     norm = float(np.linalg.norm(vector))
-    if np.isclose(norm, 0.0):
+    if not np.isfinite(norm) or norm == 0.0:
         raise ValueError(error_message)
     return vector / norm
 

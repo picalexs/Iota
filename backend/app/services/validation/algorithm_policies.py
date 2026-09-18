@@ -242,16 +242,16 @@ def _append_kqd_validation_messages(
     if (
         payload.advanced_config.evolution_method == "exact"
         and payload.advanced_config.trotter_steps != 1
-        and payload.backend_target not in {BackendTarget.AER_SIMULATOR, BackendTarget.IBM_RUNTIME}
     ):
         warnings.append("KQD trotter_steps is ignored when evolution_method='exact'.")
     if (
         payload.advanced_config.evolution_method == "exact"
         and payload.backend_target == BackendTarget.AER_SIMULATOR
+        and payload.noise_profile is None
     ):
         warnings.append(
-            "KQD Aer execution synthesizes Pauli-evolution circuits with trotter_steps "
-            "instead of using the dense exact-evolution shortcut."
+            "KQD exact evolution uses local exact matrix evolution; the Aer simulator "
+            "does not execute the time-evolution path."
         )
     if (
         payload.advanced_config.evolution_method == "exact"

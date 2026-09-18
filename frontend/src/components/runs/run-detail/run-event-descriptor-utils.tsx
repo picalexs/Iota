@@ -442,17 +442,25 @@ function formatSqdSamplingPresentation(
   context: IterationUpdateContext,
 ): IterationUpdatePresentation | null {
   if (context.iterationAlgorithm === "sqd" && context.step === "sampling") {
+    const sampleSetReused = context.payload.sample_set_reused === true;
     return {
       icon: <Waves className="size-3.5 text-info" />,
-      label: "Sampling",
+      label: sampleSetReused ? "Measured set reused" : "Sampling",
       summary: joinSegments(
         sqdIterationPrefix(context.payload, context.algorithm),
-        formatPrimitiveSegment(
-          context.payload.total_samples,
-          "Sampling ",
-          " samples",
-          "Sampling bitstrings",
-        ),
+        sampleSetReused
+          ? formatPrimitiveSegment(
+              context.payload.total_samples,
+              "Reusing ",
+              " measured samples",
+              "Reusing the measured sample set",
+            )
+          : formatPrimitiveSegment(
+              context.payload.total_samples,
+              "Sampling ",
+              " samples",
+              "Sampling bitstrings",
+            ),
         context.eta,
       ),
     };

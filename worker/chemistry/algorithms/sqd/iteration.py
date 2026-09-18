@@ -43,6 +43,7 @@ def update_best_observed_state(
     iteration: int,
     energy_value: float,
     last_spin_sq: float,
+    sci_state: Any | None,
     occupancy_vector: np.ndarray,
 ) -> None:
     """Capture the lowest-energy SQD iteration and its associated diagnostics."""
@@ -52,6 +53,7 @@ def update_best_observed_state(
     state.best_observed_energy = energy_value
     state.best_observed_iteration = iteration
     state.best_observed_spin_sq = last_spin_sq
+    state.best_sci_state = sci_state
     state.best_observed_occupancies = occupancy_vector.copy()
     state.best_sampled_distribution = list(state.last_sampled_distribution)
     state.best_sampling_stages = {
@@ -85,6 +87,7 @@ def execute_sqd_iteration(
 ) -> SQDIterationOutcome:
     """Run one SQD sampling and recovery iteration and update run state."""
     iter_start = time.monotonic()
+    reuse_sample_set = state.measured_bitstring_matrix is not None
     sampling = sampling_iteration(
         iteration=iteration,
         backend=backend,
@@ -94,10 +97,17 @@ def execute_sqd_iteration(
         avg_occupancies=state.avg_occupancies,
         progress_callback=progress_callback,
         sampling_circuit_factory=sampling_circuit_factory,
+        work_ledger=state.work_ledger,
+        measured_bitstring_matrix=state.measured_bitstring_matrix,
+        measured_circuit=state.measured_circuit,
     )
+    if not reuse_sample_set:
+        state.measured_bitstring_matrix = sampling.raw_bitstring_matrix
+        state.measured_circuit = sampling.sampled_circuit
+        if sampling.sampled_circuit is not None:
+            state.sampled_circuits.append((iteration, sampling.sampled_circuit))
+    state.work_ledger["recovery_iterations"] += 1
     state.last_sampled_circuit = sampling.sampled_circuit
-    if sampling.sampled_circuit is not None:
-        state.sampled_circuits.append((iteration, sampling.sampled_circuit))
     state.sampled_sizes.append(int(sampling.raw_bitstring_matrix.shape[0]))
     state.last_sampled_distribution = sampling.last_sampled_distribution
     state.last_raw_distribution = sampling.raw_distribution
@@ -116,6 +126,7 @@ def execute_sqd_iteration(
         carryover_ci_strings=state.carryover_ci_strings,
         progress_callback=progress_callback,
     )
+    state.work_ledger["selected_ci_batch_solves"] += options.num_batches
     state.avg_occupancies = batch_outcome.selected_occupancies
     state.last_spin_sq = batch_outcome.last_spin_sq
     state.last_selected_ci_summary = batch_outcome.last_selected_ci_summary
@@ -151,6 +162,7 @@ def execute_sqd_iteration(
         iteration=iteration,
         energy_value=batch_outcome.energy_value,
         last_spin_sq=state.last_spin_sq,
+        sci_state=batch_outcome.best_sci_state,
         occupancy_vector=occupancy_vector,
     )
     state.selected_fractions.append(sampling.postselection_weight)
@@ -159,7 +171,9 @@ def execute_sqd_iteration(
         trace_builder(
             iteration=iteration,
             num_batches=options.num_batches,
-            symmetrize_spin=options.symmetrize_spin,
+            requested_samples_per_batch=options.samples_per_batch,
+            effective_samples_per_batch=batch_outcome.effective_samples_per_batch,
+            symmetrize_spin=not options.open_shell or options.symmetrize_spin,
             sampling=sampling,
             state=state,
             energy_value=batch_outcome.energy_value,

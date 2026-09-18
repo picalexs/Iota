@@ -1,342 +1,647 @@
-"""Paper-faithful SKQD sample-union execution."""
+"""SKQD solver implementation for worker execution."""
 
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any
 
 import numpy as np
 
-from worker.chemistry.algorithms.skqd.sampling import (
-    SKQDKrylovSample,
-    SKQDSampleUnion,
-    merge_krylov_samples,
-    sample_exact_krylov_states,
-    sample_sector_krylov_states,
+from worker.chemistry.algorithms.skqd.config import SKQDConfig, resolve_skqd_config
+from worker.chemistry.algorithms.skqd.convergence import (
+    evaluate_sample_union_convergence,
 )
-from worker.chemistry.algorithms.skqd.selected_ci import (
-    SKQDSelectedCIOutcome,
-    solve_sample_union_selected_ci,
+from worker.chemistry.algorithms.skqd.diagnostics import build_skqd_prefix_summaries
+from worker.chemistry.algorithms.skqd.distributions import (
+    statevector_bitstring_distribution,
+    time_evolved_bitstring_distribution,
 )
+from worker.chemistry.algorithms.skqd.execution import (
+    SKQDExecutionPlan as _SKQDExecutionPlan,
+)
+from worker.chemistry.algorithms.skqd.execution import (
+    SKQDExtensionOutcome as _SKQDExtensionOutcome,
+)
+from worker.chemistry.algorithms.skqd.execution import execute_skqd_extension
+from worker.chemistry.algorithms.skqd.extension import (
+    build_krylov_extension as _build_krylov_extension_kernel,
+)
+from worker.chemistry.algorithms.skqd.extension import (
+    build_sector_krylov_extension as _build_sector_krylov_extension_kernel,
+)
+from worker.chemistry.algorithms.skqd.extension import emit_skqd_krylov_progress
+from worker.chemistry.algorithms.skqd.results import (
+    SKQDCompletionPayload as _SKQDCompletionPayload,
+)
+from worker.chemistry.algorithms.skqd.results import (
+    add_skqd_solution_diagnostics as _add_skqd_solution_diagnostics,
+)
+from worker.chemistry.algorithms.skqd.results import (
+    add_skqd_state_diagnostics as _add_skqd_state_diagnostics,
+)
+from worker.chemistry.algorithms.skqd.results import (
+    build_not_run_sqd_core_summary as _build_not_run_sqd_core_summary,
+)
+from worker.chemistry.algorithms.skqd.results import (
+    build_skqd_circuit_artifacts as _build_skqd_circuit_artifacts,
+)
+from worker.chemistry.algorithms.skqd.results import (
+    build_skqd_completion_payload as _build_skqd_completion_payload,
+)
+from worker.chemistry.algorithms.skqd.results import (
+    build_skqd_extension_diagnostics as _build_skqd_extension_diagnostics,
+)
+from worker.chemistry.algorithms.skqd.results import (
+    build_sqd_core_summary as _build_sqd_core_summary,
+)
+from worker.chemistry.algorithms.skqd.results import (
+    select_skqd_primary_solution as _select_skqd_primary_solution,
+)
+from worker.chemistry.algorithms.skqd.sample_union import (
+    execute_sample_union_workflow,
+    execute_sampler_sample_union_workflow,
+)
+from worker.chemistry.algorithms.skqd.seed import (
+    sector_seed_state_from_sqd_result_with_source,
+    seed_state_from_sqd_result,
+    seed_state_from_sqd_result_with_source,
+)
+from worker.chemistry.algorithms.skqd.selected_ci import solve_sample_union_selected_ci
 from worker.chemistry.algorithms.skqd.spectral_width import (
     estimate_action_spectral_width,
     estimate_dense_spectral_width,
-    estimate_pauli_spectral_width,
     paper_time_step,
 )
 from worker.chemistry.algorithms.sqd.config import resolve_sqd_options
-from worker.chemistry.algorithms.sqd.sampling_execution import sample_bitstring_matrix
 from worker.chemistry.algorithms.sqd.state import import_sqd_dependencies
-from worker.chemistry.circuit_artifacts import prepare_hf_reference_bits
-from worker.chemistry.reference_descriptor import build_reference_descriptor
-from worker.chemistry.reference_states import build_hf_reference_state_with_source
-from worker.chemistry.sector_basis import hartree_fock_sector_state
-from worker.exceptions import RunExcludedError
+from worker.chemistry.algorithms.sqd.workflow import run_sqd
+from worker.chemistry.eigensolver import (
+    build_hf_reference_state,
+    build_reference_state,
+    projected_ritz_diagnostics,
+    resolve_operator_matrix,
+)
+from worker.chemistry.hamiltonian_action import (
+    HamiltonianAction,
+    build_hamiltonian_action,
+    can_build_hamiltonian_action,
+)
+from worker.chemistry.progress import ProgressCallback
+from worker.chemistry.projected_energy import (
+    matrix_free_projected_ground_energy,
+    orthonormal_projected_ground_energy,
+)
+from worker.chemistry.projected_subspace import (
+    orthonormalize_candidate,
+    solve_action_subspace,
+)
+from worker.chemistry.sector_basis import (
+    hartree_fock_sector_state,
+)
+from worker.chemistry.solver_utils import resolve_algorithm_config
+from worker.chemistry.state_vectors import normalize_state_vector
+from worker.chemistry.time_evolution import (
+    exact_time_evolution_state_from_spectrum,
+    prepare_exact_time_evolution,
+)
+from worker.chemistry.types import SKQDResult
+
+logger = logging.getLogger(__name__)
+
+# Re-export private names for existing solver tests and importers.
+_seed_state_from_sqd_result = seed_state_from_sqd_result
+_seed_state_from_sqd_result_with_source = seed_state_from_sqd_result_with_source
+_sector_seed_state_from_sqd_result_with_source = sector_seed_state_from_sqd_result_with_source
+_statevector_bitstring_distribution = statevector_bitstring_distribution
+_time_evolved_bitstring_distribution = time_evolved_bitstring_distribution
+_dense_skqd_partial_energy = orthonormal_projected_ground_energy
+_sector_skqd_partial_energy = matrix_free_projected_ground_energy
+_emit_skqd_krylov_progress = emit_skqd_krylov_progress
 
 
-def resolve_sampling_time_step(
-    skqd_config: Any,
+def _build_krylov_extension(
+    operator: np.ndarray,
     *,
-    spectral_width: float | None,
-    spectral_source: str,
-) -> tuple[float, dict[str, Any]]:
-    """Resolve the Krylov time step, applying paper Delta t = pi / Delta E_{N-1}.
-
-    An explicit user time step is honored as-is. Otherwise the step is derived
-    from the estimated spectral width so nonzero Krylov phases stay within the
-    principal ``(-pi, pi)`` window required by the SKQD convergence analysis.
-    """
-    explicit_time_step = getattr(skqd_config, "sampling_time_step", None)
-    policy = getattr(skqd_config, "time_step_policy", "explicit_user_time_step")
-    if explicit_time_step is not None:
-        return float(explicit_time_step), {
-            "time_step_policy": "explicit_user_time_step",
-            "time_step": float(explicit_time_step),
-            "spectral_width": (float(spectral_width) if spectral_width is not None else None),
-            "spectral_width_source": spectral_source,
-        }
-    if spectral_width is None:
-        raise ValueError("SKQD auto time step requires an estimated spectral width")
-    resolved_time_step = paper_time_step(spectral_width)
-    return resolved_time_step, {
-        "time_step_policy": policy,
-        "time_step": resolved_time_step,
-        "spectral_width": float(spectral_width),
-        "spectral_width_source": spectral_source,
-    }
-
-
-def execute_sample_union_workflow(
-    *,
-    hamiltonian: object,
-    plan: Any,
-    skqd_config: Any,
-) -> tuple[SKQDSampleUnion, SKQDSelectedCIOutcome, dict[str, Any]]:
-    """Sample all Krylov states and solve their selected determinant union."""
-    options = resolve_sqd_options(skqd_config.sqd_config, hamiltonian)
-    rng = np.random.default_rng(skqd_config.seed)
-    if plan.sector_action is not None:
-        spectral_width, spectral_source = estimate_action_spectral_width(plan.sector_action)
-        time_step, time_step_metadata = resolve_sampling_time_step(
-            skqd_config,
-            spectral_width=spectral_width,
-            spectral_source=spectral_source,
-        )
-        reference = hartree_fock_sector_state(
-            plan.sector_action.norb,
-            plan.sector_action.nelec,
-        )
-        reference_source = "hartree_fock_sector"
-        sample_union = sample_sector_krylov_states(
-            plan.sector_action,
-            reference,
-            num_states=skqd_config.krylov_extension_dim,
-            time_step=time_step,
-            samples_per_state=skqd_config.samples_per_state,
-            rng=rng,
-        )
-    else:
-        if plan.operator is None:
-            raise ValueError("SKQD sample-union workflow requires an execution operator")
-        spectral_width, spectral_source = estimate_dense_spectral_width(plan.operator)
-        time_step, time_step_metadata = resolve_sampling_time_step(
-            skqd_config,
-            spectral_width=spectral_width,
-            spectral_source=spectral_source,
-        )
-        reference, reference_source = build_hf_reference_state_with_source(
-            hamiltonian,
-            fallback_dim=plan.operator.shape[0],
-        )
-        sample_union = sample_exact_krylov_states(
-            plan.operator,
-            reference,
-            num_states=skqd_config.krylov_extension_dim,
-            time_step=time_step,
-            samples_per_state=skqd_config.samples_per_state,
-            num_qubits=int(round(np.log2(plan.operator.shape[0]))),
-            rng=rng,
-        )
-
-    deps = import_sqd_dependencies()
-    outcome = solve_sample_union_selected_ci(
-        sample_union,
-        options=options,
-        rng=rng,
-        recover_configurations=None,
-        postselect_by_hamming_right_and_left=deps.postselect_by_hamming_right_and_left,
-        solve_fermion=deps.solve_fermion,
-    )
-    reference_descriptor = build_reference_descriptor(
-        state=reference,
-        reference_source=reference_source,
-        preparation_path=("sector_basis" if plan.sector_action is not None else "computational_basis"),
-        execution_mode="exact_statevector_oracle",
-        target_sector=(
-            {
-                "alpha": plan.sector_action.nelec[0],
-                "beta": plan.sector_action.nelec[1],
-            }
-            if plan.sector_action is not None
-            else {
-                "alpha": getattr(hamiltonian, "num_electrons_alpha", None),
-                "beta": getattr(hamiltonian, "num_electrons_beta", None),
-            }
+    seed_state: np.ndarray | None,
+    seeded_from_sqd: bool,
+    target_rank: int,
+    time_step: float,
+    residual_tolerance: float,
+    progress_callback: ProgressCallback | None,
+) -> tuple[np.ndarray, int, dict[str, float], np.ndarray | None]:
+    """Adapt dense SKQD inputs to the extension module."""
+    return _build_krylov_extension_kernel(
+        operator,
+        reference_state=_resolve_dense_krylov_seed(
+            operator=operator,
+            seed_state=seed_state,
         ),
-        ansatz_name="hartree_fock",
+        seeded_from_sqd=seeded_from_sqd,
+        target_rank=target_rank,
+        time_step=time_step,
+        residual_tolerance=residual_tolerance,
+        progress_callback=progress_callback,
+        orthonormalize_fn=orthonormalize_candidate,
+        partial_energy_fn=_dense_skqd_partial_energy,
+        prepare_spectrum_fn=prepare_exact_time_evolution,
+        evolve_state_fn=exact_time_evolution_state_from_spectrum,
+        emit_progress_fn=_emit_skqd_krylov_progress,
+        projected_ritz_diagnostics_fn=projected_ritz_diagnostics,
     )
-    metadata = {
-        "algorithm_variant": "skqd_sample_union",
-        "sampling_mode": "sample_union_exact",
-        "sampling_source": "exact_statevector_oracle",
-        "reference_policy": "hartree_fock",
-        "reference_source": "exact_statevector_oracle",
-        "reference_state_source": reference_source,
-        "reference_descriptor": reference_descriptor,
-        "execution_mode": plan.execution_mode,
-        "krylov_state_count": skqd_config.krylov_extension_dim,
-        "samples_per_state": skqd_config.samples_per_state,
-        "seed": skqd_config.seed,
-        "time_step": time_step,
-        "krylov_time_step_policy": time_step_metadata,
-    }
-    return sample_union, outcome, metadata
 
 
-_MAX_SAMPLER_QUBITS_LOCAL_AER = 14
-
-
-def _guard_sampler_circuit_tractability(
+def _build_sector_krylov_extension(
+    action: HamiltonianAction,
     *,
-    num_qubits: int,
-    pauli_hamiltonian: Any,
-    backend_target: Any,
-) -> None:
-    """Reject SKQD sampler runs whose local Aer simulation would exhaust the worker.
-
-    Only the local Aer target is blocked: ``ibm_runtime`` executes the circuits
-    remotely, so it does not risk an out-of-memory worker crash even though the
-    resulting depth remains impractical on near-term hardware.
-    """
-    if str(backend_target) != "aer_simulator":
-        return
-    if num_qubits <= _MAX_SAMPLER_QUBITS_LOCAL_AER:
-        return
-    pauli_terms = None
-    try:
-        pauli_terms = len(pauli_hamiltonian)
-    except TypeError:
-        pauli_terms = None
-    term_note = f" ({pauli_terms} Pauli terms)" if pauli_terms is not None else ""
-    raise RunExcludedError(
-        f"SKQD sampler execution needs to simulate {num_qubits}-qubit Trotter circuits"
-        f"{term_note} on the local Aer simulator, which exceeds the "
-        f"{_MAX_SAMPLER_QUBITS_LOCAL_AER}-qubit limit (statevector memory grows as 2^n and "
-        "dense molecular Trotter circuits reach tens of thousands of gates). "
-        "Reduce the active space (fewer orbitals) so the circuit fits, use the "
-        "statevector backend for an exact analysis oracle, or choose SQD which "
-        "samples shallow reference circuits instead of deep Trotter evolutions.",
-        reason="skqd_sampler_circuit_exceeds_local_aer_limit",
+    seed_state: np.ndarray,
+    seeded_from_sqd: bool,
+    target_rank: int,
+    time_step: float,
+    residual_tolerance: float,
+    progress_callback: ProgressCallback | None,
+) -> tuple[np.ndarray, int, dict[str, float], np.ndarray | None]:
+    """Adapt sector SKQD inputs to the extension module."""
+    return _build_sector_krylov_extension_kernel(
+        action,
+        reference_state=_resolve_sector_krylov_seed(action, seed_state),
+        seeded_from_sqd=seeded_from_sqd,
+        target_rank=target_rank,
+        time_step=time_step,
+        residual_tolerance=residual_tolerance,
+        progress_callback=progress_callback,
+        orthonormalize_fn=orthonormalize_candidate,
+        partial_energy_fn=_sector_skqd_partial_energy,
+        solve_action_subspace_fn=solve_action_subspace,
+        emit_progress_fn=_emit_skqd_krylov_progress,
     )
 
 
-def execute_sampler_sample_union_workflow(
+def _resolve_dense_krylov_seed(
+    *,
+    operator: np.ndarray,
+    seed_state: np.ndarray | None,
+) -> np.ndarray:
+    """Resolve and normalize the dense SKQD Krylov seed state."""
+    if seed_state is None:
+        return build_reference_state(operator.shape[0])
+    return normalize_state_vector(
+        seed_state,
+        error_message="SKQD seed state must be non-zero",
+        expected_size=operator.shape[0],
+    )
+
+
+def _resolve_sector_krylov_seed(
+    action: HamiltonianAction,
+    seed_state: np.ndarray,
+) -> np.ndarray:
+    """Resolve and normalize the sector SKQD Krylov seed state."""
+    return normalize_state_vector(
+        seed_state,
+        error_message="SKQD sector seed state must be non-zero",
+        expected_size=action.dimension,
+    )
+
+
+def _prepare_skqd_execution(hamiltonian: object) -> _SKQDExecutionPlan:
+    """Resolve the SKQD execution mode and underlying operator resources."""
+    sector_action = (
+        build_hamiltonian_action(hamiltonian)
+        if can_build_hamiltonian_action(hamiltonian)
+        and not hasattr(hamiltonian, "dense_operator_matrix")
+        else None
+    )
+    if sector_action is None:
+        operator = resolve_operator_matrix(hamiltonian)
+        return _SKQDExecutionPlan(
+            sector_action=None,
+            operator=operator,
+            operator_dimension=int(operator.shape[0]),
+            execution_mode="dense_matrix",
+        )
+    return _SKQDExecutionPlan(
+        sector_action=sector_action,
+        operator=None,
+        operator_dimension=int(sector_action.dimension),
+        execution_mode="sector_matrix_free",
+    )
+
+
+def _resolve_legacy_sampling_time_step(
+    *,
+    skqd_config: SKQDConfig,
+    plan: _SKQDExecutionPlan,
+    hamiltonian: object,
+) -> float:
+    """Resolve the legacy Krylov extension time step, applying paper auto-scaling.
+
+    Honors an explicit user time step; otherwise derives Delta t = pi / Delta E_{N-1}
+    from the operator or sector-action spectral width.
+    """
+    explicit = getattr(skqd_config, "sampling_time_step", None)
+    if explicit is not None:
+        return float(explicit)
+    if plan.sector_action is not None:
+        spectral_width, _source = estimate_action_spectral_width(
+            plan.sector_action,
+            pauli_hamiltonian=getattr(hamiltonian, "pauli_hamiltonian", None),
+        )
+    elif plan.operator is not None:
+        spectral_width, _source = estimate_dense_spectral_width(plan.operator)
+    else:
+        raise ValueError("SKQD legacy extension requires an operator or sector action")
+    return paper_time_step(spectral_width)
+
+
+def _run_skqd_extension(
+    *,
+    sqd_result: SKQDResult | Any,
+    plan: _SKQDExecutionPlan,
+    hamiltonian: object,
+    krylov_extension_dim: int,
+    sampling_time_step: float,
+    residual_tolerance: float,
+    progress_callback: ProgressCallback | None,
+) -> _SKQDExtensionOutcome:
+    """Resolve the Krylov seed and run the dense or sector extension path."""
+    return execute_skqd_extension(
+        sqd_result=sqd_result,
+        plan=plan,
+        hamiltonian=hamiltonian,
+        krylov_extension_dim=krylov_extension_dim,
+        sampling_time_step=sampling_time_step,
+        residual_tolerance=residual_tolerance,
+        progress_callback=progress_callback,
+        resolve_sector_seed_fn=_sector_seed_state_from_sqd_result_with_source,
+        resolve_dense_seed_fn=_seed_state_from_sqd_result_with_source,
+        build_sector_krylov_fn=_build_sector_krylov_extension,
+        build_dense_krylov_fn=_build_krylov_extension,
+        build_sector_hf_reference_fn=hartree_fock_sector_state,
+        build_dense_hf_reference_fn=build_hf_reference_state,
+    )
+
+
+def _failed_skqd_extension_outcome(plan: _SKQDExecutionPlan) -> _SKQDExtensionOutcome:
+    """Create an explicit empty extension outcome after a recoverable extension failure."""
+    seed = np.zeros(plan.operator_dimension, dtype=complex)
+    return _SKQDExtensionOutcome(
+        sqd_seed=None,
+        seed_source="extension_failed",
+        krylov_seed=seed,
+        ritz_values_raw=np.asarray([], dtype=float),
+        basis_rank=0,
+        residual_diagnostics={
+            "relative_ritz_residual": None,
+            "ritz_residual_norm": None,
+        },
+        ground_state=None,
+    )
+
+
+def _emit_skqd_completion(
+    *,
+    progress_callback: ProgressCallback | None,
+    payload: _SKQDCompletionPayload,
+) -> None:
+    """Emit the SKQD completed progress payload."""
+    if progress_callback is None:
+        return
+    progress_callback(
+        {
+            "algorithm": "skqd",
+            "stage": "completed",
+            "step": "krylov_extension",
+            "iteration": payload.basis_rank,
+            "energy": float(payload.primary_energy),
+            "completed_iterations": payload.basis_rank,
+            "total_iterations": payload.basis_rank,
+            "overall_iterations": payload.primary_iterations,
+            "krylov_extension_dim": payload.krylov_extension_dim,
+            "time_step": payload.sampling_time_step,
+            "basis_rank": payload.basis_rank,
+            "sqd_iterations": payload.sqd_iterations,
+            "seeded_from_sqd": payload.seeded_from_sqd,
+            "seeded_from_sqd_occupancies": False,
+            "seed_source": payload.seed_source,
+            "execution_mode": payload.execution_mode,
+            "krylov_converged": payload.krylov_converged,
+            "sqd_converged": payload.sqd_converged,
+            "overall_converged": payload.overall_converged,
+            "selected_solution": payload.selected_solution,
+            "selected_solution_converged": payload.selected_solution_converged,
+            "relative_residual": payload.relative_residual,
+            "residual_tolerance": payload.residual_tolerance,
+            "min_ritz": payload.min_ritz,
+            "max_ritz": payload.max_ritz,
+        }
+    )
+
+
+def _run_skqd_sample_union(
     *,
     hamiltonian: object,
-    backend: Any,
-    skqd_config: Any,
+    backend: object | None,
+    skqd_config: SKQDConfig,
+    plan: Any,
+    progress_callback: ProgressCallback | None,
     backend_context: Any | None,
-) -> tuple[SKQDSampleUnion, dict[str, Any]]:
-    """Sample each time-evolved Krylov circuit through the selected sampler."""
-    from qiskit import QuantumCircuit
-    from qiskit.circuit.library import PauliEvolutionGate
-    from qiskit.synthesis import LieTrotter, SuzukiTrotter
-
-    num_qubits = int(getattr(hamiltonian, "num_qubits", 0))
-    pauli_hamiltonian = getattr(hamiltonian, "pauli_hamiltonian", None)
-    if num_qubits < 1 or pauli_hamiltonian is None:
-        raise ValueError("SKQD sampler execution requires a qubit Hamiltonian")
-
-    _guard_sampler_circuit_tractability(
-        num_qubits=num_qubits,
-        pauli_hamiltonian=pauli_hamiltonian,
-        backend_target=getattr(backend_context, "backend_target", None),
+    started_at: float,
+) -> SKQDResult:
+    """Run the direct sample-union path and persist its explicit status."""
+    use_sampler_circuits = (
+        getattr(backend_context, "backend_target", None) in {"aer_simulator", "ibm_runtime"}
+        and backend is not None
     )
-
-    spectral_width, spectral_source = estimate_pauli_spectral_width(pauli_hamiltonian)
-    sampling_time_step, time_step_metadata = resolve_sampling_time_step(
-        skqd_config,
-        spectral_width=spectral_width,
-        spectral_source=spectral_source,
+    execution_path = (
+        "sampler_krylov_union" if use_sampler_circuits else "analysis_only_exact_statevector_oracle"
     )
-
-    trotter_order = int(getattr(skqd_config, "trotter_order", 2))
-    trotter_reps = int(skqd_config.trotter_steps)
-    if trotter_order <= 1:
-        synthesis: Any = LieTrotter(reps=trotter_reps)
-        synthesis_name = "lie_trotter_first_order"
+    if use_sampler_circuits:
+        sample_union, workflow_metadata = execute_sampler_sample_union_workflow(
+            hamiltonian=hamiltonian,
+            backend=backend,
+            skqd_config=skqd_config,
+            backend_context=backend_context,
+        )
     else:
-        synthesis = SuzukiTrotter(order=trotter_order, reps=trotter_reps)
-        synthesis_name = f"suzuki_trotter_order_{trotter_order}"
-
-    def factory_for_time(time_point: float):
-        def build_circuit(**_kwargs: Any) -> QuantumCircuit:
-            circuit = QuantumCircuit(num_qubits)
-            prepare_hf_reference_bits(circuit, hamiltonian, num_qubits=num_qubits)
-            if not np.isclose(time_point, 0.0):
-                circuit.append(
-                    PauliEvolutionGate(
-                        pauli_hamiltonian,
-                        time=float(time_point),
-                        synthesis=synthesis,
-                    ),
-                    list(range(num_qubits)),
-                )
-            # Primitive samplers do not all decompose PauliEvolutionGate. Keep
-            # the declared Trotter synthesis while sending a basis-gate circuit
-            # to Aer and Runtime samplers.
-            return circuit.decompose(reps=2)
-
-        return build_circuit
-
-    samples_by_state: list[SKQDKrylovSample] = []
-    circuit_metadata: list[dict[str, Any]] = []
-    for krylov_index in range(skqd_config.krylov_extension_dim):
-        time_point = float(krylov_index * sampling_time_step)
-        samples, _circuit = sample_bitstring_matrix(
-            backend,
-            num_bits=num_qubits,
-            total_samples=skqd_config.samples_per_state,
-            rng=np.random.default_rng(skqd_config.seed + krylov_index),
-            sampling_circuit_factory=factory_for_time(time_point),
-            return_circuit=True,
+        sample_union, outcome, workflow_metadata = execute_sample_union_workflow(
+            hamiltonian=hamiltonian,
+            plan=plan,
+            skqd_config=skqd_config,
         )
-        samples_by_state.append(
-            SKQDKrylovSample(
-                krylov_index=krylov_index,
-                time_point=time_point,
-                bitstring_matrix=np.asarray(samples, dtype=bool),
-            )
+    if use_sampler_circuits:
+        deps = import_sqd_dependencies()
+        options = resolve_sqd_options(
+            skqd_config.sqd_config,
+            hamiltonian,
+            sample_budget=getattr(backend_context, "shots", None),
         )
-        circuit_metadata.append(
+        outcome = solve_sample_union_selected_ci(
+            sample_union,
+            options=options,
+            rng=np.random.default_rng(skqd_config.seed),
+            recover_configurations=deps.recover_configurations,
+            postselect_by_hamming_right_and_left=deps.postselect_by_hamming_right_and_left,
+            solve_fermion=deps.solve_fermion,
+        )
+    sqd_core = _build_not_run_sqd_core_summary(
+        reason="sample_union_mode_uses_direct_krylov_samples"
+    )
+    prefix_options = resolve_sqd_options(
+        skqd_config.sqd_config,
+        hamiltonian,
+        sample_budget=getattr(backend_context, "shots", None),
+    )
+    prefix_summaries = build_skqd_prefix_summaries(
+        sample_union,
+        num_elec_a=prefix_options.num_elec_a,
+        num_elec_b=prefix_options.num_elec_b,
+    )
+    sample_count = sum(sample.bitstring_matrix.shape[0] for sample in sample_union.samples_by_state)
+    primary_iterations = len(sample_union.samples_by_state)
+    convergence_verdict = evaluate_sample_union_convergence(
+        prefix_summaries=prefix_summaries,
+        selected_ci_summary=outcome.summary,
+    )
+    converged = bool(convergence_verdict["converged"])
+    diagnostics = {
+        **workflow_metadata,
+        "requested_sampling_mode": skqd_config.sampling_mode,
+        "execution_path": execution_path,
+        "execution_provenance": {
+            "requested_sampling_mode": skqd_config.sampling_mode,
+            "actual_sampling_mode": workflow_metadata["sampling_mode"],
+            "execution_path": execution_path,
+            "comparison_scope": (
+                "sampler_krylov_union" if use_sampler_circuits else "analysis_only"
+            ),
+            "hardware_sampling_capable": use_sampler_circuits,
+            "backend_target": getattr(backend_context, "backend_target", None),
+        },
+        "work_ledger": dict(sample_union.work_ledger),
+        "sample_union": outcome.summary,
+        "krylov_prefix_summaries": prefix_summaries,
+        "sample_provenance": list(sample_union.provenance),
+        "selected_solution": "skqd_sample_union",
+        "selected_solution_converged": converged,
+        "convergence_status": convergence_verdict["convergence_status"],
+        "convergence_verdict": convergence_verdict,
+        "sqd_core_status": "not_run",
+        "sqd_core_energy": None,
+        "sample_union_energy": float(outcome.energy),
+        "sqd_iterations": 0,
+        "sqd_converged": None,
+        "primary_iteration_unit": "krylov_state",
+        "extension_attempted": False,
+        "extension_status": "not_applicable",
+        "extension_failure_reason": None,
+        "legacy_extension_available": True,
+        "sample_count": int(sample_count),
+        "wall_time_seconds": time.monotonic() - started_at,
+    }
+    if progress_callback is not None:
+        progress_callback(
             {
-                "krylov_index": krylov_index,
-                "time_point": time_point,
-                "num_qubits": int(getattr(_circuit, "num_qubits", num_qubits)),
-                "depth": (
-                    int(_circuit.depth())
-                    if callable(getattr(_circuit, "depth", None))
-                    else None
-                ),
-                "operation_names": sorted(
-                    {
-                        str(instruction.operation.name)
-                        for instruction in getattr(_circuit, "data", [])
-                    }
-                ),
+                "algorithm": "skqd",
+                "stage": "completed",
+                "step": "sample_union",
+                "iteration": len(sample_union.samples_by_state),
+                "completed_iterations": len(sample_union.samples_by_state),
+                "total_iterations": len(sample_union.samples_by_state),
+                "overall_iterations": primary_iterations,
+                "iteration_unit": "krylov_state",
+                "energy": float(outcome.energy),
+                "sampling_mode": workflow_metadata["sampling_mode"],
+                "selected_solution": "skqd_sample_union",
+                "selected_solution_converged": converged,
+                "overall_converged": converged,
+                "convergence_status": convergence_verdict["convergence_status"],
             }
         )
+    return SKQDResult(
+        algorithm="skqd",
+        primary_energy=float(outcome.energy),
+        primary_iterations=primary_iterations,
+        converged=converged,
+        sqd_core=sqd_core,
+        krylov_extension_diagnostics=diagnostics,
+        circuit_artifacts=[],
+        circuit_artifact_policy={},
+    )
 
-    reference_state, reference_state_source = build_hf_reference_state_with_source(
-        hamiltonian,
-        fallback_dim=2**num_qubits,
+
+def run_skqd(
+    *,
+    hamiltonian: object,
+    backend: object | None,
+    config: dict[str, Any],
+    progress_callback: ProgressCallback | None = None,
+    backend_context: Any | None = None,
+) -> SKQDResult:
+    """Run direct SKQD sample-union mode or the explicit legacy extension."""
+    resolved = resolve_algorithm_config(config, "skqd")
+    skqd_config = resolve_skqd_config(resolved)
+    backend_target = getattr(backend_context, "backend_target", None)
+    if (
+        skqd_config.sampling_mode == "sample_union_exact"
+        and backend is None
+        and backend_target in {"aer_simulator", "ibm_runtime"}
+    ):
+        raise RuntimeError(
+            f"SKQD requires a sampler for the requested {backend_target} execution; "
+            "refusing to fall back to the exact local statevector oracle"
+        )
+
+    t_start = time.monotonic()
+    plan = _prepare_skqd_execution(hamiltonian)
+    logger.info(
+        "SKQD setup: operator_dim=%d krylov_extension_dim=%d execution_mode=%s",
+        plan.operator_dimension,
+        skqd_config.krylov_extension_dim,
+        plan.execution_mode,
     )
-    reference_descriptor = build_reference_descriptor(
-        state=reference_state,
-        reference_source=reference_state_source,
-        preparation_path="sampler_hf_circuit",
-        execution_mode="sampler_circuits",
-        target_sector={
-            "alpha": getattr(hamiltonian, "num_electrons_alpha", None),
-            "beta": getattr(hamiltonian, "num_electrons_beta", None),
-        },
-        circuit_metadata=circuit_metadata,
-        backend_target=getattr(backend_context, "backend_target", None),
-        ansatz_name="hartree_fock",
+    if skqd_config.sampling_mode == "sample_union_exact":
+        return _run_skqd_sample_union(
+            hamiltonian=hamiltonian,
+            backend=backend,
+            skqd_config=skqd_config,
+            plan=plan,
+            progress_callback=progress_callback,
+            backend_context=backend_context,
+            started_at=t_start,
+        )
+    sqd_result = run_sqd(
+        hamiltonian=hamiltonian,
+        backend=backend,
+        config=skqd_config.sqd_config,
+        progress_callback=progress_callback,
+        backend_context=backend_context,
     )
-    return merge_krylov_samples(samples_by_state), {
-        "algorithm_variant": "skqd_sample_union",
-        "sampling_mode": "sample_union_sampler",
-        "sampling_source": "sampler_krylov_circuits",
-        "reference_policy": "hartree_fock",
-        "reference_source": "hf_sampler_circuit",
-        "reference_state_source": reference_state_source,
-        "reference_descriptor": reference_descriptor,
-        "execution_mode": "sampler_circuits",
-        "backend_target": getattr(backend_context, "backend_target", None),
-        "krylov_state_count": skqd_config.krylov_extension_dim,
-        "samples_per_state": skqd_config.samples_per_state,
-        "seed": skqd_config.seed,
-        "trotter_steps": skqd_config.trotter_steps,
-        "trotter_order": trotter_order,
-        "trotter_synthesis": synthesis_name,
-        "time_step": sampling_time_step,
-        "krylov_time_step_policy": time_step_metadata,
-        "krylov_circuit_metadata": circuit_metadata,
+    sampling_time_step = _resolve_legacy_sampling_time_step(
+        skqd_config=skqd_config,
+        plan=plan,
+        hamiltonian=hamiltonian,
+    )
+    extension_failure_reason: str | None = None
+    extension_started = time.monotonic()
+    try:
+        extension = _run_skqd_extension(
+            sqd_result=sqd_result,
+            plan=plan,
+            hamiltonian=hamiltonian,
+            krylov_extension_dim=skqd_config.krylov_extension_dim,
+            sampling_time_step=sampling_time_step,
+            residual_tolerance=skqd_config.residual_tolerance,
+            progress_callback=progress_callback,
+        )
+    except Exception as exc:
+        extension = _failed_skqd_extension_outcome(plan)
+        extension_failure_reason = f"{type(exc).__name__}: {exc}"
+        logger.warning("SKQD Krylov extension failed; preserving SQD core result: %s", exc)
+    extension_elapsed = time.monotonic() - extension_started
+    ritz_values = [float(value) for value in extension.ritz_values_raw]
+    sqd_core_energy = (
+        float(sqd_result.primary_energy) if sqd_result.primary_energy is not None else None
+    )
+
+    krylov_extension_diagnostics = _build_skqd_extension_diagnostics(
+        plan=plan,
+        extension=extension,
+        sqd_result=sqd_result,
+        ritz_values=ritz_values,
+        krylov_extension_dim=skqd_config.krylov_extension_dim,
+        sampling_time_step=sampling_time_step,
+    )
+
+    sqd_core = _build_sqd_core_summary(sqd_result)
+    circuit_artifacts = _build_skqd_circuit_artifacts(sqd_result)
+
+    extension_energy = float(ritz_values[0]) if ritz_values else None
+    relative_residual = extension.residual_diagnostics.get("relative_ritz_residual")
+    krylov_converged = (
+        isinstance(relative_residual, (int, float))
+        and np.isfinite(float(relative_residual))
+        and relative_residual <= skqd_config.residual_tolerance
+    )
+    primary_energy, selected_solution = _select_skqd_primary_solution(
+        sqd_core_energy=sqd_core_energy,
+        extension_energy=extension_energy,
+        extension_converged=bool(krylov_converged),
+    )
+    if primary_energy is None:
+        raise ValueError("SKQD produced no SQD-core or Krylov-extension energy")
+    primary_iterations = int(sqd_result.primary_iterations or 0) + extension.basis_rank
+    overall_converged = bool(sqd_result.converged) and bool(krylov_converged)
+    krylov_extension_diagnostics["krylov_converged"] = krylov_converged
+    krylov_extension_diagnostics["overall_converged"] = overall_converged
+    krylov_extension_diagnostics["extension_attempted"] = True
+    krylov_extension_diagnostics["extension_status"] = (
+        "failed" if extension_failure_reason is not None else "completed"
+    )
+    krylov_extension_diagnostics["extension_failure_reason"] = extension_failure_reason
+    krylov_extension_diagnostics["extension_cost"] = {
+        "wall_time_seconds": extension_elapsed,
+        "requested_dimension": skqd_config.krylov_extension_dim,
+        "basis_rank": extension.basis_rank,
+        "operator_dimension": plan.operator_dimension,
     }
+    converged = bool(sqd_result.converged) if selected_solution == "sqd_core" else overall_converged
+    _add_skqd_solution_diagnostics(
+        krylov_extension_diagnostics,
+        sqd_core_energy=sqd_core_energy,
+        extension_energy=extension_energy,
+        selected_solution=selected_solution,
+        selected_solution_converged=converged,
+    )
+    if extension_failure_reason is None:
+        _add_skqd_state_diagnostics(
+            krylov_extension_diagnostics,
+            plan=plan,
+            extension=extension,
+            sampling_time_step=sampling_time_step,
+        )
+    skqd_elapsed = time.monotonic() - t_start
+    logger.info(
+        "SKQD finished: energy=%.8f converged=%s selected_solution=%s sqd_energy=%s "
+        "basis_rank=%d total_iterations=%d relative_residual=%s elapsed=%.3fs",
+        primary_energy,
+        converged,
+        selected_solution,
+        f"{sqd_core_energy:.8f}" if sqd_core_energy is not None else None,
+        extension.basis_rank,
+        primary_iterations,
+        relative_residual,
+        skqd_elapsed,
+    )
 
+    _emit_skqd_completion(
+        progress_callback=progress_callback,
+        payload=_build_skqd_completion_payload(
+            extension=extension,
+            sqd_result=sqd_result,
+            skqd_config=skqd_config,
+            primary_energy=primary_energy,
+            primary_iterations=primary_iterations,
+            selected_solution=selected_solution,
+            selected_solution_converged=converged,
+            krylov_converged=krylov_converged,
+            overall_converged=overall_converged,
+            ritz_values=ritz_values,
+            execution_mode=plan.execution_mode,
+            sampling_time_step=sampling_time_step,
+        ),
+    )
 
-__all__ = [
-    "execute_sample_union_workflow",
-    "execute_sampler_sample_union_workflow",
-    "resolve_sampling_time_step",
-]
+    return SKQDResult(
+        algorithm="skqd",
+        primary_energy=primary_energy,
+        primary_iterations=primary_iterations,
+        converged=converged,
+        sqd_core=sqd_core,
+        krylov_extension_diagnostics={
+            **krylov_extension_diagnostics,
+            "ritz_values": ritz_values,
+        },
+        circuit_artifacts=circuit_artifacts,
+        circuit_artifact_policy=sqd_result.circuit_artifact_policy,
+    )

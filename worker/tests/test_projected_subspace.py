@@ -3,7 +3,6 @@
 import numpy as np
 import pytest
 
-from worker.chemistry import kqd_solver, qfd_solver
 from worker.chemistry.projected_subspace import (
     orthonormalize_candidate,
     projected_matrix_converged,
@@ -54,11 +53,6 @@ def test_projected_matrix_converged_applies_the_shared_stability_gate(
     assert projected_matrix_converged(diagnostics) is expected
 
 
-def test_kqd_and_qfd_keep_legacy_convergence_aliases() -> None:
-    assert kqd_solver._projected_matrix_converged is projected_matrix_converged
-    assert qfd_solver._projected_matrix_converged is projected_matrix_converged
-
-
 def test_orthonormalize_candidate_projects_and_normalizes() -> None:
     candidate, norm = orthonormalize_candidate(
         np.array([1.0, 1.0, 1.0], dtype=complex),
@@ -80,7 +74,11 @@ def test_orthonormalize_candidate_rejects_dependent_vector() -> None:
     assert norm == pytest.approx(0.0)
 
 
-def test_skqd_keeps_legacy_orthonormalization_alias() -> None:
-    from worker.chemistry import skqd_solver
+def test_orthonormalize_candidate_keeps_small_nonzero_direction() -> None:
+    candidate, norm = orthonormalize_candidate(
+        np.array([1e-13, 0.0], dtype=complex),
+        [],
+    )
 
-    assert skqd_solver._orthonormalize_krylov_candidate is orthonormalize_candidate
+    assert norm == pytest.approx(1e-13)
+    np.testing.assert_allclose(candidate, [1.0, 0.0])

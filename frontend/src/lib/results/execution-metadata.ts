@@ -16,8 +16,22 @@ export interface IbmRuntimeTiming {
 
 export interface RunExecutionMetadata {
   backendName: string | null;
+  actualExecutionTarget?: string | null;
+  actualPathClass?: string | null;
+  backendPrimitivesUsed?: boolean | null;
   selectionPolicy: string | null;
   shots: number | null;
+  requestedShots?: number | null;
+  effectiveShots?: number | null;
+  requestedEstimatorPrecision?: number | null;
+  effectiveEstimatorPrecision?: number | null;
+  reportedEnergySource?: string | null;
+  reportedEnergyIsValid?: boolean | null;
+  projectedSolveIsDiagnostic?: boolean | null;
+  scientificConverged?: boolean | null;
+  noiseSource?: string | null;
+  noiseFingerprint?: string | null;
+  workLedger?: Record<string, unknown> | null;
   optimizationLevel: number | null;
   aerMethod: string | null;
   simulatorMethod: string | null;
@@ -150,6 +164,13 @@ function firstInteger(...values: unknown[]): number | null {
   return null;
 }
 
+function firstBoolean(...values: unknown[]): boolean | null {
+  for (const value of values) {
+    if (typeof value === "boolean") return value;
+  }
+  return null;
+}
+
 function uniqueSorted(values: number[]): number[] {
   return [...new Set(values)].sort((left, right) => left - right);
 }
@@ -250,12 +271,14 @@ function aggregateIbmRuntimeTimingFromEvents(events: RunEventResponse[]): IbmRun
 
 interface ExecutionMetadataSources {
   run: RunResponse;
+  result: RunResultResponse | null | undefined;
   metadata: Record<string, unknown>;
   backendOptions: BackendOptions | null;
   transpilation: Record<string, unknown> | null;
   execution: Record<string, unknown> | null;
   transpilationSummary: Record<string, unknown> | null;
   resultExecution: Record<string, unknown> | null;
+  resultEnergy: Record<string, unknown> | null;
   ibmSubmittedPayload: Record<string, unknown> | null;
   ibmStatusPayload: Record<string, unknown> | null;
 }
@@ -277,10 +300,16 @@ function getExecutionMetadataSources(
   const ibmStatusPayload = latestEventPayload(events, "ibm_status_poll");
   const resultMetrics = pickNestedRecord(resultPayload?.algorithm_metrics);
   const responseMetrics = pickNestedRecord(result?.algorithm_metrics);
+  const resultProvenance = pickNestedRecord(
+    resultMetrics?.benchmark_provenance,
+    responseMetrics?.benchmark_provenance,
+  );
+  const resultEnergy = pickNestedRecord(resultProvenance?.energy);
   const resultExecution = pickNestedRecord(
     resultPayload?.backend_execution,
     resultMetrics?.backend_execution,
     responseMetrics?.backend_execution,
+    resultProvenance?.execution,
   );
   const transpilation = pickNestedRecord(
     resultExecution,
@@ -297,12 +326,14 @@ function getExecutionMetadataSources(
 
   return {
     run,
+    result,
     metadata,
     backendOptions,
     transpilation,
     execution,
     transpilationSummary,
     resultExecution,
+    resultEnergy,
     ibmSubmittedPayload,
     ibmStatusPayload,
   };
@@ -352,14 +383,30 @@ function getExecutionCircuitShape({
 }
 
 function getExecutionScalarFields({
+  result,
+  resultEnergy,
   backendOptions,
   transpilation,
   execution,
   transpilationSummary,
+  resultExecution,
 }: ExecutionMetadataSources): Pick<
   RunExecutionMetadata,
+  | "actualExecutionTarget"
+  | "actualPathClass"
+  | "backendPrimitivesUsed"
   | "selectionPolicy"
   | "shots"
+  | "requestedShots"
+  | "effectiveShots"
+  | "requestedEstimatorPrecision"
+  | "effectiveEstimatorPrecision"
+  | "reportedEnergySource"
+  | "reportedEnergyIsValid"
+  | "projectedSolveIsDiagnostic"
+  | "scientificConverged"
+  | "noiseSource"
+  | "noiseFingerprint"
   | "optimizationLevel"
   | "aerMethod"
   | "simulatorMethod"
@@ -368,12 +415,73 @@ function getExecutionScalarFields({
   | "seedTranspiler"
 > {
   return {
+    actualExecutionTarget: firstString(
+      resultExecution?.actual_execution_target,
+      execution?.actual_execution_target,
+      transpilation?.actual_execution_target,
+    ),
+    actualPathClass: firstString(
+      resultExecution?.actual_path_class,
+      execution?.actual_path_class,
+      transpilation?.actual_path_class,
+    ),
+    backendPrimitivesUsed: firstBoolean(
+      resultExecution?.backend_primitives_used,
+      execution?.backend_primitives_used,
+      transpilation?.backend_primitives_used,
+    ),
     selectionPolicy: firstString(
+      resultExecution?.selection_policy,
       transpilation?.selection_policy,
       execution?.selection_policy,
       backendOptions?.selection_policy,
     ),
-    shots: firstNumber(transpilation?.shots, execution?.shots, backendOptions?.shots),
+    shots: firstNumber(
+      resultExecution?.shots,
+      transpilation?.shots,
+      execution?.shots,
+      backendOptions?.shots,
+    ),
+    requestedShots: firstNumber(
+      resultExecution?.requested_shots,
+      execution?.requested_shots,
+      transpilation?.requested_shots,
+      backendOptions?.shots,
+    ),
+    effectiveShots: firstNumber(
+      resultExecution?.effective_shots,
+      execution?.effective_shots,
+      transpilation?.effective_shots,
+      resultExecution?.shots,
+      execution?.shots,
+    ),
+    requestedEstimatorPrecision: firstNumber(
+      resultExecution?.requested_estimator_precision,
+      execution?.requested_estimator_precision,
+      transpilation?.requested_estimator_precision,
+    ),
+    effectiveEstimatorPrecision: firstNumber(
+      resultExecution?.effective_estimator_precision,
+      execution?.effective_estimator_precision,
+      transpilation?.effective_estimator_precision,
+    ),
+    reportedEnergySource: firstString(
+      resultEnergy?.reported_energy_source,
+      result?.reported_energy_source,
+    ),
+    reportedEnergyIsValid: firstBoolean(resultEnergy?.reported_energy_is_valid),
+    projectedSolveIsDiagnostic: firstBoolean(resultEnergy?.projected_solve_is_diagnostic),
+    scientificConverged: firstBoolean(resultEnergy?.scientific_converged, result?.converged),
+    noiseSource: firstString(
+      pickNestedRecord(resultExecution?.noise_summary)?.source,
+      pickNestedRecord(execution?.noise_summary)?.source,
+      pickNestedRecord(transpilation?.noise_summary)?.source,
+    ),
+    noiseFingerprint: firstString(
+      pickNestedRecord(resultExecution?.noise_summary)?.model_fingerprint_sha256,
+      pickNestedRecord(execution?.noise_summary)?.model_fingerprint_sha256,
+      pickNestedRecord(transpilation?.noise_summary)?.model_fingerprint_sha256,
+    ),
     optimizationLevel: firstNumber(
       transpilationSummary?.optimization_level,
       transpilation?.optimization_level,
@@ -386,6 +494,21 @@ function getExecutionScalarFields({
     seedSimulator: firstNumber(backendOptions?.seed_simulator),
     seedTranspiler: firstNumber(backendOptions?.seed_transpiler),
   };
+}
+
+function getResultWorkLedger(
+  result: RunResultResponse | null | undefined,
+): Record<string, unknown> | null {
+  const metrics = result?.algorithm_metrics;
+  if (!isRecord(metrics)) return null;
+  const candidates = [
+    pickNestedRecord(metrics.benchmark_provenance)?.work_ledger,
+    metrics.work_ledger,
+    pickNestedRecord(metrics.matrix_element_summary)?.work_ledger,
+    pickNestedRecord(metrics.sci_result_package)?.work_ledger,
+    pickNestedRecord(metrics.optimizer_diagnostics)?.work_ledger,
+  ];
+  return candidates.find(isRecord) ?? null;
 }
 
 function getExecutionLayout(
@@ -492,10 +615,9 @@ function getExecutionIbmPubCount({
   );
 }
 
-function getExecutionIbmFields(sources: ExecutionMetadataSources): Pick<
-  RunExecutionMetadata,
-  "ibmJobId" | "ibmStatus" | "ibmQueuePosition" | "ibmPubCount"
-> {
+function getExecutionIbmFields(
+  sources: ExecutionMetadataSources,
+): Pick<RunExecutionMetadata, "ibmJobId" | "ibmStatus" | "ibmQueuePosition" | "ibmPubCount"> {
   return {
     ibmJobId: getExecutionIbmJobId(sources),
     ibmStatus: getExecutionIbmStatus(sources),
@@ -516,6 +638,7 @@ export function getRunExecutionMetadata(
   return {
     backendName: getExecutionBackendName(sources),
     ...getExecutionScalarFields(sources),
+    workLedger: getResultWorkLedger(result),
     ...circuitShape,
     ...getExecutionIbmFields(sources),
     ibmTiming: getExecutionIbmTiming(events, sources),

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
   pull_request:
-    branches: [main]
+    branches: [develop, main]
   workflow_dispatch:
 
 concurrency:
@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Check local documentation targets
         run: python3 scripts/checks/check-doc-targets.py
 
@@ -35,6 +37,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -55,6 +59,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -77,6 +83,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -99,6 +107,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -127,6 +137,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -149,5 +161,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Render Compose configuration
         run: docker compose config --quiet
+      - name: Render production Compose configuration
+        env:
+          ALLOW_INSECURE_DEFAULTS: "false"
+          DB_PASSWORD: ci-only-db-password
+          DOCS_ENABLED: "false"
+          REDIS_PASSWORD: ci-only-redis-password
+          TRUSTED_HOSTS: localhost,127.0.0.1
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
