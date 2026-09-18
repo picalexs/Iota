@@ -8,6 +8,7 @@ import {
   parseRecordInput,
 } from "@/components/forms/run-form/manual-mode-config";
 import { RUN_CONSTRAINTS } from "./run-form-constraints";
+import { kqdUsesKnownBranchEstimatorPath } from "./run-form-recommendations";
 import { BACKEND_TARGETS, EASY_GOALS, RUN_ALGORITHMS } from "@/types/run-status";
 import type { SimulationRunFormData } from "@/types/run";
 
@@ -227,6 +228,24 @@ function validateAerDenseProjectionRules(data: RunFormData, ctx: z.RefinementCtx
       "KQD and QFD require Aer method Automatic, Statevector, or MPS.",
     );
   }
+}
+
+function validateKqdEvolutionPath(data: RunFormData, ctx: z.RefinementCtx) {
+  if (
+    data.algorithm !== "kqd" ||
+    data.advanced_kqd.evolution_method === "trotter" ||
+    !kqdUsesKnownBranchEstimatorPath(data.backend_target, data.noise_profile !== null)
+  ) {
+    return;
+  }
+
+  const path: IssuePath =
+    data.mode === "easy" ? ["easy_options", "goal"] : ["advanced_kqd", "evolution_method"];
+  const message =
+    data.mode === "easy"
+      ? "Guided KQD on IBM Runtime or noisy Aer requires Trotter evolution. Apply recommended settings."
+      : "KQD on IBM Runtime or noisy Aer requires Trotter evolution. Choose Trotter or use an ideal local path.";
+  addCustomIssue(ctx, path, message);
 }
 
 function usesProjectedMatrixHardwareCap(data: RunFormData): boolean {
@@ -945,6 +964,7 @@ export const runFormSchema = z
     }
 
     validateAerDenseProjectionRules(data, ctx);
+    validateKqdEvolutionPath(data, ctx);
     validateEasyModeProjectedMatrixCap(data, ctx);
     validateAdvancedModeProjectedMatrixCap(data, ctx);
     validateAdvancedAlgorithmSettings(data, ctx);

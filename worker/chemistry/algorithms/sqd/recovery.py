@@ -32,12 +32,14 @@ class SQDBatchOutcome:
     """Selected-CI solve outputs for one SQD recovery iteration."""
 
     energy_value: float
+    best_sci_state: Any | None
     selected_occupancies: tuple[np.ndarray, np.ndarray]
     last_spin_sq: float
     last_selected_ci_summary: dict[str, Any]
     carryover_ci_strings: tuple[np.ndarray, np.ndarray]
     last_carryover_summary: dict[str, Any]
     last_batch_energies: list[float]
+    effective_samples_per_batch: int
     selected_ci_dimensions: list[int]
     selected_ci_fractions: list[float]
 
@@ -84,7 +86,9 @@ def _emit_selected_ci_progress(
                 options.selected_ci_limit_summary["cap_active"]
                 or ci_summary["cap_active_for_batch"]
             ),
-            "selected_ci_spin_symmetrized": bool(options.symmetrize_spin),
+            "selected_ci_spin_symmetrized": bool(
+                not options.open_shell or options.symmetrize_spin
+            ),
             "selected_ci_carryover_alpha": int(ci_summary["carryover_strings_alpha"]),
             "selected_ci_carryover_beta": int(ci_summary["carryover_strings_beta"]),
         },
@@ -267,12 +271,14 @@ def run_selected_ci_batches(
     last_selected_ci_summary.update(last_carryover_summary)
     return SQDBatchOutcome(
         energy_value=energy_value,
+        best_sci_state=best_batch_state,
         selected_occupancies=average_occupancies,
         last_spin_sq=best_batch_spin_sq,
         last_selected_ci_summary=last_selected_ci_summary,
         carryover_ci_strings=carryover_ci_strings,
         last_carryover_summary=last_carryover_summary,
         last_batch_energies=[round(float(value), 8) for value in batch_energies],
+        effective_samples_per_batch=effective_samples_per_batch,
         selected_ci_dimensions=selected_ci_dimensions,
         selected_ci_fractions=selected_ci_fractions,
     )

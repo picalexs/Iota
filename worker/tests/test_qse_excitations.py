@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from worker.chemistry.algorithms.qse.basis import accept_basis_candidate
 from worker.chemistry.algorithms.qse.excitations import (
     apply_fermionic_excitation,
     apply_fermionic_ladder,
@@ -34,6 +35,35 @@ def test_apply_fermionic_excitation_moves_dense_state_amplitude() -> None:
     expected = np.zeros(4, dtype=complex)
     expected[2] = 2.0
     np.testing.assert_array_equal(result, expected)
+
+
+def test_apply_fermionic_excitation_keeps_small_nonzero_amplitudes() -> None:
+    reference = np.zeros(4, dtype=complex)
+    reference[1] = 1e-12
+
+    result = apply_fermionic_excitation(
+        reference,
+        create_orbitals=(1,),
+        annihilate_orbitals=(0,),
+        num_qubits=2,
+    )
+
+    assert result[2] == 1e-12
+
+
+def test_qse_basis_keeps_small_nonzero_excitation_direction() -> None:
+    basis: list[np.ndarray] = []
+    orthonormal_basis: list[np.ndarray] = []
+
+    independence_norm = accept_basis_candidate(
+        np.array([0.0, 1e-12], dtype=complex),
+        basis=basis,
+        orthonormal_basis=orthonormal_basis,
+        overlap_threshold=1e-8,
+    )
+
+    assert independence_norm == 1.0
+    assert basis[0].tolist() == [0.0 + 0.0j, 1.0 + 0.0j]
 
 
 def test_fermionic_excitation_specs_preserve_spin_sectors() -> None:

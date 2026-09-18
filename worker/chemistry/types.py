@@ -94,6 +94,7 @@ class SQDResult(AlgorithmResult):
     sci_result_package: dict[str, Any] = field(default_factory=dict)
     circuit_artifacts: list[dict[str, Any]] = field(default_factory=list)
     circuit_artifact_policy: dict[str, Any] = field(default_factory=dict)
+    best_sci_state: Any | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)

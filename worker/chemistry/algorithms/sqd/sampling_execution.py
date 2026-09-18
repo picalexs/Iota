@@ -99,14 +99,18 @@ def _run_sampler_attempt(
     *,
     shots: int,
 ) -> Any:
-    """Execute one sampler attempt and return the primitive result object."""
-    job = sampler.run([(circuit,)], shots=shots)
-    return job.result()
+    """Submit one sampler attempt and return its job without waiting for results."""
+    return sampler.run([(circuit,)], shots=shots)
 
 
 def _is_control_flow_exception(exc: Exception) -> bool:
     """Preserve run-control signals instead of retrying sampler submissions."""
-    return exc.__class__.__name__ in {"_RunCancelled", "_RunPaused"}
+    return exc.__class__.__name__ in {
+        "RunCancelled",
+        "RunPaused",
+        "_RunCancelled",
+        "_RunPaused",
+    }
 
 
 def _ensure_measurements(circuit: Any, *, num_bits: int) -> Any:
@@ -121,14 +125,38 @@ def _ensure_measurements(circuit: Any, *, num_bits: int) -> Any:
     if int(getattr(circuit, "num_clbits", 0)) == 0:
         measured = QuantumCircuit(num_bits, num_bits)
         measured.compose(circuit, qubits=range(num_bits), inplace=True)
-    elif int(circuit.num_clbits) < num_bits:
-        raise ValueError("SQD sampling circuit needs at least one classical bit per qubit")
+    elif int(circuit.num_clbits) != num_bits:
+        raise ValueError("SQD sampling circuit must have one classical bit per qubit")
     else:
         measured = circuit.copy()
 
-    has_measurement = any(instruction.operation.name == "measure" for instruction in measured.data)
-    if not has_measurement:
+    measurement_map = []
+    seen_measurement = False
+    for instruction in measured.data:
+        operation_name = instruction.operation.name
+        if operation_name == "measure":
+            seen_measurement = True
+        elif seen_measurement and operation_name != "barrier" and instruction.qubits:
+            raise ValueError("SQD sampling circuit measurements must be terminal")
+        if operation_name != "measure":
+            continue
+        if len(instruction.qubits) != 1 or len(instruction.clbits) != 1:
+            raise ValueError("SQD sampling circuit must measure each qubit exactly once")
+        measurement_map.append(
+            (
+                measured.find_bit(instruction.qubits[0]).index,
+                measured.find_bit(instruction.clbits[0]).index,
+            )
+        )
+
+    if not measurement_map:
         measured.measure(range(num_bits), range(num_bits))
+    else:
+        measured_qubits = [qubit for qubit, _ in measurement_map]
+        if len(measured_qubits) != num_bits or set(measured_qubits) != set(range(num_bits)):
+            raise ValueError("SQD sampling circuit must measure every qubit exactly once")
+        if any(qubit != clbit for qubit, clbit in measurement_map):
+            raise ValueError("SQD sampling circuit must map each qubit to the same-index classical bit")
     return measured
 
 
@@ -142,8 +170,10 @@ def sample_bitstring_matrix(
     rng: np.random.Generator | None = None,
     sampling_circuit_factory: Callable[..., Any] | None = None,
     return_circuit: bool = False,
+    work_ledger: dict[str, int] | None = None,
+    retry_with_increased_shots: bool = True,
 ) -> np.ndarray | tuple[np.ndarray, Any]:
-    """Sample backend bitstrings from HF or a supplied preparation circuit."""
+    """Sample backend bitstrings, optionally keeping retry shot requests fixed."""
     if not hasattr(backend, "run"):
         raise ValueError("SQD backend must expose a sampler run() method")
     sampler = backend  # Structural SamplerBackend protocol keeps runtime types local.
@@ -162,24 +192,54 @@ def sample_bitstring_matrix(
         circuit = _ensure_measurements(circuit, num_bits=num_bits)
 
     last_error: Exception | None = None
-    for multiplier in (1, 2, 4):
+    allow_submission_retries = (
+        getattr(sampler, "allow_sampler_submission_retries", True) is not False
+    )
+    if not allow_submission_retries:
+        multipliers = (1,)
+    elif retry_with_increased_shots:
+        multipliers = (1, 2, 4)
+    else:
+        multipliers = (1, 1, 1)
+    for attempt_index, multiplier in enumerate(multipliers):
+        shots = max(total_samples * multiplier, 1)
+        if work_ledger is not None:
+            work_ledger["sampler_run_attempts"] = work_ledger.get("sampler_run_attempts", 0) + 1
+            work_ledger["sampler_retry_count"] = work_ledger.get("sampler_retry_count", 0) + (
+                1 if attempt_index > 0 else 0
+            )
+            work_ledger["sampler_requested_shots_total"] = work_ledger.get(
+                "sampler_requested_shots_total", 0
+            ) + shots
         try:
-            result = _run_sampler_attempt(
+            job = _run_sampler_attempt(
                 sampler,
                 circuit,
-                shots=max(total_samples * multiplier, 1),
+                shots=shots,
             )
         except Exception as exc:  # pragma: no cover - depends on backend primitive failures
             if _is_control_flow_exception(exc):
                 raise
+            if not allow_submission_retries:
+                raise
             last_error = exc
             continue
 
+        # A job object means submission succeeded. Do not submit a duplicate if
+        # result retrieval fails or times out.
+        result = job.result()
         bitstrings = extract_sampler_bitstrings(result)
         if bitstrings is None:
-            continue
+            raise RuntimeError("SQD sampler returned no measurement bitstrings")
 
         matrix = bitstrings_to_matrix(bitstrings, num_bits=num_bits)
+        if work_ledger is not None:
+            work_ledger["sampler_successful_runs"] = work_ledger.get(
+                "sampler_successful_runs", 0
+            ) + 1
+            work_ledger["sampler_returned_raw_sample_rows"] = work_ledger.get(
+                "sampler_returned_raw_sample_rows", 0
+            ) + int(matrix.shape[0])
         return (matrix, circuit) if return_circuit else matrix
 
     if last_error is not None:
@@ -264,8 +324,11 @@ def run_sqd_sampling_iteration(
     progress_callback: ProgressCallback | None,
     sample_bitstrings: Callable[..., np.ndarray | tuple[np.ndarray, Any]],
     sampling_circuit_factory: Callable[..., Any] | None = None,
+    work_ledger: dict[str, int] | None = None,
+    measured_bitstring_matrix: np.ndarray | None = None,
+    measured_circuit: Any | None = None,
 ) -> SQDIterationSampling:
-    """Sample, solve raw valid rows, then recover only later invalid rows."""
+    """Reuse one measured sample set for each recovery iteration."""
     if progress_callback is not None:
         progress_callback(
             {
@@ -276,6 +339,7 @@ def run_sqd_sampling_iteration(
                 "completed_iterations": iteration - 1,
                 "total_iterations": options.max_iterations,
                 "energy": None,
+                "sample_set_reused": measured_bitstring_matrix is not None,
                 "samples_per_batch": options.samples_per_batch,
                 "num_batches": options.num_batches,
                 "total_samples": options.total_samples,
@@ -284,22 +348,28 @@ def run_sqd_sampling_iteration(
             }
         )
 
-    sample_kwargs: dict[str, Any] = {
-        "num_bits": 2 * options.norb,
-        "total_samples": options.total_samples,
-        "num_elec_a": options.num_elec_a,
-        "num_elec_b": options.num_elec_b,
-        "rng": rng,
-        "return_circuit": True,
-    }
-    if sampling_circuit_factory is not None:
-        sample_kwargs["sampling_circuit_factory"] = sampling_circuit_factory
-    sampled_output = sample_bitstrings(backend, **sample_kwargs)
-    if isinstance(sampled_output, tuple):
-        raw_bitstring_matrix, sampled_circuit = sampled_output
-    else:  # pragma: no cover - compatibility fallback for monkeypatched tests
-        raw_bitstring_matrix = sampled_output
-        sampled_circuit = None
+    if measured_bitstring_matrix is None:
+        sample_kwargs: dict[str, Any] = {
+            "num_bits": 2 * options.norb,
+            "total_samples": options.total_samples,
+            "num_elec_a": options.num_elec_a,
+            "num_elec_b": options.num_elec_b,
+            "rng": rng,
+            "return_circuit": True,
+        }
+        if sampling_circuit_factory is not None:
+            sample_kwargs["sampling_circuit_factory"] = sampling_circuit_factory
+        if work_ledger is not None:
+            sample_kwargs["work_ledger"] = work_ledger
+        sampled_output = sample_bitstrings(backend, **sample_kwargs)
+        if isinstance(sampled_output, tuple):
+            raw_bitstring_matrix, sampled_circuit = sampled_output
+        else:  # pragma: no cover - compatibility fallback for monkeypatched tests
+            raw_bitstring_matrix = sampled_output
+            sampled_circuit = None
+    else:
+        raw_bitstring_matrix = np.asarray(measured_bitstring_matrix, dtype=bool)
+        sampled_circuit = measured_circuit
 
     bitstring_matrix, probabilities, bitstring_counts = aggregate_bitstring_frequencies(
         raw_bitstring_matrix

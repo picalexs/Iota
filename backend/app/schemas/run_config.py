@@ -317,7 +317,6 @@ class QFDAdvancedConfig(BaseModel):
     qfd_variant: Literal[
         "qfd_chemistry_forward",
         "qfd_original_symmetric",
-        "qfd_custom_grid",
     ] = "qfd_chemistry_forward"
     kappa: float = Field(1.0, gt=0.0)
     trotter_steps: int = Field(1, ge=1, le=32)

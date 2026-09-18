@@ -203,7 +203,10 @@ behavior when Redis or the worker is absent.
     optimizer-native step counts remain in
     `algorithm_metrics.optimizer_iterations`;
   - QSE honors `reference_method` semantics (`hf`, `vqe`, `provided_state`, and
-    `provided_sector`), supports `provided_state_vector` for small dense
+    `provided_sector`) on local exact and sector paths. Measured QSE on noisy
+    Aer or IBM Runtime supports `reference_method="hf"` only because its
+    measured circuit prepares the Hartree-Fock reference state. QSE supports
+    `provided_state_vector` for small dense
     references and sparse `provided_sector_amplitudes` for determinant-sector
     references, accepts JSON-safe complex coefficients for both the full-state
     and determinant-sector reference inputs, carries VQE reference depth through
@@ -239,6 +242,8 @@ behavior when Redis or the worker is absent.
   - KQD result and completion-payload construction lives in
     `worker/chemistry/algorithms/kqd/results.py`; `worker/chemistry/algorithms/kqd/workflow.py` retains
     injected private wrappers for compatibility;
+    KQD dense metadata now reports exact matrix evolution only for the exact
+    method and reports `dense_matrix_trotter` for the local Trotter method;
   - SKQD Krylov diagnostics are generated from projected Hamiltonian subspaces
     instead of synthetic arithmetic decrement ladders, use SQD selected
     bitstrings or an HF sector fallback as the seed, and normalize those seed
@@ -257,7 +262,12 @@ behavior when Redis or the worker is absent.
     cumulative work separately as `overall_iterations`, so the worker does not
     double-count the preceding SQD phase; the advanced contract's `time_step`
     sets the seeded evolution schedule used to generate the Krylov extension and
-    is echoed in diagnostics;
+    is echoed in diagnostics; sample-union `subspace_saturated` is diagnostic
+    only, and SKQD reports scientific convergence only after full selected-CI
+    sector recovery. Direct sample-union runs set the extension status to
+    `not_applicable`. Legacy extension runs record the seed source; a
+    probability-only seed does not preserve relative phases and must not be
+    treated as paper-faithful hardware SKQD evidence;
   - `worker/chemistry/algorithms/skqd/extension.py` owns dense and fixed-sector
     Krylov extension construction and progress payloads;
     `worker/chemistry/algorithms/skqd/execution.py` owns SQD-seed resolution

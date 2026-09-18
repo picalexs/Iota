@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 
 from worker.chemistry.algorithms.qse.basis import (
+    ExcitationSpec,
     accept_basis_candidate,
     build_excitation_basis,
     build_sector_excitation_basis,
@@ -51,7 +53,6 @@ from worker.chemistry.circuit_artifacts import (
 )
 from worker.chemistry.eigensolver import (
     build_hf_reference_state,
-    projected_ritz_diagnostics,
     resolve_operator_matrix,
     solve_exact_generalized_eigensystem,
     solve_generalized_eigenproblem,
@@ -67,6 +68,7 @@ from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_execution import (
     QSEExecutionPolicy,
     resolve_qse_execution_policy,
+    validate_qse_reference_method,
 )
 from worker.chemistry.projected_subspace import (
     projected_diagnostic_energy_is_reportable,
@@ -171,9 +173,9 @@ def _build_sector_excitation_basis(
     excitation_level: str,
     target_rank: int,
     overlap_threshold: float,
-    regularization: float,
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
+    selection_callback: Callable[[ExcitationSpec], None] | None = None,
 ) -> list[np.ndarray]:
     """Adapt sector-basis inputs to the basis module."""
     return build_sector_excitation_basis(
@@ -182,9 +184,9 @@ def _build_sector_excitation_basis(
         excitation_level=excitation_level,
         target_rank=target_rank,
         overlap_threshold=overlap_threshold,
-        regularization=regularization,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
+        selection_callback=selection_callback,
         sector_excitation_specs_fn=sector_excitation_specs,
         apply_fermionic_excitation_sector_fn=apply_fermionic_excitation_sector,
         accept_basis_candidate_fn=accept_basis_candidate,
@@ -201,6 +203,7 @@ def _build_excitation_basis(
     overlap_threshold: float,
     regularization: float,
     progress_callback: ProgressCallback | None,
+    selection_callback: Callable[[ExcitationSpec], None] | None = None,
 ) -> list[np.ndarray]:
     """Adapt dense-basis inputs to the basis module."""
     return build_excitation_basis(
@@ -211,6 +214,7 @@ def _build_excitation_basis(
         overlap_threshold=overlap_threshold,
         regularization=regularization,
         progress_callback=progress_callback,
+        selection_callback=selection_callback,
         vector_size_to_qubits_fn=vector_size_to_qubits,
         fermionic_excitation_specs_fn=fermionic_excitation_specs,
         apply_fermionic_excitation_fn=apply_fermionic_excitation,
@@ -243,6 +247,7 @@ def run_qse(
 
     qse_config = resolve_qse_config(resolved)
     max_subspace_dim = qse_config.max_subspace_dim
+    effective_max_subspace_dim = max_subspace_dim
     regularization = qse_config.regularization
     overlap_threshold = qse_config.overlap_threshold
     residual_tolerance = qse_config.residual_tolerance
@@ -254,8 +259,13 @@ def run_qse(
         backend_context=backend_context,
         reference_method=reference_method_requested,
     )
+    validate_qse_reference_method(
+        policy=qse_policy,
+        reference_method=reference_method_requested,
+    )
     if qse_policy.uses_measured_matrix_elements:
         measured_rank = min(max_subspace_dim, measured_qse_dimension_limit())
+        effective_max_subspace_dim = measured_rank
         logger.info(
             "QSE setup: max_subspace_dim=%d excitation=%s reference_method=%s "
             "execution_mode=measured_matrix_elements backend_target=%s",
@@ -336,8 +346,6 @@ def run_qse(
             resolve_reference_state_fn=_resolve_reference_state,
             build_excitation_basis_fn=_build_excitation_basis,
             build_overlap_matrix_fn=build_overlap_matrix,
-            solve_generalized_eigenproblem_fn=solve_generalized_eigenproblem,
-            projected_ritz_diagnostics_fn=projected_ritz_diagnostics,
             real_scalar_fn=real_scalar,
             solve_generalized_eigensystem_fn=solve_exact_generalized_eigensystem,
             execution_mode="dense_exact_emulation",
@@ -379,7 +387,7 @@ def run_qse(
             build_qse_completion_payload(
                 subspace_dim=outcome.basis_rank,
                 primary_energy=primary_energy,
-                max_subspace_dim=max_subspace_dim,
+                max_subspace_dim=effective_max_subspace_dim,
                 reference_method=outcome.reference_method,
                 excitation_level=excitation_level,
                 regularization=regularization,

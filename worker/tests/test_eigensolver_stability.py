@@ -67,6 +67,9 @@ def test_stabilized_generalized_eigenproblem_projects_negative_overlap_modes() -
     assert result.eigenvalues == pytest.approx([-1.0])
     assert result.raw_eigenvalues.size == 2
     assert result.diagnostics["stability_state"] == "stabilized"
+    assert result.diagnostics["raw_spectrum_definition"] == (
+        "regularized_unfiltered_generalized_spectrum"
+    )
     assert result.diagnostics["psd_projected"] is True
     assert result.diagnostics["raw_projected_rank"] == 2
     assert result.diagnostics["retained_rank"] == 1
@@ -86,6 +89,10 @@ def test_stabilized_generalized_eigenproblem_truncates_noisy_small_overlap_modes
     assert result.diagnostics["stability_state"] == "stabilized"
     assert result.diagnostics["retained_rank"] == 1
     assert result.diagnostics["threshold"] == pytest.approx(1e-3)
+    assert result.diagnostics["overlap_uncertainty_cutoff_method"] == (
+        "four_times_max_overlap_entry_standard_error_heuristic"
+    )
+    assert result.diagnostics["overlap_uncertainty_is_matrix_level_bound"] is False
 
 
 def test_stabilized_generalized_eigenproblem_records_projected_ritz_residual() -> None:
@@ -281,6 +288,9 @@ def test_stabilized_generalized_eigenproblem_caps_retained_condition_on_noisy_h2
 
     assert baseline.eigenvalues[0] == pytest.approx(-1.136258405257436)
     assert baseline.raw_eigenvalues[0] < baseline.eigenvalues[0] - 0.5
+    assert baseline.diagnostics["raw_spectrum_definition"] == (
+        "regularized_unfiltered_generalized_spectrum"
+    )
     assert baseline.diagnostics["stability_state"] == "stabilized"
     assert baseline.diagnostics["retained_rank"] == 2
     assert baseline.diagnostics["dropped_rank"] == 6

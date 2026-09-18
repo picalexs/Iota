@@ -47,6 +47,61 @@ def test_normalize_result_preserves_provenance_and_uses_best_observation() -> No
     }
 
 
+def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
+    normalized = normalize_result_for_persistence(
+        {
+            "algorithm": "kqd",
+            "backend_target": "ibm_runtime",
+            "energy": -1.2,
+            "iterations": 2,
+            "converged": False,
+            "algorithm_metrics": {
+                "backend_execution": {
+                    "actual_execution_target": "local_classical",
+                    "actual_path_class": "sector_matrix_free",
+                    "backend_primitives_used": False,
+                    "primitive_family": None,
+                    "requested_shots": 4096,
+                    "effective_shots": None,
+                    "requested_estimator_precision": 0.015625,
+                    "effective_estimator_precision": 0.0,
+                    "noise_summary": {"enabled": False},
+                },
+                "matrix_element_summary": {
+                    "work_ledger": {"ledger_version": 1, "primitive_run_calls": 2}
+                },
+            },
+        }
+    )
+
+    metrics = normalized[5]
+    assert metrics is not None
+    assert metrics["benchmark_provenance"] == {
+        "schema_version": 1,
+        "execution": {
+            "requested_target": "ibm_runtime",
+            "actual_execution_target": "local_classical",
+            "actual_path_class": "sector_matrix_free",
+            "backend_primitives_used": False,
+            "primitive_family": None,
+            "requested_shots": 4096,
+            "effective_shots": None,
+            "requested_estimator_precision": 0.015625,
+            "effective_estimator_precision": 0.0,
+            "noise_source": None,
+            "noise_fingerprint": None,
+        },
+        "work_ledger": {"ledger_version": 1, "primitive_run_calls": 2},
+        "energy": {
+            "reported_energy": -1.2,
+            "reported_energy_is_valid": True,
+            "reported_energy_source": "best_observed_energy",
+            "projected_solve_is_diagnostic": False,
+            "scientific_converged": False,
+        },
+    }
+
+
 @pytest.mark.parametrize(
     "result",
     [
@@ -97,6 +152,48 @@ def test_normalize_rejects_stabilized_branch_energy_without_residual() -> None:
             "algorithm_metrics": {
                 "matrix_element_summary": {"matrix_element_strategy": "branch_estimator"},
                 "stability_summary": {"stability_state": "stabilized", "dropped_rank": 1},
+            },
+        }
+    )
+
+    assert normalized[0] == 0.0
+    assert normalized[-1]["reported_energy"] is None
+    assert normalized[-1]["reported_energy_is_valid"] is False
+    assert normalized[-1]["reported_energy_source"] == (
+        "unavailable_unstable_projected_solve"
+    )
+    assert normalized[-1]["reported_energy_invalid_reason"] == "unstable_projected_metric"
+
+
+def test_normalize_rejects_invalid_local_qfd_energy() -> None:
+    normalized = normalize_result_for_persistence(
+        {
+            "algorithm": "qfd",
+            "energy": 0.0,
+            "primary_energy": 0.0,
+            "algorithm_metrics": {
+                "matrix_element_summary": {"matrix_element_strategy": "dense_classical"},
+                "stability_summary": {"stability_state": "invalid", "retained_rank": 0},
+            },
+        }
+    )
+
+    assert normalized[0] == 0.0
+    assert normalized[-1]["reported_energy"] is None
+    assert normalized[-1]["reported_energy_is_valid"] is False
+    assert normalized[-1]["reported_energy_source"] == (
+        "unavailable_unstable_projected_solve"
+    )
+
+
+def test_normalize_rejects_invalid_qfd_energy_without_matrix_summary() -> None:
+    normalized = normalize_result_for_persistence(
+        {
+            "algorithm": "qfd",
+            "energy": 0.0,
+            "primary_energy": 0.0,
+            "algorithm_metrics": {
+                "stability_summary": {"stability_state": "invalid", "retained_rank": 0},
             },
         }
     )

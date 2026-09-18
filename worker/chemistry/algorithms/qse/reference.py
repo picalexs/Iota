@@ -48,7 +48,7 @@ def normalize_reference_state_vector(raw_vector: Any, *, vector_size: int) -> np
         raise ValueError("QSE provided_state_vector size must match Hamiltonian dimension")
 
     norm = float(np.linalg.norm(vector))
-    if np.isclose(norm, 0.0):
+    if not np.isfinite(norm) or norm == 0.0:
         raise ValueError("QSE provided_state_vector norm must be non-zero")
     return vector / norm
 

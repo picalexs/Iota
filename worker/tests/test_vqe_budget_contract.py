@@ -104,7 +104,7 @@ def test_vqe_work_ledger_counts_objective_and_final_reevaluation_once(monkeypatc
         hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
         backend=backend,
         config=_config(),
-        backend_context=BackendExecutionContext(backend_target="aer_simulator", shots=256),
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime", shots=256),
     )
 
     diagnostics = result.optimizer_diagnostics
@@ -115,6 +115,105 @@ def test_vqe_work_ledger_counts_objective_and_final_reevaluation_once(monkeypatc
     assert diagnostics["objective_standard_error_trace"] == [pytest.approx(0.125)]
     assert diagnostics["objective_uncertainty_status"] == "available"
     assert diagnostics["primitive_shots"] == 2 * 256
+
+
+def test_vqe_work_ledger_distinguishes_objective_failures_from_primitive_runs(
+    monkeypatch,
+) -> None:
+    backend = _Estimator()
+    evaluate_energy = vqe_solver._vqe_objective.evaluate_energy
+    evaluator_calls = 0
+
+    def fail_once_before_primitive(*, backend, ansatz, operator, parameter_values):
+        nonlocal evaluator_calls
+        evaluator_calls += 1
+        if evaluator_calls == 1:
+            raise RuntimeError("failed before primitive submission")
+        return evaluate_energy(
+            backend=backend,
+            ansatz=ansatz,
+            operator=operator,
+            parameter_values=parameter_values,
+        )
+
+    def fake_minimize(objective, x0, method, options, bounds):
+        del method, options, bounds
+        with pytest.raises(RuntimeError, match="before primitive submission"):
+            objective(np.asarray(x0, dtype=float))
+        energy = objective(np.asarray(x0, dtype=float))
+        return SimpleNamespace(
+            x=np.asarray(x0, dtype=float),
+            fun=energy,
+            success=True,
+            status=0,
+            message="converged",
+            nfev=2,
+            nit=1,
+        )
+
+    monkeypatch.setattr(vqe_solver, "minimize", fake_minimize)
+    monkeypatch.setattr(vqe_solver, "_evaluate_energy", fail_once_before_primitive)
+    result = run_vqe(
+        hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+        backend=backend,
+        config=_config(),
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime", shots=256),
+    )
+
+    ledger = result.optimizer_diagnostics["work_ledger"]
+    assert ledger["objective_evaluation_attempts"] == 2
+    assert ledger["objective_evaluation_failures"] == 1
+    assert ledger["primitive_run_attempts"] == 2
+    assert ledger["primitive_jobs"] == 2
+    assert ledger["primitive_pubs"] == 2
+    assert len(backend.calls) == 2
+
+
+@pytest.mark.parametrize(
+    ("backend_target", "estimator_precision", "expected_mode"),
+    [
+        ("statevector", 0.0, "exact_expectation"),
+        ("aer_simulator", 0.0, "exact_expectation"),
+        ("ibm_runtime", 0.25, "estimator_precision"),
+    ],
+)
+def test_vqe_does_not_claim_fixed_shots_for_exact_or_precision_paths(
+    monkeypatch,
+    backend_target: str,
+    estimator_precision: float,
+    expected_mode: str,
+) -> None:
+    backend = _Estimator()
+
+    def fake_minimize(objective, x0, method, options, bounds):
+        del method, options, bounds
+        energy = objective(np.asarray(x0, dtype=float))
+        return SimpleNamespace(
+            x=np.asarray(x0, dtype=float),
+            fun=energy,
+            success=True,
+            status=0,
+            message="converged",
+            nfev=1,
+            nit=1,
+        )
+
+    monkeypatch.setattr(vqe_solver, "minimize", fake_minimize)
+    result = run_vqe(
+        hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+        backend=backend,
+        config=_config(),
+        backend_context=BackendExecutionContext(
+            backend_target=backend_target,
+            shots=256,
+            estimator_precision=estimator_precision,
+        ),
+    )
+
+    ledger = result.optimizer_diagnostics["work_ledger"]
+    assert ledger["shot_budget_mode"] == expected_mode
+    assert ledger["shots_per_pub"] is None
+    assert ledger["primitive_shots"] is None
 
 
 def test_vqe_reports_effective_limiter_for_120_iteration_360_evaluation_split(

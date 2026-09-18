@@ -12,6 +12,7 @@ from worker.chemistry.algorithm_contracts import (
     AlgorithmResult,
     PrimitiveRequirement,
 )
+from worker.chemistry.algorithms.kqd.config import resolve_kqd_config
 from worker.chemistry.algorithms.kqd.workflow import run_kqd
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_execution import (
@@ -32,6 +33,12 @@ def run_kqd_algorithm(
         hamiltonian=hamiltonian_bundle,
         backend_context=backend_context,
     )
+    resolved_config = resolve_algorithm_config(config, "kqd")
+    kqd_config = resolve_kqd_config(resolved_config)
+    if execution_policy.requires_estimator and kqd_config.evolution_method != "trotter":
+        raise ValueError(
+            "KQD branch matrix-element execution supports evolution_method='trotter' only"
+        )
     primitive = (
         backend.create_estimator(backend_context)
         if execution_policy.requires_estimator

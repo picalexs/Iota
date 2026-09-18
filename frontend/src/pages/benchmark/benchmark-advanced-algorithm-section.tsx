@@ -12,6 +12,7 @@ function BenchmarkAdvancedVariantGroup({
   algorithm,
   variants,
   chemicalAccuracyHa,
+  requiresBranchEstimator,
   disabled,
   collapseEditors,
   onDuplicateAdvancedVariant,
@@ -21,6 +22,7 @@ function BenchmarkAdvancedVariantGroup({
   algorithm: RunAlgorithm;
   variants: readonly BenchmarkAlgorithmVariant[];
   chemicalAccuracyHa: number;
+  requiresBranchEstimator: boolean;
   disabled: boolean;
   collapseEditors: boolean;
   onDuplicateAdvancedVariant: (variantId: string) => void;
@@ -84,6 +86,7 @@ function BenchmarkAdvancedVariantGroup({
               key={variant.id}
               variant={variant}
               chemicalAccuracyHa={chemicalAccuracyHa}
+              requiresBranchEstimator={requiresBranchEstimator}
               disabled={disabled}
               autoCollapse={collapseEditors}
               onChange={(nextVariant) => onUpdateAdvancedVariant(variant.id, () => nextVariant)}
@@ -104,6 +107,7 @@ export function BenchmarkAdvancedAlgorithmSection({
   disabledAlgorithms,
   algorithmVariants,
   chemicalAccuracyHa,
+  requiresBranchEstimator,
   onAddAdvancedVariant,
   onSetAdvancedVariantCount,
   onDuplicateAdvancedVariant,
@@ -116,6 +120,7 @@ export function BenchmarkAdvancedAlgorithmSection({
   disabledAlgorithms: ReadonlyMap<RunAlgorithm, string>;
   algorithmVariants: readonly BenchmarkAlgorithmVariant[];
   chemicalAccuracyHa: number;
+  requiresBranchEstimator: boolean;
   onAddAdvancedVariant: (algorithm: RunAlgorithm) => void;
   onSetAdvancedVariantCount: (algorithm: RunAlgorithm, count: number) => void;
   onDuplicateAdvancedVariant: (variantId: string) => void;
@@ -244,6 +249,7 @@ export function BenchmarkAdvancedAlgorithmSection({
               algorithm={group.algorithm}
               variants={group.variants}
               chemicalAccuracyHa={chemicalAccuracyHa}
+              requiresBranchEstimator={requiresBranchEstimator}
               disabled={workspaceLocked}
               collapseEditors={collapseEditors}
               onDuplicateAdvancedVariant={onDuplicateAdvancedVariant}

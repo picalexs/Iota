@@ -458,7 +458,12 @@ def test_dispatch_kqd_uses_estimator_for_large_aer_matrix_elements(monkeypatch) 
     result = dispatch_algorithm(
         algorithm="kqd",
         backend=backend,
-        config_snapshot={"algorithm": "kqd", "krylov_dim": 2, "time_step": 0.1},
+        config_snapshot={
+            "algorithm": "kqd",
+            "krylov_dim": 2,
+            "time_step": 0.1,
+            "evolution_method": "trotter",
+        },
         hamiltonian_bundle=_large_pauli_hamiltonian(),
         backend_context=BackendExecutionContext(backend_target="aer_simulator"),
     )
@@ -492,7 +497,12 @@ def test_dispatch_kqd_uses_estimator_for_noisy_small_aer_matrix_elements(monkeyp
     result = dispatch_algorithm(
         algorithm="kqd",
         backend=backend,
-        config_snapshot={"algorithm": "kqd", "krylov_dim": 2, "time_step": 0.1},
+        config_snapshot={
+            "algorithm": "kqd",
+            "krylov_dim": 2,
+            "time_step": 0.1,
+            "evolution_method": "trotter",
+        },
         hamiltonian_bundle=_dummy_hamiltonian(),
         backend_context=BackendExecutionContext(
             backend_target="aer_simulator",

@@ -63,11 +63,7 @@ from worker.chemistry.algorithms.skqd.sample_union import (
     execute_sampler_sample_union_workflow,
 )
 from worker.chemistry.algorithms.skqd.seed import (
-    matches_spin_sector,
-    parse_bitstring_index,
-    resolve_sqd_electron_sector,
     sector_seed_state_from_sqd_result_with_source,
-    seed_state_from_sqd_bitstrings,
     seed_state_from_sqd_result,
     seed_state_from_sqd_result_with_source,
 )
@@ -114,10 +110,6 @@ from worker.chemistry.types import SKQDResult
 logger = logging.getLogger(__name__)
 
 # Re-export private names for existing solver tests and importers.
-_parse_bitstring_index = parse_bitstring_index
-_matches_spin_sector = matches_spin_sector
-_resolve_sqd_electron_sector = resolve_sqd_electron_sector
-_seed_state_from_sqd_bitstrings = seed_state_from_sqd_bitstrings
 _seed_state_from_sqd_result = seed_state_from_sqd_result
 _seed_state_from_sqd_result_with_source = seed_state_from_sqd_result_with_source
 _sector_seed_state_from_sqd_result_with_source = sector_seed_state_from_sqd_result_with_source
@@ -240,6 +232,7 @@ def _resolve_legacy_sampling_time_step(
     *,
     skqd_config: SKQDConfig,
     plan: _SKQDExecutionPlan,
+    hamiltonian: object,
 ) -> float:
     """Resolve the legacy Krylov extension time step, applying paper auto-scaling.
 
@@ -250,7 +243,10 @@ def _resolve_legacy_sampling_time_step(
     if explicit is not None:
         return float(explicit)
     if plan.sector_action is not None:
-        spectral_width, _source = estimate_action_spectral_width(plan.sector_action)
+        spectral_width, _source = estimate_action_spectral_width(
+            plan.sector_action,
+            pauli_hamiltonian=getattr(hamiltonian, "pauli_hamiltonian", None),
+        )
     elif plan.operator is not None:
         spectral_width, _source = estimate_dense_spectral_width(plan.operator)
     else:
@@ -325,7 +321,8 @@ def _emit_skqd_completion(
             "time_step": payload.sampling_time_step,
             "basis_rank": payload.basis_rank,
             "sqd_iterations": payload.sqd_iterations,
-            "seeded_from_sqd_occupancies": payload.seeded_from_sqd,
+            "seeded_from_sqd": payload.seeded_from_sqd,
+            "seeded_from_sqd_occupancies": False,
             "seed_source": payload.seed_source,
             "execution_mode": payload.execution_mode,
             "krylov_converged": payload.krylov_converged,
@@ -421,6 +418,7 @@ def _run_skqd_sample_union(
             "hardware_sampling_capable": use_sampler_circuits,
             "backend_target": getattr(backend_context, "backend_target", None),
         },
+        "work_ledger": dict(sample_union.work_ledger),
         "sample_union": outcome.summary,
         "krylov_prefix_summaries": prefix_summaries,
         "sample_provenance": list(sample_union.provenance),
@@ -434,8 +432,8 @@ def _run_skqd_sample_union(
         "sqd_iterations": 0,
         "sqd_converged": None,
         "primary_iteration_unit": "krylov_state",
-        "extension_attempted": True,
-        "extension_status": "sample_union_completed",
+        "extension_attempted": False,
+        "extension_status": "not_applicable",
         "extension_failure_reason": None,
         "legacy_extension_available": True,
         "sample_count": int(sample_count),
@@ -483,6 +481,16 @@ def run_skqd(
     """Run direct SKQD sample-union mode or the explicit legacy extension."""
     resolved = resolve_algorithm_config(config, "skqd")
     skqd_config = resolve_skqd_config(resolved)
+    backend_target = getattr(backend_context, "backend_target", None)
+    if (
+        skqd_config.sampling_mode == "sample_union_exact"
+        and backend is None
+        and backend_target in {"aer_simulator", "ibm_runtime"}
+    ):
+        raise RuntimeError(
+            f"SKQD requires a sampler for the requested {backend_target} execution; "
+            "refusing to fall back to the exact local statevector oracle"
+        )
 
     t_start = time.monotonic()
     plan = _prepare_skqd_execution(hamiltonian)
@@ -509,7 +517,11 @@ def run_skqd(
         progress_callback=progress_callback,
         backend_context=backend_context,
     )
-    sampling_time_step = _resolve_legacy_sampling_time_step(skqd_config=skqd_config, plan=plan)
+    sampling_time_step = _resolve_legacy_sampling_time_step(
+        skqd_config=skqd_config,
+        plan=plan,
+        hamiltonian=hamiltonian,
+    )
     extension_failure_reason: str | None = None
     extension_started = time.monotonic()
     try:

@@ -15,6 +15,16 @@ export interface BenchmarkScatterExportPoint {
   energy: number;
   verdict: AccuracyVerdict;
   runId: string | null;
+  actualExecutionTarget?: string | null;
+  actualPathClass?: string | null;
+  primitiveFamily?: string | null;
+  reportedEnergySource?: string | null;
+  reportedEnergyIsValid?: boolean | null;
+  projectedSolveIsDiagnostic?: boolean | null;
+  scientificConverged?: boolean | null;
+  noiseSource?: string | null;
+  noiseFingerprint?: string | null;
+  workLedger?: Record<string, unknown> | null;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -48,6 +58,16 @@ function downloadScatterCsv(points: readonly BenchmarkScatterExportPoint[]): voi
       "energy_ha",
       "verdict",
       "run_id",
+      "actual_execution_target",
+      "actual_path_class",
+      "primitive_family",
+      "reported_energy_source",
+      "reported_energy_is_valid",
+      "projected_solve_is_diagnostic",
+      "scientific_converged",
+      "noise_source",
+      "noise_fingerprint",
+      "work_ledger_json",
     ],
     ...points.map((point) => [
       point.moleculeKey,
@@ -59,6 +79,18 @@ function downloadScatterCsv(points: readonly BenchmarkScatterExportPoint[]): voi
       point.energy.toString(),
       point.verdict,
       point.runId ?? "",
+      point.actualExecutionTarget ?? "unknown",
+      point.actualPathClass ?? "unknown",
+      point.primitiveFamily ?? "unknown",
+      point.reportedEnergySource ?? "unknown",
+      point.reportedEnergyIsValid == null ? "unknown" : point.reportedEnergyIsValid.toString(),
+      point.projectedSolveIsDiagnostic == null
+        ? "unknown"
+        : point.projectedSolveIsDiagnostic.toString(),
+      point.scientificConverged == null ? "unknown" : point.scientificConverged.toString(),
+      point.noiseSource ?? "unknown",
+      point.noiseFingerprint ?? "",
+      point.workLedger == null ? "" : JSON.stringify(point.workLedger),
     ]),
   ];
   const csv = rows

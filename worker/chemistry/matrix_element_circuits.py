@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-import numpy as np
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.chemistry.circuit_artifacts import prepare_hf_reference_bits
+from worker.chemistry.time_evolution import is_zero_time
 
 _AER_BOOLEAN_OPTIONS = {
     "batched_shots_gpu",
@@ -45,14 +45,14 @@ def build_branch_state_circuit(
     circuit.h(ancilla)
 
     synthesis = LieTrotter(reps=int(trotter_steps))
-    if not np.isclose(left_time, 0.0):
+    if not is_zero_time(left_time):
         left_gate = PauliEvolutionGate(
             pauli_hamiltonian,
             time=float(left_time),
             synthesis=synthesis,
         )
         circuit.append(left_gate.control(1, ctrl_state=0), [ancilla, *system_qubits])
-    if not np.isclose(right_time, 0.0):
+    if not is_zero_time(right_time):
         right_gate = PauliEvolutionGate(
             pauli_hamiltonian,
             time=float(right_time),

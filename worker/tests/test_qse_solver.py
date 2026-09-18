@@ -140,6 +140,7 @@ def test_qse_vqe_reference_treats_null_options_as_defaults() -> None:
                 "vqe_reference_max_iterations": 8,
                 "vqe_reference_reps": 1,
                 "max_subspace_dim": 2,
+                "regularization": 1e-4,
             },
         },
     )
@@ -153,6 +154,12 @@ def test_qse_vqe_reference_treats_null_options_as_defaults() -> None:
     assert metrics["circuit_artifacts"][0]["phase"] == "reference"
     assert metrics["circuit_artifacts"][0]["representative"] is True
     assert metrics["execution_mode"] == "dense_exact_emulation"
+    assert metrics["regularization"] == pytest.approx(1e-4)
+    assert metrics["requested_regularization"] == pytest.approx(1e-4)
+    assert metrics["regularization_scope"] == "basis_progress_estimates_only"
+    assert metrics["conditioning_summary"]["regularization"] == pytest.approx(0.0)
+    assert metrics["final_metric_diagonal_shift"] == pytest.approx(0.0)
+    assert metrics["regularization_may_change_reported_energy"] is False
     assert metrics["conditioning_summary"]["reference_state_execution"] == "exact_emulation"
     assert metrics["conditioning_summary"]["termination_reason"] in {
         "converged",
@@ -280,6 +287,34 @@ def test_qse_sector_wrapper_preserves_completion_metadata_and_result_fields() ->
     assert result.primary_energy == result.eigenvalues[0]
     assert result.overlap_condition >= 0.0
     assert result.relative_residual is not None
+
+
+def test_qse_sector_result_reports_actual_capped_excitation_pool() -> None:
+    """Sector-QSE results expose the excitations selected before solving."""
+    result = run_qse(
+        hamiltonian=_SectorHamiltonian(norb=4, n_alpha=2, n_beta=2),
+        backend=object(),
+        config={
+            "algorithm": "qse",
+            "advanced_config": {
+                "algorithm": "qse",
+                "reference_method": "hf",
+                "excitation_level": "singles_doubles",
+                "max_subspace_dim": 7,
+            },
+        },
+    )
+
+    basis_selection = result.matrix_element_summary["basis_selection"]
+    assert basis_selection["candidate_selection_policy"] == "reference_coupling_descending"
+    assert basis_selection["selected_specs_complete"] is True
+    assert basis_selection["actual_basis_dimension"] == 7
+    assert basis_selection["selected_excitation_counts"] == {
+        "reference": 1,
+        "single": 0,
+        "double": 6,
+    }
+    assert len(basis_selection["selected_excitation_specs"]) == 7
 
 
 def test_qse_provided_state_accepts_complex_json_scalars() -> None:

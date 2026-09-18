@@ -400,7 +400,7 @@ def _solve_kqd_branch_path(
     stabilized = solve_stabilized_generalized_eigenproblem(
         projected_hamiltonian,
         estimate.overlap,
-        max_standard_error=estimate.summary.get("max_standard_error"),
+        max_standard_error=estimate.summary.get("max_overlap_standard_error"),
     )
     if stabilized.eigenvalues.size == 0:
         raise ValueError("KQD projected solve produced no Ritz values")
@@ -455,7 +455,7 @@ def _solve_kqd_branch_path(
             "trotter_steps": kqd_config.trotter_steps,
             "projected_dimension": basis_rank,
             "projected_matrix_element_count": 2 * basis_rank * basis_rank,
-            "residual_kind": "projected_generalized_eigenpair",
+            "residual_kind": "projected_gevp_equation",
             "basis_index_convention": _KRYLOV_BASIS_INDEX_CONVENTION,
             "reference_state_source": reference_source,
             "reference_descriptor": reference_descriptor,
@@ -562,11 +562,12 @@ def _solve_kqd_dense_path(
     basis_matrix = np.column_stack(basis)
     reference_energy = float(np.real(np.vdot(reference_state, operator @ reference_state)))
     residual = operator @ reference_state - reference_energy * reference_state
-    implemented_evolution_method = (
-        "aer_pauli_lie_trotter"
-        if getattr(backend_context, "backend_target", None) == "aer_simulator"
-        else "exact_matrix_evolution"
-    )
+    if kqd_config.evolution_method == "exact":
+        implemented_evolution_method = "exact_matrix_evolution"
+    elif getattr(backend_context, "backend_target", None) == "aer_simulator":
+        implemented_evolution_method = "aer_pauli_lie_trotter"
+    else:
+        implemented_evolution_method = "dense_matrix_trotter"
     reference_descriptor = build_reference_descriptor(
         state=reference_state,
         reference_source=reference_source,
@@ -743,12 +744,16 @@ def run_kqd(
     }
     if plan.use_branch_matrix_elements:
         projected_residual = solve_data.residual_diagnostics["relative_ritz_residual"]
-        converged = projected_matrix_converged(diagnostics) and (
+        projected_solver_converged = projected_matrix_converged(diagnostics) and (
             projected_residual <= kqd_config.residual_tolerance
         )
-        matrix_element_summary["convergence_basis"] = (
-            "projected_overlap_condition_and_generalized_residual"
+        matrix_element_summary["projected_solver_converged"] = bool(
+            projected_solver_converged
         )
+        matrix_element_summary["convergence_basis"] = (
+            "projected_solver_only_full_space_residual_unavailable"
+        )
+        converged = False
     else:
         converged = projected_matrix_converged(diagnostics) and (
             solve_data.residual_diagnostics["relative_ritz_residual"]

@@ -30,6 +30,11 @@ def test_resolve_qfd_config_applies_defaults_and_bounds() -> None:
     )
 
 
+def test_resolve_qfd_config_accepts_execution_path_default() -> None:
+    result = resolve_qfd_config({}, default_num_time_points=7)
+
+    assert result.num_time_points == 7
+
 def test_resolve_qfd_config_validates_original_symmetric_grid() -> None:
     result = resolve_qfd_config(
         {
@@ -55,6 +60,16 @@ def test_resolve_qfd_config_rejects_even_original_grid() -> None:
                 "kappa": 2.0,
             }
         )
+
+
+def test_resolve_qfd_config_rejects_undefined_custom_grid_variant() -> None:
+    with pytest.raises(ValueError, match="qfd_variant must be one of"):
+        resolve_qfd_config({"qfd_variant": "qfd_custom_grid"})
+
+
+def test_resolve_qfd_config_rejects_unknown_time_grid_type() -> None:
+    with pytest.raises(ValueError, match="time_grid_type must be one of"):
+        resolve_qfd_config({"time_grid_type": "typo"})
 
 
 def test_qfd_solver_exposes_the_resolved_config_boundary() -> None:

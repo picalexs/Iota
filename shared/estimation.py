@@ -190,9 +190,26 @@ def _estimate_primary_iterations(
     return 1
 
 
-def _is_projected_branch_target(backend_target: str | None) -> bool:
-    """Return whether projected matrix elements use the branch-estimator path."""
-    return str(backend_target or "").strip().lower() in {"aer_simulator", "ibm_runtime"}
+def _is_projected_branch_target(
+    backend_target: str | None,
+    *,
+    noise_profile_enabled: bool,
+    projected_branch_path: bool | None,
+) -> bool:
+    """Return whether the requested projected path uses branch estimation."""
+    if projected_branch_path is not None:
+        return projected_branch_path
+    target = str(backend_target or "").strip().lower()
+    return target == "ibm_runtime" or (target == "aer_simulator" and noise_profile_enabled)
+
+
+def _noise_profile_enabled(
+    config_payload: dict[str, Any],
+    explicit_value: bool | None,
+) -> bool:
+    if explicit_value is not None:
+        return explicit_value
+    return config_payload.get("noise_profile") is not None
 
 
 def _projected_branch_work(
@@ -200,9 +217,15 @@ def _projected_branch_work(
     algorithm: str,
     runtime_config: dict[str, Any],
     backend_target: str | None,
+    noise_profile_enabled: bool,
+    projected_branch_path: bool | None,
 ) -> tuple[int, int] | None:
     """Return ``(matrix-element-pairs, total-progress-units)`` for branch paths."""
-    if algorithm not in {"kqd", "qfd"} or not _is_projected_branch_target(backend_target):
+    if algorithm not in {"kqd", "qfd"} or not _is_projected_branch_target(
+        backend_target,
+        noise_profile_enabled=noise_profile_enabled,
+        projected_branch_path=projected_branch_path,
+    ):
         return None
     dimension_key = "krylov_dim" if algorithm == "kqd" else "num_time_points"
     dimension = _as_positive_numeric_int(runtime_config.get(dimension_key))
@@ -218,13 +241,16 @@ def estimate_total_iterations(
     config_payload: dict[str, Any],
     num_qubits: int | None = None,
     backend_target: str | None = None,
+    noise_profile_enabled: bool | None = None,
+    projected_branch_path: bool | None = None,
 ) -> int:
     """Estimate total progress units from algorithm-native configuration payloads.
 
     The primary axis remains algorithm-specific. Branch-estimator KQD and QFD
     also execute one projected matrix-element unit for each upper-triangular
-    state pair and a final projected solve phase. Include those units when the
-    execution target selects that path.
+    state pair and a final projected solve phase. Include those units for IBM
+    Runtime and noisy Aer. Ideal Aer uses local dense or sector evolution for
+    the normal chemistry path.
     """
     algorithm_key = algorithm.lower()
     runtime_config = _select_runtime_config(algorithm_key, config_payload)
@@ -237,6 +263,8 @@ def estimate_total_iterations(
         algorithm=algorithm_key,
         runtime_config=runtime_config,
         backend_target=backend_target,
+        noise_profile_enabled=_noise_profile_enabled(config_payload, noise_profile_enabled),
+        projected_branch_path=projected_branch_path,
     )
     return projected_work[1] if projected_work is not None else primary_iterations
 
@@ -247,6 +275,8 @@ def estimate_workload_breakdown(
     config_payload: dict[str, Any],
     num_qubits: int | None = None,
     backend_target: str | None = None,
+    noise_profile_enabled: bool | None = None,
+    projected_branch_path: bool | None = None,
 ) -> dict[str, Any]:
     """Describe native progress work and any nested algorithm work.
 
@@ -272,6 +302,8 @@ def estimate_workload_breakdown(
         algorithm=algorithm_key,
         runtime_config=runtime_config,
         backend_target=backend_target,
+        noise_profile_enabled=_noise_profile_enabled(config_payload, noise_profile_enabled),
+        projected_branch_path=projected_branch_path,
     )
     if projected_work is not None:
         matrix_element_pairs, total_work_units = projected_work

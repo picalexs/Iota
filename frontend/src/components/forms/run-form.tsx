@@ -51,6 +51,7 @@ import {
   buildRecommendedAdvancedPatch,
   getChemicalAccuracyTargetOptions,
   goalForChemicalAccuracyTarget,
+  kqdUsesKnownBranchEstimatorPath,
 } from "@/lib/run-form-recommendations";
 import type { ChemicalAccuracyTargetOption } from "@/lib/run-form-recommendations";
 import type { IbmBackendWarmupProgress } from "@/lib/ibm-profile-events";
@@ -748,6 +749,28 @@ export function RunForm({ initialMoleculeId = null }: RunFormProps) {
     values.noise_profile,
   ]);
 
+  useEffect(() => {
+    if (
+      values.algorithm !== "kqd" ||
+      !kqdUsesKnownBranchEstimatorPath(values.backend_target, values.noise_profile !== null) ||
+      values.advanced_kqd.evolution_method === "trotter" ||
+      form.getFieldState("advanced_kqd.evolution_method").isTouched
+    ) {
+      return;
+    }
+
+    form.setValue("advanced_kqd.evolution_method", "trotter", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }, [
+    form,
+    values.advanced_kqd.evolution_method,
+    values.algorithm,
+    values.backend_target,
+    values.noise_profile,
+  ]);
+
   const applyRecommendedSettings = useCallback(() => {
     if (values.algorithm == null) {
       return;
@@ -758,6 +781,7 @@ export function RunForm({ initialMoleculeId = null }: RunFormProps) {
       recommendedGoal,
       selectedMolecule?.active_space,
       configMetadata,
+      kqdUsesKnownBranchEstimatorPath(values.backend_target, values.noise_profile !== null),
     );
     form.setValue("easy_options.goal", recommendedGoal, {
       shouldDirty: true,
@@ -769,7 +793,15 @@ export function RunForm({ initialMoleculeId = null }: RunFormProps) {
       shouldTouch: true,
       shouldValidate: true,
     });
-  }, [configMetadata, form, recommendedGoal, selectedMolecule?.active_space, values.algorithm]);
+  }, [
+    configMetadata,
+    form,
+    recommendedGoal,
+    selectedMolecule?.active_space,
+    values.algorithm,
+    values.backend_target,
+    values.noise_profile,
+  ]);
 
   const resetRecommendedForAlgorithm = useCallback(() => {
     applyRecommendedSettings();

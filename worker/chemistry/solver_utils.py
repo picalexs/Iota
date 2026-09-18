@@ -21,6 +21,8 @@ def bounded_int(value: Any, *, default: int, low: int, high: int) -> int:
     """Normalize integer settings to rollout-safe bounds."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return default
+    if isinstance(value, float) and not math.isfinite(value):
+        return default
     return max(low, min(int(value), high))
 
 

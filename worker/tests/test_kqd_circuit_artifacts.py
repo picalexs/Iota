@@ -58,3 +58,16 @@ def test_build_kqd_circuit_artifacts_returns_reference_and_evolution() -> None:
     assert artifacts[0]["artifact_id"] == "kqd.reference"
     assert artifacts[1]["artifact_id"] == "kqd.evolution"
     assert artifacts[1]["source"] == "logical_time_evolution_template"
+
+
+def test_kqd_circuit_artifacts_keep_small_nonzero_evolution() -> None:
+    artifacts = build_kqd_circuit_artifacts(
+        hamiltonian=_hamiltonian(),
+        time_step=7e-10,
+        trotter_steps=1,
+        evolution_method="exact",
+        use_branch_matrix_elements=False,
+    )
+
+    assert len(artifacts) == 2
+    assert artifacts[1]["size"] > 0

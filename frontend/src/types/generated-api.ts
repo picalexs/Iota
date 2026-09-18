@@ -1974,7 +1974,7 @@ export interface components {
              * @default qfd_chemistry_forward
              * @enum {string}
              */
-            qfd_variant: "qfd_chemistry_forward" | "qfd_original_symmetric" | "qfd_custom_grid";
+            qfd_variant: "qfd_chemistry_forward" | "qfd_original_symmetric";
             /** Residual Tolerance */
             residual_tolerance?: number | null;
             /**
