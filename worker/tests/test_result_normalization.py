@@ -247,7 +247,7 @@ def test_normalize_reports_rank_reduced_exact_energy_as_diagnostic(algorithm: st
                     "stability_state": "stabilized",
                     "dropped_rank": 1,
                     "retained_rank": 7,
-                    "relative_projected_ritz_residual": 1e-15,
+                    "relative_generalized_residual": 1e-15,
                 },
             },
         }
