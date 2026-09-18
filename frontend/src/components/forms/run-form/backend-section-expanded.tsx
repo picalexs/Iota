@@ -146,7 +146,7 @@ export function BackendSectionExpanded({
         />
       ) : null}
 
-      {value !== "aer_simulator" || noiseProfile != null ? (
+      {topologyDevice != null && (value !== "aer_simulator" || noiseProfile != null) ? (
         <div className="min-w-0">
           <Suspense
             fallback={
