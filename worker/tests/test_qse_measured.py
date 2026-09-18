@@ -19,8 +19,8 @@ from worker.chemistry.algorithms.qse.measured import (
 )
 from worker.chemistry.algorithms.qse.workflow import run_qse
 from worker.chemistry.eigensolver import solve_stabilized_generalized_eigenproblem
-from worker.chemistry.reference_states import build_hf_reference_state
 from worker.chemistry.reference_descriptor import fingerprint_state_vector
+from worker.chemistry.reference_states import build_hf_reference_state
 
 
 def test_measured_qse_accepts_bounded_aer_pub_chunk_override() -> None:

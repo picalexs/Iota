@@ -13,8 +13,7 @@ from worker.chemistry.algorithms.skqd.sampling import (
     sample_krylov_state_sources,
     sample_sector_krylov_states,
 )
-from worker.chemistry.hamiltonian_action import HamiltonianAction
-from worker.chemistry.hamiltonian_action import build_hamiltonian_action
+from worker.chemistry.hamiltonian_action import HamiltonianAction, build_hamiltonian_action
 
 
 def test_sample_krylov_state_sources_samples_every_index_and_keeps_provenance() -> None:
