@@ -249,6 +249,9 @@ export function BenchmarkPage() {
         restartInProgress={restartInProgress}
         total={visibleStats.total}
         done={visibleStats.done}
+        completed={visibleStats.completed}
+        failed={visibleStats.failed}
+        cancelled={visibleStats.cancelled}
         backendHelperText={backendHelperText}
         onToggleMolecule={toggleMolecule}
         onToggleAlgorithm={toggleAlgorithm}
