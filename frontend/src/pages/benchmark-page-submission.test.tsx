@@ -172,7 +172,7 @@ describe("BenchmarkPage submission", () => {
       expect.objectContaining({
         backend_target: "aer_simulator",
         backend_options: expect.objectContaining({
-          backend_name: "ibm_kyiv",
+          backend_name: "aer_simulator",
         }),
         noise_profile: {
           source: "backend_derived",

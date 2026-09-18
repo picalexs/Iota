@@ -285,7 +285,7 @@ const SECTIONS: HelpSection[] = [
     id: "time_grid_type",
     title: "Time grid type",
     summary:
-      "Chooses how time samples are spaced across the evolution window. Use a uniform linear grid or a geometric grid with more resolution near zero.",
+      "Chooses how time samples are spaced across the evolution window. Uniform grids are simpler, while custom grids can emphasize specific regions.",
   },
 ];
 

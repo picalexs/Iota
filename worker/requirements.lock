@@ -41,10 +41,8 @@ ibm-cloud-sdk-core==3.24.4
     # via ibm-platform-services
 ibm-platform-services==0.75.0
     # via qiskit-ibm-runtime
-idna==3.19
-    # via
-    #   -r worker/requirements.txt
-    #   requests
+idna==3.13
+    # via requests
 jax==0.7.1
     # via
     #   ffsim
@@ -90,10 +88,8 @@ packaging==26.2
     # via
     #   matplotlib
     #   qiskit-ibm-runtime
-pillow==12.3.0
-    # via
-    #   -r worker/requirements.txt
-    #   matplotlib
+pillow==12.2.0
+    # via matplotlib
 psutil==7.2.2
     # via qiskit-aer
 psycopg2-binary==2.9.11
@@ -107,12 +103,10 @@ pydantic==2.13.4
     #   qiskit-ibm-runtime
 pydantic-core==2.46.4
     # via pydantic
-pydantic-settings==2.15.0
+pydantic-settings==2.14.1
     # via -r worker/requirements.txt
-pyjwt==2.14.0
-    # via
-    #   -r worker/requirements.txt
-    #   ibm-cloud-sdk-core
+pyjwt==2.12.1
+    # via ibm-cloud-sdk-core
 pylatexenc==2.10
     # via -r worker/requirements.txt
 pyparsing==3.3.2

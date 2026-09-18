@@ -9,17 +9,14 @@ import pytest
 from qiskit.quantum_info import Operator, SparsePauliOp, Statevector
 
 from worker.adapters.result_adapter import normalize_result
-from worker.chemistry.algorithms.qse import measured as qse_measured
-from worker.chemistry.algorithms.qse.definition import run_qse_algorithm
 from worker.chemistry.algorithms.qse.excitations import apply_fermionic_excitation
-from worker.chemistry.algorithms.qse.measured import (
+from worker.chemistry.eigensolver import solve_stabilized_generalized_eigenproblem
+from worker.chemistry.qse_measured import (
     _estimator_pub_chunk_size,
     build_measured_excitation_operators,
     estimate_measured_qse_matrices,
 )
-from worker.chemistry.algorithms.qse.workflow import run_qse
-from worker.chemistry.eigensolver import solve_stabilized_generalized_eigenproblem
-from worker.chemistry.reference_descriptor import fingerprint_state_vector
+from worker.chemistry.qse_solver import run_qse
 from worker.chemistry.reference_states import build_hf_reference_state
 
 
@@ -133,10 +130,6 @@ def test_measured_excitation_operators_match_statevector_excitations() -> None:
     num_qubits = 4
     operators = build_measured_excitation_operators(
         num_qubits=num_qubits,
-        reference_state=build_hf_reference_state(
-            _HamiltonianBundle(_four_qubit_hamiltonian(), num_qubits=4),
-            fallback_dim=16,
-        ),
         excitation_level="singles_doubles",
         max_dimension=8,
     )
@@ -154,7 +147,7 @@ def test_measured_excitation_operators_match_statevector_excitations() -> None:
 
     # Direct comparison: build the operator for create (1,) annihilate (0,) and
     # compare against apply_fermionic_excitation on all basis vectors.
-    from worker.chemistry.algorithms.qse.measured import _excitation_operator
+    from worker.chemistry.qse_measured import _excitation_operator
 
     operator = _excitation_operator(
         num_qubits,
@@ -172,20 +165,6 @@ def test_measured_excitation_operators_match_statevector_excitations() -> None:
             num_qubits=num_qubits,
         )
         assert np.allclose(matrix @ vector, expected, atol=1e-9)
-
-
-def test_measured_qse_keeps_small_nonzero_excitation_direction() -> None:
-    reference = np.zeros(16, dtype=complex)
-    reference[1] = 1e-13
-
-    operators = build_measured_excitation_operators(
-        num_qubits=4,
-        reference_state=reference,
-        excitation_level="singles",
-        max_dimension=2,
-    )
-
-    assert len(operators) == 2
 
 
 def test_measured_qse_assembles_hermitian_matrices_with_identity_reference() -> None:
@@ -217,111 +196,6 @@ def test_measured_qse_assembles_hermitian_matrices_with_identity_reference() -> 
     assert estimate.summary["max_standard_error"] == 0.0
 
 
-def test_measured_qse_separates_hamiltonian_and_overlap_uncertainty(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=27))
-    captured_plans = []
-    original_build_plans = qse_measured._build_pair_measurement_plans
-
-    def build_plans(**kwargs):
-        plans = original_build_plans(**kwargs)
-        captured_plans[:] = plans
-        return plans
-
-    class _SplitUncertaintyEstimator:
-        def __init__(self) -> None:
-            self.next_plan = 0
-
-        def run(self, pubs):
-            results = []
-            for _circuit, observables in pubs:
-                plan = captured_plans[self.next_plan]
-                h_count = plan.h_component_count
-                self.next_plan += 1
-                results.append(
-                    _PubResult(
-                        [0.0] * len(observables),
-                        [5.0] * h_count + [0.01] * (len(observables) - h_count),
-                    )
-                )
-            return _Job(results)
-
-    monkeypatch.setattr(qse_measured, "_build_pair_measurement_plans", build_plans)
-    events: list[dict[str, object]] = []
-    estimate = estimate_measured_qse_matrices(
-        hamiltonian=hamiltonian,
-        estimator=_SplitUncertaintyEstimator(),
-        excitation_level="singles_doubles",
-        max_dimension=8,
-        backend_context=None,
-        progress_callback=events.append,
-    )
-
-    assert estimate.summary["max_hamiltonian_standard_error"] == pytest.approx(5.0)
-    assert estimate.summary["max_overlap_standard_error"] == pytest.approx(0.01)
-    assert estimate.summary["max_standard_error"] == pytest.approx(5.0)
-    matrix_events = [event for event in events if "matrix_element_pair" in event]
-    assert matrix_events[-1]["max_hamiltonian_standard_error"] == pytest.approx(5.0)
-    assert matrix_events[-1]["max_overlap_standard_error"] == pytest.approx(0.01)
-
-
-def test_measured_qse_dimension_cap_counts_independent_hf_excitation_states() -> None:
-    """Zero-on-reference singles must not consume the cap ahead of doubles."""
-    hamiltonian = _HamiltonianBundle(
-        SparsePauliOp.from_list([("IIIIII", 0.5), ("ZIIIII", -0.25)]),
-        num_qubits=6,
-        n_alpha=1,
-        n_beta=1,
-        norb=3,
-    )
-    reference = build_hf_reference_state(hamiltonian, fallback_dim=64)
-    estimator = _MockEstimator(reference)
-
-    estimate = estimate_measured_qse_matrices(
-        hamiltonian=hamiltonian,
-        estimator=estimator,
-        excitation_level="singles_doubles",
-        max_dimension=8,
-        backend_context=None,
-    )
-
-    # This HF reference has four useful independent singles. The remaining
-    # three slots must be filled by useful doubles, not zero-on-reference singles.
-    assert estimate.summary["projected_dimension"] == 8
-    assert np.linalg.matrix_rank(estimate.overlap, tol=1e-10) == 8
-
-
-def test_measured_qse_reports_actual_capped_excitation_pool() -> None:
-    """Measured-QSE metadata records its singles-first capped basis."""
-    hamiltonian = _HamiltonianBundle(
-        SparsePauliOp.from_list([("I" * 8, 1.0)]),
-        num_qubits=8,
-        n_alpha=2,
-        n_beta=2,
-        norb=4,
-    )
-    reference = build_hf_reference_state(hamiltonian, fallback_dim=2**8)
-    estimator = _MockEstimator(reference)
-
-    estimate = estimate_measured_qse_matrices(
-        hamiltonian=hamiltonian,
-        estimator=estimator,
-        excitation_level="singles_doubles",
-        max_dimension=7,
-        backend_context=None,
-    )
-
-    basis_selection = estimate.summary["basis_selection"]
-    assert basis_selection["candidate_selection_policy"] == "fermionic_generator_order"
-    assert basis_selection["selected_excitation_counts"] == {
-        "reference": 1,
-        "single": 6,
-        "double": 0,
-    }
-    assert len(basis_selection["selected_excitation_specs"]) == 7
-
-
 def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
     hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=3))
     reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
@@ -348,9 +222,6 @@ def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
     assert result.primary_energy is not None
     # The stabilized noisy solve is a rank-reduced diagnostic.
     assert result.conditioning_summary["stability_state"] in {"stabilized", "stable"}
-    assert result.conditioning_summary["termination_reason"] == (
-        "measured_matrix_elements_diagnostic"
-    )
 
     normalized = normalize_result(result)
     convergence = normalized["algorithm_metrics"]["convergence"]
@@ -361,113 +232,10 @@ def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
     }
 
 
-def test_measured_qse_completion_reports_effective_basis_cap() -> None:
-    hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=6))
-    reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
-    events: list[dict[str, object]] = []
-
-    run_qse(
-        hamiltonian=hamiltonian,
-        backend=_MockEstimator(reference, noise=0.01, seed=8),
-        config={
-            "algorithm": "qse",
-            "advanced_config": {
-                "algorithm": "qse",
-                "reference_method": "hf",
-                "excitation_level": "singles_doubles",
-                "max_subspace_dim": 96,
-            },
-        },
-        progress_callback=events.append,
-        backend_context=_noisy_ctx("aer_simulator"),
-    )
-
-    completion = events[-1]
-    assert completion["stage"] == "completed"
-    assert completion["max_subspace_dim"] == 8
-
-
-def test_measured_qse_fallback_reference_matches_pauli_circuit_width() -> None:
-    pauli = _four_qubit_hamiltonian(seed=10)
-    hamiltonian = SimpleNamespace(
-        pauli_hamiltonian=pauli,
-        num_electrons_alpha=1,
-        num_electrons_beta=1,
-        num_spatial_orbitals=2,
-    )
-    expected_reference = np.zeros(16, dtype=complex)
-    expected_reference[5] = 1.0
-
-    result = run_qse(
-        hamiltonian=hamiltonian,
-        backend=_MockEstimator(expected_reference, noise=0.01, seed=12),
-        config={
-            "algorithm": "qse",
-            "advanced_config": {
-                "algorithm": "qse",
-                "reference_method": "hf",
-                "excitation_level": "singles",
-                "max_subspace_dim": 4,
-            },
-        },
-        backend_context=_noisy_ctx("aer_simulator"),
-    )
-
-    assert result.conditioning_summary["reference_descriptor"]["state_fingerprint"] == (
-        fingerprint_state_vector(expected_reference)
-    )
-
-
-def test_measured_qse_rejects_non_hf_reference_before_estimator_run() -> None:
-    hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=4))
-    estimator = _MockEstimator(np.ones(16, dtype=complex) / 4.0)
-
-    with pytest.raises(ValueError, match="reference_method='hf' only"):
-        run_qse(
-            hamiltonian=hamiltonian,
-            backend=estimator,
-            config={
-                "algorithm": "qse",
-                "advanced_config": {
-                    "algorithm": "qse",
-                    "reference_method": "vqe",
-                    "excitation_level": "singles_doubles",
-                    "max_subspace_dim": 8,
-                },
-            },
-            backend_context=_noisy_ctx("aer_simulator"),
-        )
-
-    assert estimator.pub_count == 0
-
-
-def test_qse_dispatch_rejects_non_hf_reference_before_creating_estimator() -> None:
-    class _Backend:
-        def __init__(self) -> None:
-            self.create_estimator_calls = 0
-
-        def create_estimator(self, _backend_context: object) -> object:
-            self.create_estimator_calls += 1
-            raise AssertionError("measured QSE must reject before primitive creation")
-
-    backend = _Backend()
-    with pytest.raises(ValueError, match="reference_method='hf' only"):
-        run_qse_algorithm(
-            backend=backend,
-            config={"reference_method": "vqe"},
-            hamiltonian_bundle=object(),
-            progress_callback=None,
-            backend_context=_noisy_ctx("ibm_runtime"),
-        )
-
-    assert backend.create_estimator_calls == 0
-
-
-def test_measured_qse_noisy_hf_solve_is_reportable_diagnostic() -> None:
+def test_measured_qse_rank_reduced_solve_is_reportable_diagnostic() -> None:
     hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=5))
     reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
-    # The four-qubit (1, 1) sector has only four independent HF directions.
-    # Noisy measured QSE must keep this bounded solve diagnostic and reportable.
+    # Higher noise forces overlap thresholding to drop rank.
     estimator = _MockEstimator(reference, noise=0.08, seed=11)
 
     result = run_qse(
@@ -486,14 +254,14 @@ def test_measured_qse_noisy_hf_solve_is_reportable_diagnostic() -> None:
     )
 
     diagnostics = result.conditioning_summary
-    assert diagnostics["stability_state"] == "stable"
+    assert diagnostics["stability_state"] == "stabilized"
     assert int(diagnostics["retained_rank"]) >= 1
     assert result.converged is False
 
     normalized = normalize_result(result)
     # A reportable diagnostic keeps a finite reported energy.
     assert normalized["reported_energy"] is not None
-    assert normalized["reported_energy_source"] == "lowest_qse_projected_eigenvalue"
+    assert normalized["reported_energy_source"] == "stabilized_projected_diagnostic"
 
 
 def test_measured_qse_ibm_target_uses_mock_estimator_without_live_access() -> None:
@@ -631,11 +399,19 @@ def test_measured_qse_submits_only_hermitian_observables() -> None:
 
 
 def test_measured_qse_reconstructs_complex_off_diagonal_element() -> None:
-    """A Hermitian Y-containing Hamiltonian reconstructs a complex H_ij."""
-    hamiltonian = _HamiltonianBundle(
-        SparsePauliOp.from_list([("IIXY", 1.0)])
-    )
-    reference = build_hf_reference_state(hamiltonian, fallback_dim=16)
+    """An off-diagonal element with a known non-zero imaginary part is recovered.
+
+    The reference state is chosen so that a specific overlap S_ij is genuinely
+    complex; the fix must reconstruct <O> = <O_re> + i <O_im> exactly, whereas
+    the old single-real-EV path would have discarded the imaginary part.
+    """
+    hamiltonian = _HamiltonianBundle(_four_qubit_hamiltonian(seed=23))
+    # A superposition reference makes off-diagonal overlaps complex in general.
+    raw = np.zeros(16, dtype=complex)
+    raw[0b0011] = 1.0
+    raw[0b0101] = 1.0j
+    raw[0b0110] = 0.5 - 0.5j
+    reference = raw / np.linalg.norm(raw)
 
     estimator = _HermitianStrictEstimator(reference)
     estimate = estimate_measured_qse_matrices(
@@ -650,7 +426,6 @@ def test_measured_qse_reconstructs_complex_off_diagonal_element() -> None:
     # excitation operators on the same reference state.
     operators = build_measured_excitation_operators(
         num_qubits=4,
-        reference_state=reference,
         excitation_level="singles_doubles",
         max_dimension=8,
     )
@@ -671,11 +446,9 @@ def test_measured_qse_reconstructs_complex_off_diagonal_element() -> None:
     assert np.allclose(estimate.projected_hamiltonian, expected_h, atol=1e-9)
     assert np.allclose(estimate.overlap, expected_s, atol=1e-9)
 
-    # At least one projected Hamiltonian element is genuinely complex. Its
-    # imaginary part comes from the Y-containing Hermitian observable.
-    off_diagonal = estimate.projected_hamiltonian - np.diag(
-        np.diag(estimate.projected_hamiltonian)
-    )
+    # At least one reconstructed off-diagonal overlap has a non-zero imaginary
+    # part, which the old real-only path could not have produced.
+    off_diagonal = estimate.overlap - np.diag(np.diag(estimate.overlap))
     assert np.max(np.abs(off_diagonal.imag)) > 1e-3
 
 

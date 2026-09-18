@@ -94,6 +94,7 @@ interface BenchmarkBackendOptionsState {
 }
 
 export const DEFAULT_BENCHMARK_BACKEND_MODE: BenchmarkBackendMode = "statevector";
+export const DEFAULT_NOISE_REFERENCE_BACKEND = "ibm_brisbane";
 
 export function benchmarkEntryDisplayLabel(
   entry: Pick<BenchmarkEntry, "algorithm" | "variantLabel">,
@@ -307,7 +308,6 @@ export function normalizeStoredEntry(entry: BenchmarkEntry): BenchmarkEntry {
     advancedConfig: entry.advancedConfig ?? null,
     currentEnergy: entry.currentEnergy ?? entry.energy ?? null,
     elapsedSeconds: entry.elapsedSeconds ?? null,
-    executionMetadata: entry.executionMetadata ?? null,
     latestEventSequence: entry.latestEventSequence ?? 0,
   };
 
@@ -329,8 +329,7 @@ function normalizeStoredEntryStatus(
   entry: BenchmarkEntry,
   normalized: BenchmarkEntry,
 ): BenchmarkEntry {
-  if (entry.runId)
-    return hasQueuedStatus(entry.status) ? { ...normalized, status: "queued" } : normalized;
+  if (entry.runId) return hasQueuedStatus(entry.status) ? { ...normalized, status: "queued" } : normalized;
   const hasKnownStatus =
     entry.status === "idle" || TERMINAL.has(entry.status) || NON_EXECUTING.has(entry.status);
   return hasKnownStatus ? normalized : { ...normalized, status: "idle" };
@@ -391,7 +390,6 @@ export function buildInitialEntries(
       errorMessage: null,
       classicalRefs: null,
       elapsedSeconds: null,
-      executionMetadata: null,
       latestEventSequence: 0,
     })),
   );
@@ -461,7 +459,6 @@ export function applyEntryUpdates(
         classicalRefs,
         errorMessage,
         elapsedSeconds,
-        executionMetadata: update.value.executionMetadata,
         latestEventSequence: Math.max(existing.latestEventSequence, latestEventSequence),
       });
     }

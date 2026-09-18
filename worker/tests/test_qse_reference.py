@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from worker.chemistry import qse_solver
 from worker.chemistry.algorithms.qse.reference import (
     normalize_reference_state_vector,
     parse_reference_scalar,
@@ -69,3 +70,10 @@ def test_vector_size_to_qubits_accepts_powers_of_two(size: int, expected: int) -
 def test_vector_size_to_qubits_rejects_non_power_of_two() -> None:
     with pytest.raises(ValueError, match="power of two"):
         vector_size_to_qubits(3)
+
+
+def test_qse_solver_keeps_legacy_reference_aliases() -> None:
+    assert qse_solver._string_option is string_option
+    assert qse_solver._parse_reference_scalar is parse_reference_scalar
+    assert qse_solver._normalize_reference_state_vector is normalize_reference_state_vector
+    assert qse_solver._vector_size_to_qubits is vector_size_to_qubits

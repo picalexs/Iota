@@ -56,7 +56,6 @@ class SQDRunState(Protocol):
     termination_reason: str | None
     previous_occupancies: np.ndarray | None
     last_carryover_summary: dict[str, Any]
-    work_ledger: dict[str, int]
 
 
 def serialize_sqd_circuit_preview(circuit: Any) -> dict[str, Any]:
@@ -95,17 +94,12 @@ def build_sqd_circuit_artifacts(
     total_iterations: int,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Build per-iteration SQD artifacts with bounded full preview storage."""
-    available_iterations = sorted({int(iteration) for iteration, _circuit in sampled_circuits})
-    selected_iterations = set(select_sqd_artifact_iterations(total_iterations))
-    stored_iterations = [
-        iteration for iteration in available_iterations if iteration in selected_iterations
-    ]
+    stored_iterations = select_sqd_artifact_iterations(total_iterations)
     policy = circuit_artifact_downsampling_policy(
         total_iterations=total_iterations,
         stored_iterations=stored_iterations,
     )
     stored_iteration_set = set(stored_iterations)
-    representative_iteration = available_iterations[-1] if available_iterations else None
     artifacts: list[dict[str, Any]] = []
     for iteration, circuit in sampled_circuits:
         if iteration not in stored_iteration_set:
@@ -118,7 +112,7 @@ def build_sqd_circuit_artifacts(
                 role="sqd_sampling",
                 label=f"Recovery iter {iteration}",
                 phase="recovery",
-                representative=iteration == representative_iteration,
+                representative=iteration == stored_iterations[-1],
                 source="backend_sampler",
                 iteration=iteration,
                 downsampling={
@@ -218,7 +212,6 @@ def _build_sci_result_package(
         "symmetrize_spin": options.symmetrize_spin,
         "carryover_threshold": round(options.carryover_threshold, 8),
         "best_carryover": state.best_carryover_summary or state.last_carryover_summary,
-        "work_ledger": dict(state.work_ledger),
     }
     if state.last_sampled_circuit is not None:
         package["circuit_preview"] = serialize_sqd_circuit_preview(state.last_sampled_circuit)
@@ -342,5 +335,4 @@ def build_sqd_result(
         sci_result_package=sci_result_package,
         circuit_artifacts=circuit_artifacts,
         circuit_artifact_policy=circuit_artifact_policy,
-        best_sci_state=state.best_sci_state,
     )

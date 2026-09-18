@@ -16,7 +16,6 @@ from worker.chemistry.state_vectors import normalize_state_vector
 from worker.chemistry.time_evolution import (
     aer_pauli_time_evolution_state,
     exact_time_evolution_state_from_spectrum,
-    is_zero_time,
     prepare_exact_time_evolution,
     trotterized_time_evolution_state,
 )
@@ -33,7 +32,7 @@ def prepare_dense_krylov_spectrum(
     ),
 ) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
     """Prepare exact dense evolution data when KQD can reuse it."""
-    if evolution_method != "exact":
+    if evolution_method != "exact" or use_aer:
         return None, None, None
     eigenvalues, eigenvectors = prepare_exact_time_evolution_fn(operator_matrix)
     return eigenvalues, eigenvectors, eigenvectors.conj().T @ reference
@@ -64,8 +63,16 @@ def evolve_dense_krylov_state(
     trotterized_time_evolution_fn = evolution_dependencies.get(
         "trotterized_time_evolution_fn", trotterized_time_evolution_state
     )
-    if is_zero_time(time_point):
+    if np.isclose(time_point, 0.0):
         return reference.copy()
+    if use_aer:
+        return aer_time_evolution_fn(
+            hamiltonian,
+            reference,
+            time_step=time_point,
+            trotter_steps=trotter_steps,
+            context=backend_context,
+        )
     if evolution_method == "exact":
         if eigenvalues is None or eigenvectors is None:
             raise RuntimeError("KQD exact evolution spectrum was not prepared")
@@ -75,14 +82,6 @@ def evolve_dense_krylov_state(
             reference,
             time_step=time_point,
             state_projection=reference_projection,
-        )
-    if use_aer:
-        return aer_time_evolution_fn(
-            hamiltonian,
-            reference,
-            time_step=time_point,
-            trotter_steps=trotter_steps,
-            context=backend_context,
         )
     return trotterized_time_evolution_fn(
         operator_matrix,
@@ -248,7 +247,7 @@ def build_krylov_basis(
             backend_context=backend_context,
         )
         norm = float(np.linalg.norm(vector))
-        if not np.isfinite(norm) or norm == 0.0:
+        if np.isclose(norm, 0.0):
             continue
 
         basis.append(vector / norm)
@@ -264,7 +263,7 @@ def build_krylov_basis(
             time_point=time_point,
             time_step=time_step,
             trotter_steps=trotter_steps,
-            use_aer=use_aer and evolution_method != "exact",
+            use_aer=use_aer,
         )
 
     if not basis:
@@ -303,7 +302,7 @@ def build_sector_krylov_basis(
 
     for step in range(target_rank):
         time_point = float(step * time_step)
-        if is_zero_time(time_point):
+        if np.isclose(time_point, 0.0):
             vector = reference.copy()
         elif evolution_method == "exact":
             vector = action.time_evolve(reference, time_point=time_point)
@@ -316,7 +315,7 @@ def build_sector_krylov_basis(
                 trotter_steps=trotter_steps,
             )
         norm = float(np.linalg.norm(vector))
-        if not np.isfinite(norm) or norm == 0.0:
+        if np.isclose(norm, 0.0):
             continue
 
         basis.append(vector / norm)

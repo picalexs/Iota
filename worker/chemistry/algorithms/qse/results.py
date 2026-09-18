@@ -129,14 +129,12 @@ def build_qse_result(
         relative_residual=relative_residual,
         residual_tolerance=residual_tolerance,
     )
-    if execution_mode == "measured_matrix_elements" and not converged:
-        termination_reason = "measured_matrix_elements_diagnostic"
     if execution_mode == "measured_matrix_elements":
         matrix_element_summary = {
             "matrix_element_strategy": "branch_estimator",
             "measured_matrix_element_construction": diagnostics.get(
                 "measured_matrix_element_construction",
-                "fixed_pool_qse_nonorthogonal_eigensolver",
+                "da_case_nonorthogonal_eigensolver",
             ),
             "projected_dimension": basis_rank,
             "projected_matrix_element_count": 2 * basis_rank**2,
@@ -144,15 +142,7 @@ def build_qse_result(
                 "jordan_wigner_fermionic_excitation_operators"
             ),
             "backend_target": diagnostics.get("backend_target"),
-            "max_hamiltonian_standard_error": diagnostics.get(
-                "max_hamiltonian_standard_error"
-            ),
-            "max_overlap_standard_error": diagnostics.get("max_overlap_standard_error"),
             "max_standard_error": diagnostics.get("max_standard_error"),
-            "standard_error_units": diagnostics.get("standard_error_units"),
-            "max_standard_error_compatibility": diagnostics.get(
-                "max_standard_error_compatibility"
-            ),
         }
     else:
         matrix_element_summary = {
@@ -165,9 +155,6 @@ def build_qse_result(
             "projected_matrix_element_count": 2 * basis_rank**2,
             "basis_construction_rule": "fermionic_excitation_basis",
         }
-    basis_selection = diagnostics.get("basis_selection")
-    if isinstance(basis_selection, dict):
-        matrix_element_summary["basis_selection"] = basis_selection
     if reference_state is not None:
         matrix_element_summary["reference_descriptor"] = build_reference_descriptor(
             state=reference_state,
@@ -188,10 +175,6 @@ def build_qse_result(
             circuit_metadata=reference_circuit_artifacts,
             ansatz_name=("hartree_fock" if reference_method == "hf" else reference_method),
         )
-    conditioning_summary = {
-        key: value for key, value in diagnostics.items() if key != "basis_selection"
-    }
-    conditioning_summary["termination_reason"] = termination_reason
     return QSEResult(
         algorithm="qse",
         primary_energy=normalized_eigenvalues[0],
@@ -214,7 +197,7 @@ def build_qse_result(
         execution_mode=execution_mode,
         excitation_level=excitation_level,
         regularization=regularization,
-        conditioning_summary=conditioning_summary,
+        conditioning_summary={**diagnostics, "termination_reason": termination_reason},
         matrix_element_summary=matrix_element_summary,
     )
 

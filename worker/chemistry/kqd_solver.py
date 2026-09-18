@@ -49,17 +49,15 @@ from worker.chemistry.hamiltonian_action import (
     HamiltonianAction,
     build_hamiltonian_action,
 )
-from worker.chemistry.matrix_elements import (
-    estimate_projected_matrices_with_branch_estimator,
-)
+from worker.chemistry.matrix_elements import estimate_projected_matrices_with_branch_estimator
 from worker.chemistry.overlap import build_overlap_matrix
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_energy import generalized_projected_ground_energy
 from worker.chemistry.projected_execution import (
-    ProjectedExecutionPolicy,
     backend_label,
     can_use_sector_action,
     num_qubits,
+    num_spatial_orbitals,
     should_use_branch_matrix_elements,
     validate_branch_estimator_feasibility,
 )
@@ -84,6 +82,18 @@ from worker.chemistry.types import KQDResult
 logger = logging.getLogger(__name__)
 
 
+# Re-export private names for existing solver tests and importers.
+_num_qubits = num_qubits
+_num_spatial_orbitals = num_spatial_orbitals
+_can_use_sector_action = can_use_sector_action
+_should_use_branch_matrix_elements = should_use_branch_matrix_elements
+_backend_label = backend_label
+_normalize_krylov_reference_state = normalize_state_vector
+
+
+_KQDExecutionPlan = KQDExecutionPlan
+
+
 @dataclass(frozen=True)
 class _KQDSolveData:
     """Projected solve outputs shared across KQD execution paths."""
@@ -106,7 +116,7 @@ def _build_kqd_circuit_artifacts(
     evolution_method: str,
     use_branch_matrix_elements: bool,
 ) -> list[dict[str, Any]]:
-    """Adapt KQD artifact inputs to the artifact builder."""
+    """Keep the legacy KQD artifact helper import-compatible."""
     return build_kqd_circuit_artifacts(
         hamiltonian=hamiltonian,
         time_step=time_step,
@@ -127,7 +137,7 @@ def _build_representative_kqd_circuit(
     evolution_method: str,
     use_branch_matrix_elements: bool,
 ) -> Any | None:
-    """Adapt KQD circuit inputs to the circuit builder."""
+    """Keep the legacy KQD circuit helper import-compatible."""
     return build_representative_kqd_circuit(
         hamiltonian=hamiltonian,
         time_step=time_step,
@@ -136,7 +146,7 @@ def _build_representative_kqd_circuit(
         use_branch_matrix_elements=use_branch_matrix_elements,
         build_hf_reference_circuit_fn=build_hf_reference_circuit,
         prepare_hf_reference_bits_fn=prepare_hf_reference_bits,
-        num_qubits_fn=num_qubits,
+        num_qubits_fn=_num_qubits,
     )
 
 
@@ -162,7 +172,7 @@ def _build_krylov_basis(
     progress_callback: ProgressCallback | None,
     backend_context: Any | None = None,
 ) -> list[np.ndarray]:
-    """Adapt dense KQD basis inputs to the basis builder."""
+    """Keep the legacy dense KQD basis helper import-compatible."""
     return build_krylov_basis(
         hamiltonian,
         operator_matrix,
@@ -173,7 +183,7 @@ def _build_krylov_basis(
         trotter_steps=trotter_steps,
         progress_callback=progress_callback,
         backend_context=backend_context,
-        normalize_reference_fn=normalize_state_vector,
+        normalize_reference_fn=_normalize_krylov_reference_state,
         prepare_spectrum_fn=_prepare_dense_krylov_spectrum,
         evolve_state_fn=_evolve_dense_krylov_state,
         partial_energy_fn=_dense_krylov_partial_energy,
@@ -191,7 +201,7 @@ def _build_sector_krylov_basis(
     trotter_steps: int,
     progress_callback: ProgressCallback | None,
 ) -> list[np.ndarray]:
-    """Adapt sector KQD basis inputs to the basis builder."""
+    """Keep the legacy sector KQD basis helper import-compatible."""
     return build_sector_krylov_basis(
         action,
         reference_state,
@@ -200,7 +210,7 @@ def _build_sector_krylov_basis(
         time_step=time_step,
         trotter_steps=trotter_steps,
         progress_callback=progress_callback,
-        normalize_reference_fn=normalize_state_vector,
+        normalize_reference_fn=_normalize_krylov_reference_state,
         partial_energy_fn=_sector_krylov_partial_energy,
         emit_progress_fn=_emit_sector_krylov_progress,
     )
@@ -213,7 +223,7 @@ def _prepare_dense_krylov_spectrum(
     evolution_method: str,
     use_aer: bool,
 ) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None]:
-    """Adapt dense-spectrum inputs to the basis builder."""
+    """Keep the legacy dense-spectrum helper import-compatible."""
     return prepare_dense_krylov_spectrum(
         operator_matrix=operator_matrix,
         reference=reference,
@@ -237,7 +247,7 @@ def _evolve_dense_krylov_state(
     reference_projection: np.ndarray | None,
     backend_context: Any | None,
 ) -> np.ndarray:
-    """Adapt dense-evolution inputs to the basis builder."""
+    """Keep the legacy dense evolution helper import-compatible."""
     return evolve_dense_krylov_state(
         hamiltonian=hamiltonian,
         operator_matrix=operator_matrix,
@@ -260,7 +270,7 @@ def _dense_krylov_partial_energy(
     operator_matrix: np.ndarray,
     basis: list[np.ndarray],
 ) -> float | None:
-    """Adapt dense partial-energy inputs to the basis builder."""
+    """Keep the legacy dense partial-energy helper import-compatible."""
     return dense_krylov_partial_energy(
         operator_matrix,
         basis,
@@ -274,7 +284,7 @@ def _sector_krylov_partial_energy(
     action: HamiltonianAction,
     basis: list[np.ndarray],
 ) -> float | None:
-    """Adapt sector partial-energy inputs to the basis builder."""
+    """Keep the legacy sector partial-energy helper import-compatible."""
     return sector_krylov_partial_energy(
         action,
         basis,
@@ -297,7 +307,7 @@ def _emit_dense_krylov_progress(
     trotter_steps: int,
     use_aer: bool,
 ) -> None:
-    """Adapt dense progress inputs to the basis builder."""
+    """Keep the legacy dense progress helper import-compatible."""
     emit_dense_krylov_progress(
         progress_callback=progress_callback,
         iteration=iteration,
@@ -328,7 +338,7 @@ def _emit_sector_krylov_progress(
     sector_dimension: int,
     implemented_evolution_method: str = "sector_expm_multiply",
 ) -> None:
-    """Adapt sector progress inputs to the basis builder."""
+    """Keep the legacy sector progress helper import-compatible."""
     emit_sector_krylov_progress(
         progress_callback=progress_callback,
         iteration=iteration,
@@ -350,31 +360,31 @@ def _prepare_kqd_execution(
     hamiltonian: object,
     backend: object | None,
     backend_context: Any | None,
-    execution_policy: ProjectedExecutionPolicy | None = None,
-) -> KQDExecutionPlan:
+) -> _KQDExecutionPlan:
     """Resolve the KQD execution path and base operator resources."""
     return prepare_kqd_execution(
         hamiltonian=hamiltonian,
         backend=backend,
         backend_context=backend_context,
-        should_use_branch_matrix_elements_fn=should_use_branch_matrix_elements,
-        can_use_sector_action_fn=can_use_sector_action,
+        should_use_branch_matrix_elements_fn=_should_use_branch_matrix_elements,
+        can_use_sector_action_fn=_can_use_sector_action,
         build_hamiltonian_action_fn=build_hamiltonian_action,
         resolve_operator_matrix_fn=resolve_operator_matrix,
-        num_qubits_fn=num_qubits,
-        backend_label_fn=backend_label,
-        execution_policy=execution_policy,
+        num_qubits_fn=_num_qubits,
+        backend_label_fn=_backend_label,
     )
 
 
+_KQDConfig = KQDConfig
 _KRYLOV_BASIS_INDEX_CONVENTION = "k=0..krylov_dim-1"
+_resolve_kqd_config = resolve_kqd_config
 
 
 def _solve_kqd_branch_path(
     *,
     hamiltonian: object,
     backend: object | None,
-    kqd_config: KQDConfig,
+    kqd_config: _KQDConfig,
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
 ) -> _KQDSolveData:
@@ -400,7 +410,7 @@ def _solve_kqd_branch_path(
     stabilized = solve_stabilized_generalized_eigenproblem(
         projected_hamiltonian,
         estimate.overlap,
-        max_standard_error=estimate.summary.get("max_overlap_standard_error"),
+        max_standard_error=estimate.summary.get("max_standard_error"),
     )
     if stabilized.eigenvalues.size == 0:
         raise ValueError("KQD projected solve produced no Ritz values")
@@ -418,7 +428,7 @@ def _solve_kqd_branch_path(
     basis_rank = projected_hamiltonian.shape[0]
     reference_state, reference_source = build_hf_reference_state_with_source(
         hamiltonian,
-        fallback_dim=2 ** max(0, num_qubits(hamiltonian)),
+        fallback_dim=2 ** max(0, _num_qubits(hamiltonian)),
     )
     reference_descriptor = build_reference_descriptor(
         state=reference_state,
@@ -455,7 +465,7 @@ def _solve_kqd_branch_path(
             "trotter_steps": kqd_config.trotter_steps,
             "projected_dimension": basis_rank,
             "projected_matrix_element_count": 2 * basis_rank * basis_rank,
-            "residual_kind": "projected_gevp_equation",
+            "residual_kind": "projected_generalized_eigenpair",
             "basis_index_convention": _KRYLOV_BASIS_INDEX_CONVENTION,
             "reference_state_source": reference_source,
             "reference_descriptor": reference_descriptor,
@@ -466,7 +476,7 @@ def _solve_kqd_branch_path(
 def _solve_kqd_sector_path(
     *,
     sector_action: HamiltonianAction,
-    kqd_config: KQDConfig,
+    kqd_config: _KQDConfig,
     progress_callback: ProgressCallback | None,
 ) -> _KQDSolveData:
     """Solve KQD in the fixed-particle sector."""
@@ -539,7 +549,7 @@ def _solve_kqd_dense_path(
     *,
     hamiltonian: object,
     operator: np.ndarray,
-    kqd_config: KQDConfig,
+    kqd_config: _KQDConfig,
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
 ) -> _KQDSolveData:
@@ -562,12 +572,11 @@ def _solve_kqd_dense_path(
     basis_matrix = np.column_stack(basis)
     reference_energy = float(np.real(np.vdot(reference_state, operator @ reference_state)))
     residual = operator @ reference_state - reference_energy * reference_state
-    if kqd_config.evolution_method == "exact":
-        implemented_evolution_method = "exact_matrix_evolution"
-    elif getattr(backend_context, "backend_target", None) == "aer_simulator":
-        implemented_evolution_method = "aer_pauli_lie_trotter"
-    else:
-        implemented_evolution_method = "dense_matrix_trotter"
+    implemented_evolution_method = (
+        "aer_pauli_lie_trotter"
+        if getattr(backend_context, "backend_target", None) == "aer_simulator"
+        else "exact_matrix_evolution"
+    )
     reference_descriptor = build_reference_descriptor(
         state=reference_state,
         reference_source=reference_source,
@@ -619,10 +628,10 @@ def _solve_kqd_dense_path(
 
 def _run_kqd_solve_path(
     *,
-    plan: KQDExecutionPlan,
+    plan: _KQDExecutionPlan,
     hamiltonian: object,
     backend: object | None,
-    kqd_config: KQDConfig,
+    kqd_config: _KQDConfig,
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
 ) -> _KQDSolveData:
@@ -659,7 +668,7 @@ def _emit_kqd_completion(
     ritz_values: np.ndarray,
     diagnostics: dict[str, Any],
     matrix_element_summary: dict[str, Any],
-    kqd_config: KQDConfig,
+    kqd_config: _KQDConfig,
     primary_energy: float,
     time_evolution_backend: str,
     kqd_elapsed: float,
@@ -679,6 +688,7 @@ def _emit_kqd_completion(
         ),
     )
 
+
 def run_kqd(
     *,
     hamiltonian: object,
@@ -686,18 +696,16 @@ def run_kqd(
     config: dict[str, Any],
     progress_callback: ProgressCallback | None = None,
     backend_context: Any | None = None,
-    execution_policy: ProjectedExecutionPolicy | None = None,
 ) -> KQDResult:
     """Run a deterministic Krylov subspace diagonalization workflow."""
     resolved = resolve_algorithm_config(config, "kqd")
-    kqd_config = resolve_kqd_config(resolved)
+    kqd_config = _resolve_kqd_config(resolved)
 
     t_start = time.monotonic()
     plan = _prepare_kqd_execution(
         hamiltonian=hamiltonian,
         backend=backend,
         backend_context=backend_context,
-        execution_policy=execution_policy,
     )
     logger.info(
         "KQD setup: hilbert_dim=%d krylov_dim=%d evolution=%s time_step=%.4f "
@@ -744,18 +752,14 @@ def run_kqd(
     }
     if plan.use_branch_matrix_elements:
         projected_residual = solve_data.residual_diagnostics["relative_ritz_residual"]
-        projected_solver_converged = projected_matrix_converged(diagnostics) and (
+        converged = _projected_matrix_converged(diagnostics) and (
             projected_residual <= kqd_config.residual_tolerance
         )
-        matrix_element_summary["projected_solver_converged"] = bool(
-            projected_solver_converged
-        )
         matrix_element_summary["convergence_basis"] = (
-            "projected_solver_only_full_space_residual_unavailable"
+            "projected_overlap_condition_and_generalized_residual"
         )
-        converged = False
     else:
-        converged = projected_matrix_converged(diagnostics) and (
+        converged = _projected_matrix_converged(diagnostics) and (
             solve_data.residual_diagnostics["relative_ritz_residual"]
             <= kqd_config.residual_tolerance
         )
@@ -806,3 +810,6 @@ def run_kqd(
             use_branch_matrix_elements=plan.use_branch_matrix_elements,
         ),
     )
+
+
+_projected_matrix_converged = projected_matrix_converged

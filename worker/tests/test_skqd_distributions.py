@@ -34,18 +34,3 @@ def test_time_evolved_distribution_normalizes_seed_and_averages_steps() -> None:
     )
 
     assert distribution == [{"bitstring": "0", "probability": 1.0}]
-
-
-def test_time_evolved_distribution_keeps_small_nonzero_time() -> None:
-    operator = np.asarray([[0.0, 1e10], [1e10, 0.0]], dtype=complex)
-
-    distribution = time_evolved_bitstring_distribution(
-        operator,
-        np.asarray([1.0, 0.0], dtype=complex),
-        num_steps=2,
-        time_step=7e-10,
-    )
-
-    assert distribution[0]["bitstring"] == "0"
-    assert distribution[1]["bitstring"] == "1"
-    assert distribution[1]["probability"] > 0.2

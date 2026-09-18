@@ -7,21 +7,6 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class ExecutionPlan:
-    """Resolved backend path consumed by an algorithm workflow."""
-
-    requested_backend_target: str | None
-    actual_path: str
-    primitive: str | None
-    selection_reason: str
-
-    @property
-    def requires_estimator(self) -> bool:
-        """Return whether the selected path needs an EstimatorV2 primitive."""
-        return self.primitive == "EstimatorV2"
-
-
-@dataclass(frozen=True)
 class AlgorithmResult:
     """Base worker-internal solver result before API normalization."""
 
@@ -94,7 +79,6 @@ class SQDResult(AlgorithmResult):
     sci_result_package: dict[str, Any] = field(default_factory=dict)
     circuit_artifacts: list[dict[str, Any]] = field(default_factory=list)
     circuit_artifact_policy: dict[str, Any] = field(default_factory=dict)
-    best_sci_state: Any | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)

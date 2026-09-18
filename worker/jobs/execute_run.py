@@ -371,8 +371,6 @@ def _estimate_total_iterations(
     *,
     num_qubits: int | None = None,
     backend_target: str | None = None,
-    noise_profile_enabled: bool | None = None,
-    projected_branch_path: bool | None = None,
 ) -> int:
     """Estimate total iterations for live telemetry before dispatch starts."""
     return _shared_estimate_total_iterations(
@@ -380,8 +378,6 @@ def _estimate_total_iterations(
         config_payload=config_snapshot,
         num_qubits=num_qubits,
         backend_target=backend_target,
-        noise_profile_enabled=noise_profile_enabled,
-        projected_branch_path=projected_branch_path,
     )
 
 

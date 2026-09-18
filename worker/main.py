@@ -147,7 +147,7 @@ def main() -> None:
         handler.setLevel(numeric_level)
         handler.setFormatter(_JsonFormatter())
         root_logger.addHandler(handler)
-    logger.info("Worker initialized for queue '%s'", settings.queue_name)
+    logger.info("Worker scaffold initialized for queue '%s'", settings.queue_name)
 
     _log_queue_depth(settings.redis_url, settings.queue_name)
 

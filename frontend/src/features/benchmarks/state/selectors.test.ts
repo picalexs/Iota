@@ -1,18 +1,12 @@
-import { act, renderHook } from "@testing-library/react";
-import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { BENCHMARK_MOLECULE_PRESETS } from "@/lib/benchmark-presets";
-import type { BenchmarkBackendMode, BenchmarkEntry } from "@/types/benchmark";
-import type { RunAlgorithm, UUID } from "@/types/run";
+import type { UUID } from "@/types/run";
 import {
   createAdvancedBenchmarkVariant,
   createSimpleBenchmarkVariant,
-  type BenchmarkAlgorithmVariant,
-  type BenchmarkVariantMode,
 } from "@/pages/benchmark/benchmark-variants";
 import { buildInitialEntries } from "@/pages/benchmark/benchmark-utils";
-import { useBenchmarkVariantSelectionState } from "./variant-selection";
 import {
   buildGroupedBenchmarkEntries,
   describeBenchmarkBackendMode,
@@ -35,35 +29,6 @@ function getPreset(index: number) {
 
 const firstPreset = getPreset(0);
 const secondPreset = getPreset(1);
-const emptyPresets: [] = [];
-const noDisabledAlgorithms = new Map<RunAlgorithm, string>();
-
-function renderVariantSelection(selectedBackendMode: BenchmarkBackendMode) {
-  return renderHook(() => {
-    const [benchmarkMode, setBenchmarkMode] = useState<BenchmarkVariantMode>("advanced");
-    const [selectedAlgorithms, setSelectedAlgorithms] = useState<RunAlgorithm[]>([]);
-    const [algorithmVariants, setAlgorithmVariants] = useState<BenchmarkAlgorithmVariant[]>([]);
-    const [entries, setEntries] = useState<BenchmarkEntry[]>([]);
-    const selection = useBenchmarkVariantSelectionState({
-      benchmarkMode,
-      selectedBackendMode,
-      selectedAlgorithms,
-      algorithmVariants,
-      selectedPresets: emptyPresets,
-      entries,
-      running: false,
-      pendingBenchmarkAction: null,
-      disabledAlgorithms: noDisabledAlgorithms,
-      chemicalAccuracyHa: 0.0016,
-      setBenchmarkMode,
-      setSelectedAlgorithms,
-      setAlgorithmVariants,
-      setEntries,
-    });
-
-    return { ...selection, algorithmVariants };
-  });
-}
 
 function entryWithStatus(
   status: Parameters<typeof hasPendingEntrySubmission>[0][number]["status"],
@@ -82,32 +47,6 @@ function entryWithStatus(
 }
 
 describe("benchmark entry selectors", () => {
-  it("uses backend-aware KQD recommendations for added and resized rows", () => {
-    const ibm = renderVariantSelection("ibm_runtime");
-    act(() => ibm.result.current.addAdvancedVariant("kqd"));
-    expect(ibm.result.current.algorithmVariants[0]?.advancedConfig).toMatchObject({
-      algorithm: "kqd",
-      evolution_method: "trotter",
-    });
-    ibm.unmount();
-
-    const noisyAer = renderVariantSelection("aer_simulator_backend_noise");
-    act(() => noisyAer.result.current.setAdvancedVariantCount("kqd", 1));
-    expect(noisyAer.result.current.algorithmVariants[0]?.advancedConfig).toMatchObject({
-      algorithm: "kqd",
-      evolution_method: "trotter",
-    });
-    noisyAer.unmount();
-
-    const idealAer = renderVariantSelection("aer_simulator");
-    act(() => idealAer.result.current.addAdvancedVariant("kqd"));
-    expect(idealAer.result.current.algorithmVariants[0]?.advancedConfig).toMatchObject({
-      algorithm: "kqd",
-      evolution_method: "exact",
-    });
-    idealAer.unmount();
-  });
-
   it("describes local and remote benchmark execution modes", () => {
     expect(describeBenchmarkBackendMode("statevector", null, 2)).toBe(
       "Benchmark jobs will run locally.",

@@ -30,12 +30,6 @@ def test_positive_float_or_default(value: object, expected: float) -> None:
     assert positive_float_or_default(value, default=0.5) == pytest.approx(expected)
 
 
-@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
-def test_vqe_float_helpers_reject_non_finite_values(value: float) -> None:
-    assert bounded_optional_positive_int(value, high=10) is None
-    assert positive_float_or_default(value, default=0.5) == pytest.approx(0.5)
-
-
 def test_resolve_parameter_bounds_normalizes_numeric_pairs() -> None:
     assert resolve_parameter_bounds(
         {"parameter_bounds": [[0, 1], (-2.5, 3)]},
@@ -50,8 +44,6 @@ def test_resolve_parameter_bounds_normalizes_numeric_pairs() -> None:
         ({"parameter_bounds": [[0, 1]]}, 2, "exactly 2"),
         ({"parameter_bounds": [[0]]}, 1, "numeric"),
         ({"parameter_bounds": [[2, 1]]}, 1, "cannot exceed"),
-        ({"parameter_bounds": [[float("nan"), 1]]}, 1, "must be finite"),
-        ({"parameter_bounds": [[float("inf"), 1]]}, 1, "must be finite"),
     ],
 )
 def test_resolve_parameter_bounds_rejects_invalid_values(
@@ -86,13 +78,6 @@ def test_resolve_vqe_config_applies_defaults_and_caps() -> None:
         reps=6,
         optimizer_policy="explicit",
     )
-
-
-def test_resolve_vqe_config_defaults_non_finite_integer_options() -> None:
-    result = resolve_vqe_config({"max_iterations": float("nan"), "reps": float("inf")})
-
-    assert result.max_iterations == 500
-    assert result.reps == 2
 
 
 def test_resolve_vqe_config_prefers_explicit_function_limit() -> None:

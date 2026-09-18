@@ -342,24 +342,8 @@ def _append_qse_reference_guardrails(
     *,
     advanced_config: QSEAdvancedConfig,
     molecule_active_space_n_orbitals: int | None,
-    is_measured_target: bool,
     errors: list[RunValidationErrorDetail],
 ) -> None:
-    if is_measured_target and advanced_config.reference_method != "hf":
-        _append_error(
-            errors,
-            field="advanced_config.reference_method",
-            code=ValidationErrorCode.UNSUPPORTED_OPTION,
-            message=(
-                "Measured QSE on noisy Aer and IBM Runtime supports "
-                "reference_method='hf' only because the measured circuit prepares "
-                "the Hartree-Fock reference state."
-            ),
-            suggestion=(
-                "Use reference_method='hf' for measured QSE, or use statevector or "
-                "ideal Aer for a non-HF reference."
-            ),
-        )
     if (
         advanced_config.reference_method == "provided_state"
         and not advanced_config.provided_state_vector
@@ -454,7 +438,6 @@ def _append_qse_guardrails(
     _append_qse_reference_guardrails(
         advanced_config=advanced_config,
         molecule_active_space_n_orbitals=molecule_active_space_n_orbitals,
-        is_measured_target=is_measured_target,
         errors=errors,
     )
     _append_qse_ignored_option_warnings(advanced_config, warnings)

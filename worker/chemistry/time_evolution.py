@@ -9,11 +9,6 @@ import numpy as np
 _AER_STATEVECTOR_METHODS = {"automatic", "statevector", "matrix_product_state"}
 
 
-def is_zero_time(time_value: float) -> bool:
-    """Return whether a time value is exactly zero."""
-    return float(time_value) == 0.0
-
-
 def prepare_exact_time_evolution(operator_matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Diagonalize a Hermitian operator once for repeated exact evolution."""
     hermitian = np.asarray(operator_matrix, dtype=complex)
@@ -37,8 +32,6 @@ def build_time_grid(
     if normalized_grid_type == "geometric":
         positive_times = np.geomspace(max_time / num_time_points, max_time, num_time_points - 1)
         return np.concatenate([np.array([0.0]), positive_times.astype(float)])
-    if normalized_grid_type != "linear":
-        raise ValueError("grid_type must be one of: geometric, linear")
 
     return np.linspace(0.0, max_time, num_time_points, dtype=float)
 
@@ -65,7 +58,7 @@ def exact_time_evolution_state_from_spectrum(
     phases = np.exp(-1j * np.asarray(eigenvalues, dtype=float) * time_step)
     evolved = eigenvectors @ (phases * state_projection)
     norm = np.linalg.norm(evolved)
-    if norm == 0.0:
+    if np.isclose(norm, 0.0):
         return evolved
     return evolved / norm
 
@@ -108,7 +101,7 @@ def trotterized_time_evolution_state(
         evolved = _exponentiate_hermitian(residual, step_time) @ evolved
 
     norm = np.linalg.norm(evolved)
-    if norm == 0.0:
+    if np.isclose(norm, 0.0):
         return evolved
     return evolved / norm
 
@@ -122,7 +115,7 @@ def aer_pauli_time_evolution_state(
     context: Any | None = None,
 ) -> np.ndarray:
     """Evolve a state by simulating a PauliEvolutionGate with AerSimulator."""
-    if is_zero_time(time_step):
+    if np.isclose(time_step, 0.0):
         return _normalized_state(state)
     if trotter_steps < 1:
         raise ValueError("trotter_steps must be positive")
@@ -136,8 +129,7 @@ def aer_pauli_time_evolution_state(
     from qiskit.circuit.library import PauliEvolutionGate
     from qiskit.quantum_info import SparsePauliOp
     from qiskit.synthesis import LieTrotter
-
-    from worker.chemistry.matrix_element_circuits import build_aer_simulator
+    from qiskit_aer import AerSimulator
 
     pauli_hamiltonian = getattr(hamiltonian, "pauli_hamiltonian", None)
     if not isinstance(pauli_hamiltonian, SparsePauliOp):
@@ -152,7 +144,10 @@ def aer_pauli_time_evolution_state(
             "'statevector', or 'matrix_product_state'."
         )
 
-    simulator = build_aer_simulator(context)
+    simulator_options: dict[str, Any] = {}
+    if simulator_method != "automatic":
+        simulator_options["method"] = simulator_method
+    simulator = AerSimulator(**simulator_options)
 
     circuit = QuantumCircuit(num_qubits)
     circuit.initialize([complex(value) for value in state_array], list(range(num_qubits)))
@@ -191,7 +186,7 @@ def aer_pauli_time_evolution_state(
 def _normalized_state(state: np.ndarray) -> np.ndarray:
     state_array = np.asarray(state, dtype=complex)
     norm = float(np.linalg.norm(state_array))
-    if norm == 0.0:
+    if np.isclose(norm, 0.0):
         return state_array
     return state_array / norm
 

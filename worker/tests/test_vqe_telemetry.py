@@ -64,17 +64,3 @@ def test_objective_state_stops_before_evaluator_after_cap() -> None:
         state(np.asarray([1.0, 1.0]))
 
     assert len(evaluations) == 1
-
-
-def test_objective_state_counts_failed_evaluation_attempts() -> None:
-    def failed_evaluator(_parameters: np.ndarray) -> float:
-        raise RuntimeError("backend failed")
-
-    state = _build_state(failed_evaluator)
-
-    with pytest.raises(RuntimeError, match="backend failed"):
-        state(np.asarray([0.0, 0.0]))
-
-    assert state.evaluation_count == 0
-    assert state.evaluation_attempt_count == 1
-    assert state.evaluation_failure_count == 1

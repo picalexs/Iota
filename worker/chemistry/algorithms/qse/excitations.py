@@ -45,7 +45,7 @@ def apply_fermionic_excitation(
     ]
 
     for basis_index, amplitude in enumerate(np.asarray(reference_state, dtype=complex)):
-        if amplitude == 0.0:
+        if np.isclose(amplitude, 0.0):
             continue
         new_index = basis_index
         sign = 1

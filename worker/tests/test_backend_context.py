@@ -29,7 +29,7 @@ def _build_context(
         run_id="run-1",
         backend_target=backend_target,
         backend_options_runtime=backend_options or {},
-        config_snapshot={},
+        config_snapshot={"noise_profile": {"readout_error": 0.02}},
         run_wall_start=12.5,
         run_guard_factory=_guard_factory,
         ibm_job_observer_factory=_ibm_observer_factory,
@@ -76,6 +76,7 @@ def test_ibm_context_attaches_runtime_observer_and_preserves_selection_policy() 
         backend_options_runtime={"shots": 256},
         config_snapshot={
             "backend_options": {"selection_policy": "least_busy"},
+            "noise_profile": {"readout_error": 0.02},
         },
         run_wall_start=4.0,
         run_guard_factory=_guard_factory,

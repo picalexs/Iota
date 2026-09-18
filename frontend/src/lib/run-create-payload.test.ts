@@ -20,7 +20,7 @@ const baseValues: SimulationRunFormData = {
   },
   noise_profile: {
     source: "backend_derived",
-    reference_backend: "ibm_brisbane",
+    reference_backend: "aer_simulator",
   },
   basis_set_override: "",
   easy_options: {
@@ -127,7 +127,7 @@ describe("buildAlgorithmAwareRunCreate", () => {
       },
       noise_profile: {
         source: "backend_derived",
-        reference_backend: "ibm_brisbane",
+        reference_backend: "aer_simulator",
       },
     });
   });

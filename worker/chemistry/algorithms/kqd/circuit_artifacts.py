@@ -5,13 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
+
 from worker.chemistry.circuit_artifacts import (
     build_hf_reference_circuit,
     prepare_hf_reference_bits,
     serialize_circuit_artifact,
 )
 from worker.chemistry.projected_execution import num_qubits
-from worker.chemistry.time_evolution import is_zero_time
 
 
 def build_kqd_circuit_artifacts(
@@ -98,7 +99,7 @@ def build_representative_kqd_circuit(
     num_qubits_fn: Callable[[object], int | None] = num_qubits,
 ) -> Any | None:
     """Build a logical KQD circuit template for visualization."""
-    if is_zero_time(time_step):
+    if np.isclose(time_step, 0.0):
         return None
 
     try:

@@ -829,9 +829,6 @@ at the schema level. The request shape is `RunValidationRequest`:
   itself. Statevector KQD/QFD use a fixed-particle-sector matrix-free path; QSE
   still rejects `reference_method="vqe"` and `"provided_state"` above this size;
   large QSE uses `reference_method="hf"` or `"provided_sector"`.
-- Measured QSE on noisy Aer or IBM Runtime supports `reference_method="hf"`
-  only. The measured circuit prepares the Hartree-Fock reference state. Use
-  statevector or ideal Aer for non-HF QSE references.
 - QSE `provided_state` validation requires `provided_state_vector`; each entry
   may be a real number or a `{real, imag}` object.
 - QSE `provided_sector` validation requires `provided_sector_amplitudes` entries

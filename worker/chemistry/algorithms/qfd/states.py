@@ -16,7 +16,6 @@ from worker.chemistry.state_vectors import normalize_state_vector
 from worker.chemistry.time_evolution import (
     aer_pauli_time_evolution_state,
     exact_time_evolution_state_from_spectrum,
-    is_zero_time,
 )
 
 
@@ -25,7 +24,7 @@ def build_sector_qfd_states(
     reference_state: np.ndarray,
     time_grid: np.ndarray,
     *,
-    max_time: float | None,
+    max_time: float,
     time_grid_type: str,
     progress_callback: ProgressCallback | None,
     normalize_state_fn: Callable[..., np.ndarray] = normalize_state_vector,
@@ -43,14 +42,14 @@ def build_sector_qfd_states(
     for index, time_point in enumerate(time_grid, start=1):
         state = (
             reference.copy()
-            if is_zero_time(time_point)
+            if np.isclose(time_point, 0.0)
             else action.time_evolve(
                 reference,
                 time_point=float(time_point),
             )
         )
         norm = float(np.linalg.norm(state))
-        if not np.isfinite(norm) or norm == 0.0:
+        if np.isclose(norm, 0.0):
             continue
         states.append(state / norm)
 
@@ -73,7 +72,7 @@ def build_sector_qfd_states(
                     "total_iterations": total,
                     "energy": partial_energy,
                     "time_point": float(time_point),
-                    "max_time": max_time,
+                    "max_time": float(max_time),
                     "time_grid_type": time_grid_type,
                     "time_evolution_backend": "sector_matrix_free",
                     "implemented_evolution_method": "sector_expm_multiply",
@@ -94,7 +93,7 @@ def evolve_dense_qfd_state(
     exact_time_evolution_fn: Callable[..., np.ndarray] = exact_time_evolution_state_from_spectrum,
 ) -> np.ndarray:
     """Evolve the QFD reference state to one time point."""
-    if is_zero_time(time_point):
+    if np.isclose(time_point, 0.0):
         return evolution_context.reference_state
     if evolution_context.use_aer:
         return aer_time_evolution_fn(
@@ -140,7 +139,7 @@ def emit_dense_qfd_progress(
     total_iterations: int,
     partial_energy: float | None,
     time_point: float,
-    max_time: float | None,
+    max_time: float,
     time_grid_type: str,
     use_aer: bool,
     trotter_steps: int,
@@ -158,7 +157,7 @@ def emit_dense_qfd_progress(
             "total_iterations": total_iterations,
             "energy": partial_energy,
             "time_point": time_point,
-            "max_time": max_time,
+            "max_time": float(max_time),
             "time_grid_type": time_grid_type,
             "time_evolution_backend": "aer_simulator" if use_aer else "dense_matrix",
             "aer_trotter_steps": trotter_steps if use_aer else None,
@@ -171,7 +170,7 @@ def build_dense_qfd_states(
     evolution_context: Any,
     time_grid: np.ndarray,
     num_time_points: int,
-    max_time: float | None,
+    max_time: float,
     time_grid_type: str,
     progress_callback: ProgressCallback | None,
     evolve_state_fn: Callable[..., np.ndarray] = evolve_dense_qfd_state,

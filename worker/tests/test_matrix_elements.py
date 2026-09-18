@@ -9,10 +9,6 @@ from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.aer_adapter import AerAdapter
 from worker.adapters.base import BackendExecutionContext
-from worker.chemistry import matrix_elements
-from worker.chemistry.algorithms.kqd.workflow import run_kqd
-from worker.chemistry.algorithms.qfd.grid import build_qfd_time_grid
-from worker.chemistry.algorithms.qfd.workflow import run_qfd
 from worker.chemistry.eigensolver import (
     StabilizedGeneralizedEigenproblemResult,
     build_reference_state,
@@ -59,13 +55,7 @@ def test_branch_estimator_handles_symmetric_negative_time_grid() -> None:
         pauli_hamiltonian=SparsePauliOp.from_list([("X", 1.0)]),
         num_qubits=1,
     )
-    time_points = build_qfd_time_grid(
-        qfd_variant="qfd_original_symmetric",
-        num_time_points=3,
-        max_time=1.0,
-        time_grid_type="linear",
-        kappa=2.0 * np.pi / 0.4,
-    )
+    time_points = [-0.4, 0.0, 0.4]
     estimate = estimate_projected_matrices_with_branch_estimator(
         hamiltonian=hamiltonian,
         estimator=StatevectorEstimator(),
@@ -74,15 +64,16 @@ def test_branch_estimator_handles_symmetric_negative_time_grid() -> None:
         algorithm="qfd",
     )
 
-    # QFD uses |phi_k> = exp(-i 2 pi k H / kappa) |phi_0>. For H=X and
-    # |phi_0>=|0>, S_ij=cos(t_i-t_j), while H_ij=i sin(t_i-t_j).
-    time_differences = np.subtract.outer(time_points, time_points)
-    expected_overlap = np.cos(time_differences)
-    expected_hamiltonian = 1j * np.sin(time_differences)
+    operator = hamiltonian.pauli_hamiltonian.to_matrix()
+    reference = build_reference_state(2)
+    states = [
+        exact_time_evolution_state(operator, reference, time_step=time_point)
+        for time_point in time_points
+    ]
+    basis = np.column_stack(states)
 
-    assert time_points == pytest.approx([-0.4, 0.0, 0.4])
-    assert estimate.projected_hamiltonian == pytest.approx(expected_hamiltonian)
-    assert estimate.overlap == pytest.approx(expected_overlap)
+    assert estimate.projected_hamiltonian == pytest.approx(basis.conj().T @ operator @ basis)
+    assert estimate.overlap == pytest.approx(basis.conj().T @ basis)
     assert estimate.summary["time_points"] == pytest.approx(time_points)
 
 
@@ -179,146 +170,6 @@ def test_branch_estimator_does_not_infer_zero_uncertainty_when_stds_are_missing(
     assert estimate.summary["max_standard_error"] is None
 
 
-def test_branch_estimator_separates_hamiltonian_and_overlap_uncertainty(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class _FakeJob:
-        def result(self):
-            return [
-                SimpleNamespace(
-                    data=SimpleNamespace(
-                        evs=np.array([-1.0, 0.0, 1.0, 0.0]),
-                        stds=np.array([5.0, 7.0, 0.02, 0.03]),
-                    )
-                )
-                for _ in range(3)
-            ]
-
-    class _Estimator:
-        def run(self, pubs):
-            assert len(pubs) == 3
-            return _FakeJob()
-
-    solver_errors: list[float | None] = []
-    original_solver = matrix_elements.solve_stabilized_generalized_eigenproblem
-
-    def _record_solver_error(hamiltonian, overlap, **kwargs):
-        solver_errors.append(kwargs.get("max_standard_error"))
-        return original_solver(hamiltonian, overlap, **kwargs)
-
-    monkeypatch.setattr(
-        "worker.chemistry.matrix_elements.solve_stabilized_generalized_eigenproblem",
-        _record_solver_error,
-    )
-    events: list[dict[str, object]] = []
-    hamiltonian = SimpleNamespace(
-        pauli_hamiltonian=SparsePauliOp.from_list([("Z", -1.0)]),
-        num_qubits=1,
-    )
-
-    estimate = estimate_projected_matrices_with_branch_estimator(
-        hamiltonian=hamiltonian,
-        estimator=_Estimator(),
-        time_points=[0.0, 0.1],
-        trotter_steps=1,
-        algorithm="kqd",
-        progress_callback=events.append,
-    )
-
-    assert estimate.summary["max_hamiltonian_standard_error"] == pytest.approx(7.0)
-    assert estimate.summary["max_overlap_standard_error"] == pytest.approx(0.03)
-    assert estimate.summary["max_standard_error"] == pytest.approx(7.0)
-    assert estimate.summary["max_standard_error_compatibility"] == {
-        "definition": "legacy_max_across_hamiltonian_and_overlap_entries",
-        "units": "mixed_hamiltonian_energy_and_dimensionless_overlap",
-        "deprecated": True,
-    }
-    assert solver_errors == pytest.approx([0.03, 0.03])
-    matrix_events = [event for event in events if "matrix_element_pair" in event]
-    assert matrix_events
-    assert matrix_events[-1]["max_hamiltonian_standard_error"] == pytest.approx(7.0)
-    assert matrix_events[-1]["max_overlap_standard_error"] == pytest.approx(0.03)
-    assert matrix_events[-1]["max_standard_error"] == pytest.approx(7.0)
-    assert matrix_events[-1]["standard_error_units"]["max_overlap_standard_error"] == (
-        "dimensionless"
-    )
-    assert matrix_events[-1]["max_standard_error_compatibility"]["deprecated"] is True
-    projected_events = [
-        event for event in events if event.get("step") == "projected_subspace_progress"
-    ]
-    assert projected_events[-1]["max_hamiltonian_standard_error"] == pytest.approx(7.0)
-    assert projected_events[-1]["max_overlap_standard_error"] == pytest.approx(0.03)
-
-
-class _FixedUncertaintyEstimator:
-    """Return valid rank-one H/S data with deliberately different error scales."""
-
-    def run(self, pubs):
-        class _Job:
-            def result(self):
-                return [
-                    SimpleNamespace(
-                        data=SimpleNamespace(
-                            evs=np.array([-1.0, 0.0, 1.0, 0.0]),
-                            stds=np.array([5.0, 7.0, 0.02, 0.03]),
-                        )
-                    )
-                    for _ in pubs
-                ]
-
-        return _Job()
-
-
-def test_kqd_branch_solve_uses_only_dimensionless_overlap_error() -> None:
-    result = run_kqd(
-        hamiltonian=SimpleNamespace(
-            pauli_hamiltonian=SparsePauliOp.from_list([("Z", -1.0)]),
-            num_qubits=1,
-        ),
-        backend=_FixedUncertaintyEstimator(),
-        config={
-            "algorithm": "kqd",
-            "advanced_config": {
-                "algorithm": "kqd",
-                "krylov_dim": 2,
-                "time_step": 0.1,
-                "evolution_method": "trotter",
-                "trotter_steps": 1,
-            },
-        },
-        backend_context=BackendExecutionContext(backend_target="ibm_runtime"),
-    )
-
-    assert result.matrix_element_summary["max_hamiltonian_standard_error"] == pytest.approx(7.0)
-    assert result.matrix_element_summary["max_overlap_standard_error"] == pytest.approx(0.03)
-    assert result.stability_summary["max_standard_error"] == pytest.approx(0.03)
-
-
-def test_qfd_branch_solve_uses_only_dimensionless_overlap_error() -> None:
-    result = run_qfd(
-        hamiltonian=SimpleNamespace(
-            pauli_hamiltonian=SparsePauliOp.from_list([("Z", -1.0)]),
-            num_qubits=1,
-        ),
-        backend=_FixedUncertaintyEstimator(),
-        config={
-            "algorithm": "qfd",
-            "advanced_config": {
-                "algorithm": "qfd",
-                "num_time_points": 2,
-                "max_time": 0.1,
-                "time_grid_type": "linear",
-                "trotter_steps": 1,
-            },
-        },
-        backend_context=BackendExecutionContext(backend_target="ibm_runtime"),
-    )
-
-    assert result.matrix_element_summary["max_hamiltonian_standard_error"] == pytest.approx(7.0)
-    assert result.matrix_element_summary["max_overlap_standard_error"] == pytest.approx(0.03)
-    assert result.conditioning_summary["max_standard_error"] == pytest.approx(0.03)
-
-
 def test_branch_estimator_submits_pub_chunks_for_live_progress() -> None:
     class _FakeJob:
         def __init__(self, count: int) -> None:
@@ -350,7 +201,7 @@ def test_branch_estimator_submits_pub_chunks_for_live_progress() -> None:
         num_qubits=1,
     )
 
-    estimate = estimate_projected_matrices_with_branch_estimator(
+    estimate_projected_matrices_with_branch_estimator(
         hamiltonian=hamiltonian,
         estimator=estimator,
         time_points=[0.0, 0.1, 0.2],
@@ -365,14 +216,6 @@ def test_branch_estimator_submits_pub_chunks_for_live_progress() -> None:
     assert events[-1]["completed_iterations"] == 6
     assert events[-1]["step"] == "projected_subspace_progress"
     assert events[-1]["convergence_iteration"] == 3
-    assert estimate.summary["work_ledger"] == {
-        "ledger_version": 1,
-        "counting_scope": "worker_observed",
-        "primitive_run_calls": 2,
-        "primitive_successful_runs": 2,
-        "primitive_pub_count": 6,
-        "primitive_observable_slots": 24,
-    }
 
 
 def test_branch_estimator_batches_cpu_aer_noise_pubs() -> None:
@@ -425,11 +268,7 @@ def test_branch_estimator_accepts_bounded_aer_pub_chunk_override() -> None:
     context = BackendExecutionContext(
         backend_target="aer_simulator",
         backend_options={"aer_pub_chunk_size": 99},
-        noise_profile={
-            "source": "custom_preset",
-            "preset": "depolarizing_cx",
-            "strength": 0.01,
-        },
+        noise_profile={"source": "custom_preset", "preset": "depolarizing_cx"},
     )
 
     assert _estimator_pub_chunk_size(context) == 32

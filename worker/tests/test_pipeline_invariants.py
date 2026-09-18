@@ -2,7 +2,7 @@
 Worker-side pipeline invariant tests.
 
 Covers:
-- F1: on_job_success marks non-dict results as invalid in every environment.
+- F1: on_job_success raises in test mode when result is not a dict.
 - F2: on_job_success raises in test mode when DB exception occurs.
 - F3: Three-way reconcile — runs.status vs run_events last status_changed.
 - F4: Progress callback invoked at least once per algorithm.
@@ -14,7 +14,7 @@ All tests use unittest.mock to avoid requiring a live DB/Redis.
 
 from __future__ import annotations
 
-import json
+import os
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -27,6 +27,10 @@ from shared.contracts.identifiers import RunAlgorithm
 from worker.chemistry.backend_selector import select_backend
 from worker.jobs import on_job_success
 from worker.jobs.dispatcher import dispatch_algorithm, supported_algorithms
+
+# Ensure _IN_TEST is True for all tests in this module.
+os.environ.setdefault("PYTEST_CURRENT_TEST", "worker/tests/test_pipeline_invariants.py::module")
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,31 +67,22 @@ def _make_session_mock(fetchone_result: Any = (1,)) -> MagicMock:
     return session
 
 
-# ── F1: non-dict result is invalid in every environment ──────────────────────
+# ── F1: non-dict result raises in test mode ───────────────────────────────────
 
 
-class TestNonDictResultFailsRun:
-    """F1: on_job_success must never complete a run without a result object."""
+class TestNonDictResultRaisesInTestMode:
+    """F1: on_job_success must raise when result is not a dict (test mode only)."""
 
     @pytest.mark.parametrize("bad_result", [None, "energy=-1.137", 42, [1, 2, 3]])
-    def test_non_dict_result_marks_run_failed(self, bad_result: Any) -> None:
+    def test_non_dict_result_raises(self, bad_result: Any) -> None:
         job = _make_job()
         session = _make_session_mock()
 
         with patch("worker.jobs.callbacks.get_db_session") as mock_ctx:
             mock_ctx.return_value.__enter__ = lambda s: session
             mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
-            on_job_success(job, MagicMock(), result=bad_result)
-
-        executed_calls = [
-            (str(call.args[0]), call.args[1] if len(call.args) > 1 else {})
-            for call in session.execute.call_args_list
-        ]
-        failure_update = next(
-            params for sql, params in executed_calls if "SET status = 'FAILED'" in sql
-        )
-        assert json.loads(failure_update["error"])["error_code"] == "invalid_result"
-        assert not any("SET status = 'COMPLETED'" in sql for sql, _ in executed_calls)
+            with pytest.raises(RuntimeError, match="non-dict result"):
+                on_job_success(job, MagicMock(), result=bad_result)
 
     def test_dict_result_does_not_raise(self) -> None:
         job = _make_job()

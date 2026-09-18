@@ -3,25 +3,38 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, NoReturn
 
 from worker.adapters.aer_adapter import AerAdapter
-from worker.adapters.aer_noise import normalize_noise_profile
 from worker.adapters.base import AdapterCapabilities, BackendAdapter, BackendExecutionContext
 from worker.adapters.ibm_adapter import IBMAdapter
 from worker.adapters.statevector_adapter import StatevectorAdapter
 from worker.exceptions import BackendError
 
-_AER_METHODS = {
-    "automatic",
-    "statevector",
-    "density_matrix",
-    "matrix_product_state",
-    "stabilizer",
-    "extended_stabilizer",
-    "unitary",
-    "superop",
-}
+
+class _DisabledAdapter(BackendAdapter):
+    """Placeholder adapter for planned-but-disabled backend targets."""
+
+    def __init__(self, *, backend_target: str, supports_noise_profile: bool) -> None:
+        self._caps = AdapterCapabilities(
+            backend_target=backend_target,
+            enabled=False,
+            supports_noise_profile=supports_noise_profile,
+        )
+
+    @property
+    def capabilities(self) -> AdapterCapabilities:
+        return self._caps
+
+    def create_estimator(self, context: BackendExecutionContext | None = None) -> object:
+        del context
+        return self._raise_disabled()
+
+    def create_sampler(self, context: BackendExecutionContext | None = None) -> object:
+        return self.create_estimator(context)
+
+    def _raise_disabled(self) -> NoReturn:
+        raise BackendError(f"backend_target '{self._caps.backend_target}' is not enabled")
 
 
 _BACKEND_REGISTRY: dict[str, BackendAdapter] = {
@@ -83,14 +96,7 @@ def build_backend_execution_context(
     )
     simulator_method = str(
         options.pop("aer_method", options.pop("method", "automatic")) or "automatic"
-    ).strip().lower()
-    if simulator_method not in _AER_METHODS:
-        raise BackendError(f"Unsupported Aer method '{simulator_method}'")
-    device = options.get("device")
-    if device is not None and (
-        not isinstance(device, str) or device.upper() not in {"CPU", "GPU"}
-    ):
-        raise BackendError("Aer device must be 'CPU' or 'GPU'")
+    )
     selection_policy = str(options.pop("selection_policy", selection_policy) or selection_policy)
     for key in ("seed_simulator", "seed_transpiler"):
         seed_value = options.get(key)
@@ -98,11 +104,8 @@ def build_backend_execution_context(
             options.pop(key, None)
         else:
             options[key] = max(0, min(int(seed_value), 2**32 - 1))
-    noise_profile = normalize_noise_profile(noise_profile)
-    if noise_profile is not None and backend_target != "aer_simulator":
-        raise BackendError(
-            f"noise_profile is only supported for backend_target 'aer_simulator', not '{backend_target}'"
-        )
+    if backend_target == "statevector":
+        noise_profile = None
 
     return BackendExecutionContext(
         backend_target=backend_target,

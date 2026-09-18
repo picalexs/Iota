@@ -113,7 +113,7 @@ def accept_basis_candidate(
     """Append a normalized candidate when it adds a new independent direction."""
     vector = np.asarray(candidate, dtype=complex).reshape(-1)
     norm = float(np.linalg.norm(vector))
-    if not np.isfinite(norm) or norm == 0.0:
+    if np.isclose(norm, 0.0):
         return None
 
     normalized = vector / norm
@@ -125,10 +125,8 @@ def accept_basis_candidate(
     if orthonormal_basis and residual_norm <= overlap_threshold:
         return None
 
-    if not np.isfinite(residual_norm):
-        return None
     basis.append(normalized)
-    if residual_norm == 0.0:
+    if np.isclose(residual_norm, 0.0):
         orthonormal_basis.append(normalized)
         return 0.0
 
@@ -145,7 +143,7 @@ def orthonormalize_candidate(
     for basis_vector in basis:
         vector -= np.vdot(basis_vector, vector) * basis_vector
     norm = float(np.linalg.norm(vector))
-    if not np.isfinite(norm) or norm == 0.0:
+    if np.isclose(norm, 0.0):
         return None, norm
     return vector / norm, norm
 

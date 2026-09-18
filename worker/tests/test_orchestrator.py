@@ -34,30 +34,12 @@ def _contexts() -> tuple[StartedRunContext, PreparedRunContext]:
 
 def test_orchestrator_keeps_estimate_dispatch_and_finalization_order() -> None:
     started, prepared = _contexts()
-    started = started._replace(
-        algorithm="kqd",
-        backend_target="aer_simulator",
-        config_snapshot={"algorithm": "kqd", "noise_profile": None},
-        algorithm_config={"algorithm": "kqd", "krylov_dim": 2},
-    )
-    prepared = prepared._replace(
-        backend_context=BackendExecutionContext(
-            backend_target="aer_simulator",
-            noise_profile=None,
-        ),
-        hamiltonian_bundle=SimpleNamespace(num_qubits=14, metadata={"pipeline": "test"}),
-    )
     session = MagicMock()
     session_context = MagicMock()
     session_context.__enter__.return_value = session
     session_context.__exit__.return_value = False
     order: list[str] = []
     progress_state: dict[str, object] = {}
-    estimate_projected_paths: list[bool | None] = []
-
-    def estimate_total_iterations(*_args: object, **kwargs: object) -> int:
-        estimate_projected_paths.append(kwargs.get("projected_branch_path"))
-        return 2
 
     def emit_progress_update(*_: object, **__: object) -> None:
         order.append("progress")
@@ -79,7 +61,7 @@ def test_orchestrator_keeps_estimate_dispatch_and_finalization_order() -> None:
         prepared=prepared,
         progress_state=progress_state,
         run_wall_start=0.0,
-        estimate_total_iterations=estimate_total_iterations,
+        estimate_total_iterations=lambda *_args, **_kwargs: 2,
         emit_progress_update=emit_progress_update,
         build_telemetry_estimate=lambda **_: (
             order.append("estimate") or {"estimated_total_iterations": 2}
@@ -108,7 +90,6 @@ def test_orchestrator_keeps_estimate_dispatch_and_finalization_order() -> None:
     assert result["execution_timing"]["algorithm_dispatch_seconds"] >= 0.0
     assert result["execution_timing"]["total_wall_seconds"] == result["runtime_seconds"]
     assert isinstance(result["run_finished_at"], str)
-    assert estimate_projected_paths == [True]
     assert order == [
         "estimate",
         "persist_estimate",

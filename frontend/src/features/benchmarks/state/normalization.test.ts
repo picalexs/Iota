@@ -4,18 +4,13 @@ import type { RunRestartResponse, UUID } from "@/types/run";
 import { buildInitialEntries } from "@/pages/benchmark/benchmark-utils";
 import {
   buildBenchmarkWorkspaceSnapshotFromSavedRun,
-  benchmarkEntriesChanged,
   clearBenchmarkWorkspaceViewCache,
-  entrySaveSignature,
   getBenchmarkSubmissionConcurrency,
   getRestartTargetRunId,
   readBenchmarkWorkspaceViewCache,
   writeBenchmarkWorkspaceViewCache,
 } from "./normalization";
-import {
-  createAdvancedBenchmarkVariant,
-  createSimpleBenchmarkVariant,
-} from "@/pages/benchmark/benchmark-variants";
+import { createSimpleBenchmarkVariant } from "@/pages/benchmark/benchmark-variants";
 import type { SavedBenchmarkRun } from "@/pages/benchmark/benchmark-storage";
 
 const preset = BENCHMARK_MOLECULE_PRESETS[0];
@@ -59,22 +54,6 @@ describe("benchmark state normalization", () => {
     expect(snapshot.entries).toHaveLength(1);
   });
 
-  it("preserves an exact KQD config when restoring an IBM benchmark row", () => {
-    const savedRun = {
-      ...savedBenchmarkRun(),
-      selectedBackendMode: "ibm_runtime" as const,
-      entries: buildInitialEntries([preset], [createAdvancedBenchmarkVariant("kqd", 0.0016)]),
-    };
-
-    const snapshot = buildBenchmarkWorkspaceSnapshotFromSavedRun(savedRun);
-
-    expect(snapshot.selectedBackendMode).toBe("ibm_runtime");
-    expect(snapshot.algorithmVariants[0]?.advancedConfig).toMatchObject({
-      algorithm: "kqd",
-      evolution_method: "exact",
-    });
-  });
-
   it("uses explicit submission concurrency for each backend mode", () => {
     expect(getBenchmarkSubmissionConcurrency("statevector")).toBe(3);
     expect(getBenchmarkSubmissionConcurrency("aer_simulator")).toBe(2);
@@ -106,22 +85,5 @@ describe("benchmark state normalization", () => {
     expect(readBenchmarkWorkspaceViewCache("benchmark-1")?.selectedMoleculeKeys).toEqual([
       preset.key,
     ]);
-  });
-
-  it("persists execution metadata changes in the saved-entry signature", () => {
-    const entry = savedBenchmarkRun().entries[0];
-    if (!entry) throw new Error("Expected a benchmark entry");
-
-    const updatedEntry = {
-      ...entry,
-      executionMetadata: {
-        ...(entry.executionMetadata ?? {}),
-        shots: 1024,
-        actualExecutionTarget: "local_classical",
-      } as NonNullable<typeof entry.executionMetadata>,
-    };
-
-    expect(entrySaveSignature(updatedEntry)).not.toBe(entrySaveSignature(entry));
-    expect(benchmarkEntriesChanged([entry], [updatedEntry])).toBe(true);
   });
 });

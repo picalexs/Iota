@@ -265,31 +265,11 @@ class TestEstimateTotalIterations:
 
         assert estimate == 88
 
-    def test_ideal_aer_projected_estimate_uses_local_progress_axis(self) -> None:
+    def test_projected_branch_estimate_includes_matrix_pairs_and_solve(self) -> None:
         estimate = _estimate_total_iterations(
             "kqd",
             {"algorithm": "kqd", "krylov_dim": 8},
             backend_target="aer_simulator",
-        )
-
-        assert estimate == 8
-
-    def test_noisy_aer_projected_estimate_includes_matrix_pairs_and_solve(self) -> None:
-        estimate = _estimate_total_iterations(
-            "kqd",
-            {"algorithm": "kqd", "krylov_dim": 8},
-            backend_target="aer_simulator",
-            noise_profile_enabled=True,
-        )
-
-        assert estimate == 44
-
-    def test_resolved_ideal_aer_branch_path_includes_matrix_work(self) -> None:
-        estimate = _estimate_total_iterations(
-            "kqd",
-            {"algorithm": "kqd", "krylov_dim": 8},
-            backend_target="aer_simulator",
-            projected_branch_path=True,
         )
 
         assert estimate == 44

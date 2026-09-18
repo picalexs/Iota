@@ -8,14 +8,6 @@ from typing import Any
 
 import numpy as np
 
-from worker.chemistry.algorithms.qse.basis import (
-    ExcitationSpec,
-    build_basis_selection_summary,
-)
-from worker.chemistry.algorithms.qse.sector import (
-    DOMINANT_DETERMINANT_SELECTION_THRESHOLD,
-    dominant_sector_occupations,
-)
 from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_subspace import (
@@ -26,38 +18,10 @@ from worker.chemistry.projected_subspace import (
 ReferenceResolver = Callable[..., tuple[str, np.ndarray, list[dict[str, Any]]]]
 BasisBuilder = Callable[..., list[np.ndarray]]
 ActionSubspaceSolver = Callable[..., tuple[np.ndarray, Any, dict[str, Any], dict[str, float], Any]]
+GeneralizedEigensolver = Callable[..., tuple[np.ndarray, dict[str, Any]]]
 GeneralizedEigensystemSolver = Callable[..., tuple[np.ndarray, np.ndarray, dict[str, Any]]]
+ProjectedDiagnosticsBuilder = Callable[..., dict[str, float]]
 RealScalar = Callable[..., float]
-
-
-def _record_regularization_scope(
-    diagnostics: dict[str, Any],
-    *,
-    requested_regularization: float,
-    scope: str,
-    final_metric_diagonal_shift: float,
-    may_change_reported_energy: bool,
-) -> None:
-    """Record how the requested QSE regularization affects this execution path."""
-    diagnostics.update(
-        {
-            "requested_regularization": float(requested_regularization),
-            "regularization_scope": scope,
-            "final_metric_diagonal_shift": float(final_metric_diagonal_shift),
-            "regularization_may_change_reported_energy": may_change_reported_energy,
-        }
-    )
-
-
-def _basis_selection_observer(
-) -> tuple[Callable[[ExcitationSpec], None], list[ExcitationSpec]]:
-    """Capture accepted specifications without creating progress events."""
-    selected_specs: list[ExcitationSpec] = []
-
-    def observe(spec: ExcitationSpec) -> None:
-        selected_specs.append(spec)
-
-    return observe, selected_specs
 
 
 @dataclass(frozen=True)
@@ -101,51 +65,22 @@ def execute_sector_qse(
         action=action,
         resolved_config=resolved_config,
     )
-    basis_selection_callback, selected_specs = _basis_selection_observer()
     basis = build_excitation_basis_fn(
         reference_state,
         action,
         excitation_level=excitation_level,
         target_rank=target_rank,
         overlap_threshold=overlap_threshold,
+        regularization=regularization,
         residual_tolerance=residual_tolerance,
         progress_callback=progress_callback,
-        selection_callback=basis_selection_callback,
     )
     basis_matrix = np.column_stack(basis)
     eigenvalues, _, diagnostics, residual_diagnostics, _ = solve_action_subspace_fn(
         action,
         basis_matrix,
         residual_tolerance=residual_tolerance,
-        regularization=0.0,
-    )
-    diagnostics["regularization"] = 0.0
-    dominant_reference_used = (
-        dominant_sector_occupations(reference_state, action) is not None
-    )
-    diagnostics["basis_selection"] = build_basis_selection_summary(
-        selected_specs,
-        candidate_selection_policy=(
-            "reference_coupling_descending"
-            if dominant_reference_used
-            else "full_fermionic_generator_order"
-        ),
-        excitation_level=excitation_level,
-        dimension_cap=target_rank,
-        actual_dimension=int(basis_matrix.shape[1]),
-        policy_details={
-            "dominant_determinant_reference_used": dominant_reference_used,
-            "dominant_determinant_probability_threshold": (
-                DOMINANT_DETERMINANT_SELECTION_THRESHOLD
-            ),
-        },
-    )
-    _record_regularization_scope(
-        diagnostics,
-        requested_regularization=regularization,
-        scope="not_applied_in_fixed_sector_path",
-        final_metric_diagonal_shift=0.0,
-        may_change_reported_energy=False,
+        regularization=regularization,
     )
     relative_residual = residual_diagnostics["relative_ritz_residual"]
     reference_energy = real_scalar_fn(
@@ -187,14 +122,17 @@ def execute_dense_qse(
     regularization: float,
     residual_tolerance: float,
     progress_callback: ProgressCallback | None,
-    resolve_reference_state_fn: ReferenceResolver,
-    build_excitation_basis_fn: BasisBuilder,
-    build_overlap_matrix_fn: Callable[[list[np.ndarray]], np.ndarray],
-    solve_generalized_eigensystem_fn: GeneralizedEigensystemSolver,
-    real_scalar_fn: RealScalar,
-    execution_mode: str = "dense_exact_emulation",
+    **execution_dependencies: Any,
 ) -> QSEExecutionOutcome:
-    """Execute the dense QSE path with an exact projected eigensystem solve."""
+    """Execute the dense QSE path."""
+    resolve_reference_state_fn = execution_dependencies["resolve_reference_state_fn"]
+    build_excitation_basis_fn = execution_dependencies["build_excitation_basis_fn"]
+    build_overlap_matrix_fn = execution_dependencies["build_overlap_matrix_fn"]
+    solve_generalized_eigenproblem_fn = execution_dependencies["solve_generalized_eigenproblem_fn"]
+    projected_ritz_diagnostics_fn = execution_dependencies["projected_ritz_diagnostics_fn"]
+    real_scalar_fn = execution_dependencies["real_scalar_fn"]
+    solve_generalized_eigensystem_fn = execution_dependencies.get("solve_generalized_eigensystem_fn")
+    execution_mode = execution_dependencies.get("execution_mode", "dense_exact_emulation")
     reference_method, reference_state, reference_artifacts = resolve_reference_state_fn(
         hamiltonian=hamiltonian,
         backend=backend,
@@ -202,7 +140,6 @@ def execute_dense_qse(
         resolved_config=resolved_config,
         progress_callback=progress_callback,
     )
-    basis_selection_callback, selected_specs = _basis_selection_observer()
     basis = build_excitation_basis_fn(
         reference_state,
         operator,
@@ -211,66 +148,62 @@ def execute_dense_qse(
         overlap_threshold=overlap_threshold,
         regularization=regularization,
         progress_callback=progress_callback,
-        selection_callback=basis_selection_callback,
     )
     basis_matrix = np.column_stack(basis)
     overlap = build_overlap_matrix_fn(basis)
     projected_hamiltonian = basis_matrix.conj().T @ operator @ basis_matrix
-    eigenvalues, eigenvectors, diagnostics = solve_generalized_eigensystem_fn(
-        projected_hamiltonian,
-        overlap,
-    )
-    if eigenvalues.size:
-        ritz_state = basis_matrix @ eigenvectors[:, 0]
-        full_residual = operator @ ritz_state - eigenvalues[0] * ritz_state
-        full_residual_norm = float(np.linalg.norm(full_residual))
-        full_operator_state_norm = float(np.linalg.norm(operator @ ritz_state))
-        full_relative_residual = full_residual_norm / max(
-            1.0,
-            abs(float(eigenvalues[0])),
-            full_operator_state_norm,
+    if solve_generalized_eigensystem_fn is None:
+        eigenvalues, diagnostics = solve_generalized_eigenproblem_fn(
+            projected_hamiltonian,
+            overlap,
+            regularization=regularization,
+        )
+        residual_diagnostics = projected_ritz_diagnostics_fn(
+            operator,
+            basis_matrix,
+            residual_tolerance=residual_tolerance,
         )
     else:
-        full_residual_norm = float("nan")
-        full_relative_residual = float("nan")
-    generalized_residual_norm = diagnostics.get("generalized_residual_norm")
-    relative_generalized_residual = diagnostics.get("relative_generalized_residual")
-    metric_normalization_error = diagnostics.get("metric_normalization_error")
-    residual_diagnostics = {
-        "ritz_energy": float(eigenvalues[0]) if eigenvalues.size else float("nan"),
-        "ritz_residual_norm": full_residual_norm,
-        "relative_ritz_residual": full_relative_residual,
-        "generalized_residual_norm": (
-            float(generalized_residual_norm)
-            if generalized_residual_norm is not None
-            else float("nan")
-        ),
-        "relative_generalized_residual": (
-            float(relative_generalized_residual)
-            if relative_generalized_residual is not None
-            else float("nan")
-        ),
-        "metric_normalization_error": (
-            float(metric_normalization_error)
-            if metric_normalization_error is not None
-            else float("nan")
-        ),
-    }
-    diagnostics["regularization"] = 0.0
-    diagnostics["basis_selection"] = build_basis_selection_summary(
-        selected_specs,
-        candidate_selection_policy="fermionic_generator_order",
-        excitation_level=excitation_level,
-        dimension_cap=target_rank,
-        actual_dimension=int(basis_matrix.shape[1]),
-    )
-    _record_regularization_scope(
-        diagnostics,
-        requested_regularization=regularization,
-        scope="basis_progress_estimates_only",
-        final_metric_diagonal_shift=0.0,
-        may_change_reported_energy=False,
-    )
+        eigenvalues, eigenvectors, diagnostics = solve_generalized_eigensystem_fn(
+            projected_hamiltonian,
+            overlap,
+        )
+        if eigenvalues.size:
+            ritz_state = basis_matrix @ eigenvectors[:, 0]
+            full_residual = operator @ ritz_state - eigenvalues[0] * ritz_state
+            full_residual_norm = float(np.linalg.norm(full_residual))
+            full_operator_state_norm = float(np.linalg.norm(operator @ ritz_state))
+            full_relative_residual = full_residual_norm / max(
+                1.0,
+                abs(float(eigenvalues[0])),
+                full_operator_state_norm,
+            )
+        else:
+            full_residual_norm = float("nan")
+            full_relative_residual = float("nan")
+        generalized_residual_norm = diagnostics.get("generalized_residual_norm")
+        relative_generalized_residual = diagnostics.get("relative_generalized_residual")
+        metric_normalization_error = diagnostics.get("metric_normalization_error")
+        residual_diagnostics = {
+            "ritz_energy": float(eigenvalues[0]) if eigenvalues.size else float("nan"),
+            "ritz_residual_norm": full_residual_norm,
+            "relative_ritz_residual": full_relative_residual,
+            "generalized_residual_norm": (
+                float(generalized_residual_norm)
+                if generalized_residual_norm is not None
+                else float("nan")
+            ),
+            "relative_generalized_residual": (
+                float(relative_generalized_residual)
+                if relative_generalized_residual is not None
+                else float("nan")
+            ),
+            "metric_normalization_error": (
+                float(metric_normalization_error)
+                if metric_normalization_error is not None
+                else float("nan")
+            ),
+        }
     relative_residual = residual_diagnostics["relative_ritz_residual"]
     reference_energy = real_scalar_fn(
         np.vdot(reference_state, operator @ reference_state),
@@ -340,7 +273,7 @@ def execute_measured_qse(
         projected_hamiltonian,
         overlap,
         regularization=regularization,
-        max_standard_error=estimate.summary.get("max_overlap_standard_error"),
+        max_standard_error=estimate.summary.get("max_standard_error"),
     )
     if stabilized.eigenvalues.size == 0:
         raise ValueError("Measured QSE projected solve produced no eigenvalues")
@@ -348,18 +281,16 @@ def execute_measured_qse(
     diagnostics = dict(stabilized.diagnostics)
     reportable = diagnostic_reportable_fn(diagnostics)
     is_stable = projected_matrix_converged(diagnostics)
-    diagnostics["diagnostic_only"] = True
+    diagnostics["diagnostic_only"] = not is_stable
     relative_residual = float(
         diagnostics.get("relative_projected_ritz_residual", float("inf"))
     )
-    if not is_stable:
+    if diagnostics["diagnostic_only"]:
         diagnostics["diagnostic_reason"] = projected_convergence_reason(
             diagnostics,
             relative_residual=relative_residual,
             residual_tolerance=residual_tolerance,
         )
-    else:
-        diagnostics["diagnostic_reason"] = "measured_matrix_elements_diagnostic"
     # Measured QSE is a diagnostic construction: never converged, never
     # chemically accurate. Convergence stays False even when a stable subspace
     # remains, because the measured metric only yields a diagnostic energy.
@@ -373,17 +304,9 @@ def execute_measured_qse(
         "basis_numerical_rank": float(diagnostics.get("retained_rank", basis_rank) or basis_rank),
     }
 
-    measured_num_qubits = estimate.summary.get("num_qubits")
-    if not isinstance(measured_num_qubits, int) or measured_num_qubits < 1:
-        measured_num_qubits = getattr(hamiltonian, "num_qubits", None)
-    fallback_dim = (
-        2 ** measured_num_qubits
-        if isinstance(measured_num_qubits, int) and measured_num_qubits > 0
-        else 2**basis_rank
-    )
     reference_state, reference_source = build_hf_reference_state_fn(
         hamiltonian,
-        fallback_dim=fallback_dim,
+        fallback_dim=2**basis_rank,
     )
     reference_descriptor = build_reference_descriptor_fn(
         state=reference_state,
@@ -403,19 +326,12 @@ def execute_measured_qse(
         "matrix_element_source": "measured_pauli_expectations",
         "matrix_element_strategy": "branch_estimator",
         "measured_matrix_element_construction": (
-            "fixed_pool_qse_nonorthogonal_eigensolver"
+            "da_case_nonorthogonal_eigensolver"
         ),
         "reference_descriptor": reference_descriptor,
         "backend_target": getattr(backend_context, "backend_target", None),
         **estimate.summary,
     }
-    _record_regularization_scope(
-        diagnostics,
-        requested_regularization=regularization,
-        scope="raw_metric_spectrum_and_overlap_mode_cutoff_floor",
-        final_metric_diagonal_shift=0.0,
-        may_change_reported_energy=True,
-    )
     return QSEExecutionOutcome(
         eigenvalues=stabilized.eigenvalues,
         basis_rank=basis_rank,

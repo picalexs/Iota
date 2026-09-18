@@ -212,7 +212,7 @@ function fallbackConfigMetadata(): RunConfigMetadataResponse {
   });
 
   return {
-    catalog_version: "2026-09-16-v22",
+    catalog_version: "2026-09-11-v21",
     algorithms: [...RUN_ALGORITHMS],
     backend_targets: [...BACKEND_TARGETS],
     easy_goals: [...EASY_GOALS],
@@ -266,9 +266,9 @@ function fallbackConfigMetadata(): RunConfigMetadataResponse {
       }),
     ],
     defaults: {
-      ansatz_name: "NumberPreserving",
+      ansatz_name: "EfficientSU2",
       optimizer_name: "COBYLA",
-      qse_reference_ansatz_name: "NumberPreserving",
+      qse_reference_ansatz_name: "EfficientSU2",
       qse_reference_optimizer_name: "COBYLA",
     },
     limits: {},

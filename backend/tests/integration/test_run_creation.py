@@ -355,7 +355,7 @@ class TestRunEnqueue:
         assert first_data["metadata"] == second_data["metadata"]
 
         easy_mode_metadata = first_data["metadata"]["easy_mode"]
-        assert easy_mode_metadata["catalog_version"] == "2026-09-16-v22"
+        assert easy_mode_metadata["catalog_version"] == "2026-09-11-v21"
         assert easy_mode_metadata["goal"] == "balanced"
 
         expanded = easy_mode_metadata["expanded_advanced_config"]
@@ -508,7 +508,7 @@ class TestRunConfigMetadata:
             },
         ]
         assert data["limits"]["advanced_config.max_iterations"]["maximum"] == 5000
-        assert data["defaults"]["ansatz_name"] == "NumberPreserving"
+        assert data["defaults"]["ansatz_name"] == "EfficientSU2"
         assert {item["id"] for item in data["ansatzes"]} == {
             "EfficientSU2",
             "NumberPreserving",

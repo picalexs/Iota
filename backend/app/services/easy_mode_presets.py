@@ -40,11 +40,20 @@ def _normalize_backend_target(backend_target: BackendTarget | str | None) -> str
     return None
 
 
+def _supports_ibm_qse_reference_vqe(molecule: Molecule | None) -> bool:
+    n_orbitals = _active_space_orbitals(molecule)
+    return n_orbitals is not None and n_orbitals <= 6
+
+
 def _qse_reference_solve_policy(
     *,
     backend_target: BackendTarget | str | None,
     molecule: Molecule | None,
 ) -> str:
+    if _normalize_backend_target(
+        backend_target
+    ) == BackendTarget.IBM_RUNTIME.value and _supports_ibm_qse_reference_vqe(molecule):
+        return "vqe_small_system_ibm_easy_mode"
     return "hf_easy_mode"
 
 
@@ -153,12 +162,40 @@ def _build_qfd_easy_mode_advanced_config(
     }
 
 
+def _build_qse_reference_vqe_presets() -> dict[EasyGoal, dict[str, Any]]:
+    return {
+        EasyGoal.FASTEST: {
+            "vqe_reference_ansatz_name": "RealAmplitudes",
+            "vqe_reference_optimizer_name": "COBYLA",
+            "vqe_reference_max_iterations": 24,
+            "vqe_reference_reps": 1,
+        },
+        EasyGoal.BALANCED: {
+            "vqe_reference_ansatz_name": "RealAmplitudes",
+            "vqe_reference_optimizer_name": "COBYLA",
+            "vqe_reference_max_iterations": 48,
+            "vqe_reference_reps": 1,
+        },
+        EasyGoal.BEST_ACCURACY: {
+            "vqe_reference_ansatz_name": "RealAmplitudes",
+            "vqe_reference_optimizer_name": "COBYLA",
+            "vqe_reference_max_iterations": 72,
+            "vqe_reference_reps": 1,
+        },
+    }
+
+
 def _build_qse_easy_mode_advanced_config(
     *,
     goal: EasyGoal,
     molecule: Molecule | None,
     backend_target: BackendTarget | str | None,
 ) -> dict[str, Any]:
+    use_ibm_reference_vqe = _normalize_backend_target(
+        backend_target
+    ) == BackendTarget.IBM_RUNTIME.value and _supports_ibm_qse_reference_vqe(molecule)
+    reference_vqe_by_goal = _build_qse_reference_vqe_presets()
+
     def _qse_config(
         *,
         excitation_level: str,
@@ -173,18 +210,21 @@ def _build_qse_easy_mode_advanced_config(
                 goal=goal.value,
             ),
         }
-        config["reference_method"] = "hf"
+        config["reference_method"] = "vqe" if use_ibm_reference_vqe else "hf"
         config["excitation_level"] = excitation_level
         config["max_subspace_dim"] = max_subspace_dim
         config["regularization"] = regularization
         config["overlap_threshold"] = overlap_threshold
-        for key in (
-            "vqe_reference_ansatz_name",
-            "vqe_reference_optimizer_name",
-            "vqe_reference_max_iterations",
-            "vqe_reference_reps",
-        ):
-            config.pop(key, None)
+        if not use_ibm_reference_vqe:
+            for key in (
+                "vqe_reference_ansatz_name",
+                "vqe_reference_optimizer_name",
+                "vqe_reference_max_iterations",
+                "vqe_reference_reps",
+            ):
+                config.pop(key, None)
+        if use_ibm_reference_vqe:
+            config.update(reference_vqe_by_goal[goal])
         return config
 
     presets = {

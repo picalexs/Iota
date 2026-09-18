@@ -346,7 +346,6 @@ export function SettingsPage() {
       null;
 
     notifyIbmCredentialProfilesChanged({
-      profilesChanged: true,
       activeProfileId,
       backendCapabilitiesRefresh: "started",
       backendWarmupProgress: { loadedProfiles: 0, totalProfiles: 1 },

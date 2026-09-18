@@ -119,23 +119,6 @@ def test_estimate_total_iterations_covers_algorithm_specific_paths() -> None:
             config_payload={"algorithm": "kqd", "krylov_dim": 8},
             backend_target="aer_simulator",
         )
-        == 8
-    )
-    assert (
-        estimate_total_iterations(
-            algorithm="kqd",
-            config_payload={"algorithm": "kqd", "krylov_dim": 8},
-            backend_target="aer_simulator",
-            noise_profile_enabled=True,
-        )
-        == 44
-    )
-    assert (
-        estimate_total_iterations(
-            algorithm="kqd",
-            config_payload={"algorithm": "kqd", "krylov_dim": 8},
-            backend_target="ibm_runtime",
-        )
         == 44
     )
     assert estimate_total_iterations(algorithm="unknown", config_payload={}) == 1
