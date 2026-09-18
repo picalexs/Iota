@@ -71,14 +71,14 @@ export const BENCHMARK_MOLECULE_PRESETS: MoleculePreset[] = [
     key: "hf_mol",
     name: "Hydrogen Fluoride (HF)",
     formula: "HF",
-    description: "10-electron polar molecule. Tests active-space selection near F HOMO.",
+    description: "10-electron polar molecule. Uses the two active orbitals near the F HOMO.",
     atoms: [
       { symbol: "H", x: 0, y: 0, z: 0 },
       { symbol: "F", x: 0, y: 0, z: 0.9168 },
     ],
     charge: 0,
     multiplicity: 1,
-    active_space: { n_electrons: 2, n_orbitals: 3 },
+    active_space: { n_electrons: 2, n_orbitals: 2 },
     basis: "sto-3g",
     references: {
       hf: -98.57063,
