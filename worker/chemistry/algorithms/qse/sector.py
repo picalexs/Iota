@@ -26,6 +26,8 @@ def dominant_sector_occupations(
     vector = np.asarray(reference_state, dtype=complex).reshape(-1)
     if vector.size != action.dimension:
         return None
+    if not hasattr(action, "nelec"):
+        return None
     probabilities = np.abs(vector) ** 2
     if probabilities.size == 0:
         return None

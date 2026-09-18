@@ -65,7 +65,11 @@ def build_hf_reference_state_with_source(
     """
     hf_metadata = _hamiltonian_hf_metadata(hamiltonian)
     num_qubits = _hamiltonian_num_qubits(hamiltonian)
-    if hf_metadata is not None and num_qubits is not None:
+    if (
+        hf_metadata is not None
+        and num_qubits is not None
+        and 2 * hf_metadata[0] == num_qubits
+    ):
         n_orb, n_alpha, n_beta = hf_metadata
         dim = 2 ** (2 * n_orb)
         hf_index = 0
