@@ -30,6 +30,7 @@ import {
 import type { BenchmarkEntriesSetter } from "@/features/benchmarks/state/polling";
 
 export type BenchmarkPendingAction = "pause" | "resume" | "restart" | "retry" | "cancel" | null;
+export type BenchmarkEntryAction = Exclude<BenchmarkPendingAction, null>;
 type BenchmarkActionErrorReporter = (scope: string, title: string, error: unknown) => void;
 
 function mapSettledResultsByEntryId<T>(
@@ -698,10 +699,8 @@ export function useBenchmarkControlActions({
     }
   }, [reportActionError, restartBenchmark]);
 
-  const handleBenchmarkEntryAction = useCallback(
-    async (entry: BenchmarkEntry, action: "pause" | "resume" | "restart" | "retry" | "cancel") => {
-      const targetEntryIds = new Set([entry.id]);
-
+  const handleBenchmarkEntriesAction = useCallback(
+    async (targetEntryIds: ReadonlySet<string>, action: BenchmarkEntryAction) => {
       try {
         if (action === "pause") {
           await pauseBenchmarkEntries({
@@ -804,11 +803,24 @@ export function useBenchmarkControlActions({
     ],
   );
 
+  const handleBenchmarkEntryAction = useCallback(
+    (entry: BenchmarkEntry, action: BenchmarkEntryAction) =>
+      handleBenchmarkEntriesAction(new Set([entry.id]), action),
+    [handleBenchmarkEntriesAction],
+  );
+
+  const handleBenchmarkMoleculeAction = useCallback(
+    (moleculeEntries: readonly BenchmarkEntry[], action: BenchmarkEntryAction) =>
+      handleBenchmarkEntriesAction(new Set(moleculeEntries.map((entry) => entry.id)), action),
+    [handleBenchmarkEntriesAction],
+  );
+
   return {
     handleCancelBenchmark,
     handlePauseBenchmark,
     handleResumeBenchmark,
     handleRestartBenchmark,
     handleBenchmarkEntryAction,
+    handleBenchmarkMoleculeAction,
   };
 }

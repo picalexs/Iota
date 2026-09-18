@@ -174,7 +174,12 @@ def solve_exact_generalized_eigensystem(
     diagnostics["relative_generalized_residual"] = float(relative_residuals[0])
     diagnostics["max_generalized_residual_norm"] = float(np.max(residual_norms))
     diagnostics["max_relative_generalized_residual"] = float(np.max(relative_residuals))
-    diagnostics["stability_state"] = "stable" if diagnostics["dropped_rank"] == 0 else "invalid"
+    # A positive semidefinite exact metric can lose rank when the generated
+    # projected states are linearly dependent. The retained solve is still a
+    # finite diagnostic, but it must not claim full projected convergence.
+    diagnostics["stability_state"] = (
+        "stable" if diagnostics["dropped_rank"] == 0 else "stabilized"
+    )
     return eigenvalues, generalized_eigenvectors, diagnostics
 
 

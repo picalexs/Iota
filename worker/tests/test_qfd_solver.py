@@ -453,7 +453,7 @@ def test_run_qfd_does_not_mark_singular_dense_projection_converged(
     )
 
     assert result.converged is False
-    assert result.stability_summary["stability_state"] == "invalid"
+    assert result.stability_summary["stability_state"] == "stabilized"
 
 
 def test_run_qfd_ibm_context_uses_estimator_matrix_elements() -> None:

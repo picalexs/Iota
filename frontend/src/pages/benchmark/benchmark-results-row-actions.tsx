@@ -176,7 +176,11 @@ function BenchmarkRowActionMenuButton({
         item.destructive && "text-destructive hover:bg-destructive/10 hover:text-destructive",
       )}
       disabled={item.disabled}
-      onClick={item.onSelect}
+      onClick={(event) => {
+        event.stopPropagation();
+        item.onSelect();
+      }}
+      onKeyDown={stopRowInteraction}
     >
       <Icon className="size-4" />
       {item.label}

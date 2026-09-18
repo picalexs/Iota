@@ -125,6 +125,9 @@ function statusBadge(run: SavedBenchmarkRun) {
   if (status === "finished") {
     return <Badge variant="success">{BENCHMARK_HISTORY_STATUS_LABELS[status]}</Badge>;
   }
+  if (status === "partial") {
+    return <Badge variant="warning">{BENCHMARK_HISTORY_STATUS_LABELS[status]}</Badge>;
+  }
   if (status === "failed") {
     return <Badge variant="destructive">{BENCHMARK_HISTORY_STATUS_LABELS[status]}</Badge>;
   }

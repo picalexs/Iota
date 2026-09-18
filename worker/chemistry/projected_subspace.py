@@ -70,6 +70,7 @@ def _stabilized_relative_residual(diagnostics: Mapping[str, Any]) -> float | Non
     for key in (
         "relative_projected_ritz_residual",
         "stabilized_relative_ritz_residual",
+        "relative_generalized_residual",
     ):
         residual = _real_diagnostic(diagnostics.get(key), default=float("nan"))
         if np.isfinite(residual):

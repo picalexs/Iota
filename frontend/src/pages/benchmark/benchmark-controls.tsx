@@ -52,6 +52,9 @@ interface BenchmarkControlsProps {
   restartInProgress: boolean;
   total: number;
   done: number;
+  completed?: number;
+  failed?: number;
+  cancelled?: number;
   backendHelperText?: string | null;
   onToggleMolecule: (key: string) => void;
   onToggleAlgorithm: (algorithm: RunAlgorithm) => void;
@@ -108,6 +111,9 @@ export function BenchmarkControls({
   restartInProgress,
   total,
   done,
+  completed = done,
+  failed = 0,
+  cancelled = 0,
   backendHelperText,
   onToggleMolecule,
   onToggleAlgorithm,
@@ -310,6 +316,9 @@ export function BenchmarkControls({
           total={total}
           completionRatio={completionRatio}
           done={done}
+          completed={completed}
+          failed={failed}
+          cancelled={cancelled}
           showResetResults={showResetResults}
           onClear={onClear}
         />

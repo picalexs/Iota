@@ -97,6 +97,7 @@ export function BenchmarkPage() {
     handleResumeBenchmark,
     handleRestartBenchmark,
     handleBenchmarkEntryAction,
+    handleBenchmarkMoleculeAction,
     handleDeleteSavedBenchmark,
     handleCancelBenchmark,
   } = useBenchmarkState({ benchmarkId });
@@ -155,6 +156,10 @@ export function BenchmarkPage() {
         }))
         .filter(({ rows }) => rows.length > 0),
     [accuracyFilter, accuracySort, chemicalAccuracyHa, grouped],
+  );
+  const moleculeActionEntriesByKey = useMemo(
+    () => new Map(grouped.map(({ preset, rows }) => [preset.key, rows] as const)),
+    [grouped],
   );
 
   const filterOptions: Array<{ value: BenchmarkAccuracyFilter; label: string }> = [
@@ -249,6 +254,9 @@ export function BenchmarkPage() {
         restartInProgress={restartInProgress}
         total={visibleStats.total}
         done={visibleStats.done}
+        completed={visibleStats.completed}
+        failed={visibleStats.failed}
+        cancelled={visibleStats.cancelled}
         backendHelperText={backendHelperText}
         onToggleMolecule={toggleMolecule}
         onToggleAlgorithm={toggleAlgorithm}
@@ -319,6 +327,10 @@ export function BenchmarkPage() {
             chemicalAccuracyHa={chemicalAccuracyHa}
             pendingAction={pendingBenchmarkAction}
             onRunAction={handleBenchmarkEntryAction}
+            onMoleculeAction={handleBenchmarkMoleculeAction}
+            getMoleculeActionEntries={(presetKey) =>
+              moleculeActionEntriesByKey.get(presetKey) ?? []
+            }
             onBeforeOpenRun={rememberBenchmarkScrollPosition}
           />
         </div>

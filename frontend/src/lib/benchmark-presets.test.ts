@@ -25,4 +25,12 @@ describe("benchmark scoring helpers", () => {
     expect(n2?.active_space).toEqual({ n_electrons: 10, n_orbitals: 8 });
     expect(usesLargeBenchmarkActiveSpace(n2?.active_space)).toBe(true);
   });
+
+  it("keeps the HF benchmark active space within its STO-3G orbital capacity", () => {
+    const hydrogenFluoride = BENCHMARK_MOLECULE_PRESETS.find(
+      (preset) => preset.key === "hf_mol",
+    );
+
+    expect(hydrogenFluoride?.active_space).toEqual({ n_electrons: 2, n_orbitals: 2 });
+  });
 });

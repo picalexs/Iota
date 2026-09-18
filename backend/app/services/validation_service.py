@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -77,6 +80,9 @@ def validate_run_request(
     molecule_active_space_n_electrons: int | None = None,
     molecule_active_space_n_orbitals: int | None = None,
     molecule_multiplicity: int | None = None,
+    molecule_atoms: Sequence[Mapping[str, Any]] | None = None,
+    molecule_charge: int = 0,
+    molecule_active_space_method: str | None = None,
     require_ibm_confirmation: bool = False,
     ibm_credentials_available: bool | None = None,
 ) -> RunValidationResponse:
@@ -131,6 +137,9 @@ def validate_run_request(
         molecule_active_space_n_electrons=molecule_active_space_n_electrons,
         molecule_active_space_n_orbitals=molecule_active_space_n_orbitals,
         molecule_multiplicity=molecule_multiplicity,
+        molecule_atoms=molecule_atoms,
+        molecule_charge=molecule_charge,
+        molecule_active_space_method=molecule_active_space_method,
         errors=errors,
         warnings=warnings,
     )
@@ -205,6 +214,13 @@ def validate_run_validation_request(
         molecule_active_space_n_electrons=n_electrons,
         molecule_active_space_n_orbitals=n_orbitals,
         molecule_multiplicity=(int(molecule.multiplicity) if molecule is not None else None),
+        molecule_atoms=molecule.atoms,
+        molecule_charge=int(molecule.charge or 0),
+        molecule_active_space_method=(
+            molecule.active_space.get("method")
+            if isinstance(molecule.active_space, dict)
+            else None
+        ),
         ibm_credentials_available=credentials_available,
     )
     estimate = build_initial_estimate_for_run_request(

@@ -11,18 +11,32 @@ function BenchmarkCompletionSummary({
   total,
   completionRatio,
   done,
+  completed = done,
+  failed = 0,
+  cancelled = 0,
 }: Readonly<{
   total: number;
   completionRatio: number;
   done: number;
+  completed?: number;
+  failed?: number;
+  cancelled?: number;
 }>) {
   if (total <= 0) return <div />;
 
   return (
     <div className="flex min-w-0 items-center gap-3">
       <Progress value={completionRatio} className="h-2 flex-1" />
-      <div className="shrink-0 text-xs text-muted-foreground">
-        {done} / {total} rows complete
+      <div
+        className="shrink-0 text-xs text-muted-foreground"
+        aria-label={`${done} of ${total} benchmark rows terminal`}
+      >
+        <div>{done} / {total} rows terminal</div>
+        {(failed > 0 || cancelled > 0) && (
+          <div className="text-[10px]">
+            {completed} completed · {failed} failed · {cancelled} cancelled
+          </div>
+        )}
       </div>
     </div>
   );
@@ -70,6 +84,9 @@ export function BenchmarkActionBar({
   total,
   completionRatio,
   done,
+  completed = done,
+  failed = 0,
+  cancelled = 0,
   showResetResults,
   onClear,
 }: Readonly<{
@@ -92,6 +109,9 @@ export function BenchmarkActionBar({
   total: number;
   completionRatio: number;
   done: number;
+  completed?: number;
+  failed?: number;
+  cancelled?: number;
   showResetResults: boolean;
   onClear: () => void;
 }>) {
@@ -145,7 +165,14 @@ export function BenchmarkActionBar({
         />
       </div>
 
-      <BenchmarkCompletionSummary total={total} completionRatio={completionRatio} done={done} />
+      <BenchmarkCompletionSummary
+        total={total}
+        completionRatio={completionRatio}
+        done={done}
+        completed={completed}
+        failed={failed}
+        cancelled={cancelled}
+      />
 
       <BenchmarkResetResultsButton showResetResults={showResetResults} onClear={onClear} />
     </div>

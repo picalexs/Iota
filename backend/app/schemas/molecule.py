@@ -11,6 +11,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
+from app.core.active_space_capacity import minimum_basis_active_orbital_limit
 from app.schemas.common import BaseORMModel
 
 MAX_ATOMS_PER_MOLECULE = 5_000
@@ -183,6 +184,7 @@ def build_molecule_eligibility(
     multiplicity: int,
     active_space: ActiveSpaceSchema | dict[str, Any] | None,
     atoms: list[AtomSchema] | list[dict[str, Any]] | None = None,
+    charge: int = 0,
 ) -> MoleculeEligibilityResponse:
     """Build frontend-facing molecule eligibility and capability labels."""
     unsupported_symbols = _unsupported_atom_symbols(atoms)
@@ -199,6 +201,12 @@ def build_molecule_eligibility(
         )
 
     n_electrons, n_orbitals = _active_space_numbers(active_space)
+    active_space_payload = (
+        active_space.model_dump() if isinstance(active_space, ActiveSpaceSchema) else active_space
+    )
+    derived_active_space = isinstance(active_space_payload, dict) and active_space_payload.get(
+        "method"
+    ) in {"automatic_valence", "automatic_frontier_estimate"}
 
     if multiplicity != 1:
         return MoleculeEligibilityResponse(
@@ -223,6 +231,23 @@ def build_molecule_eligibility(
             reason="Active-space electrons cannot exceed twice the active orbitals.",
             capability_labels=[],
         )
+
+    if derived_active_space and n_electrons is not None and n_orbitals is not None and atoms:
+        capacity = minimum_basis_active_orbital_limit(
+            atoms,
+            active_electrons=n_electrons,
+            charge=charge,
+        )
+        if capacity is not None and n_orbitals > capacity:
+            return MoleculeEligibilityResponse(
+                selectable=False,
+                label="Invalid active space",
+                reason=(
+                    "The active space exceeds the available STO-3G orbital capacity "
+                    f"after frozen-core orbitals are accounted for (maximum {capacity})."
+                ),
+                capability_labels=[],
+            )
 
     if n_electrons is None or n_orbitals is None:
         return MoleculeEligibilityResponse(
@@ -257,12 +282,14 @@ def build_molecule_capability_fields(
     multiplicity: int,
     active_space: ActiveSpaceSchema | dict[str, Any] | None,
     atoms: list[AtomSchema] | list[dict[str, Any]] | None = None,
+    charge: int = 0,
 ) -> dict[str, Any]:
     """Build explicit visualization/run capability fields from backend validation rules."""
     eligibility = build_molecule_eligibility(
         multiplicity=multiplicity,
         active_space=active_space,
         atoms=atoms,
+        charge=charge,
     )
     blocking_reasons = (
         [eligibility.reason] if eligibility.reason and not eligibility.selectable else []
@@ -475,11 +502,13 @@ class MoleculeResponse(MoleculeBase, BaseORMModel):
                 multiplicity=self.multiplicity,
                 active_space=self.active_space,
                 atoms=self.atoms,
+                charge=self.charge,
             )
         capability_fields = build_molecule_capability_fields(
             multiplicity=self.multiplicity,
             active_space=self.active_space,
             atoms=self.atoms,
+            charge=self.charge,
         )
         self.visualizable = bool(capability_fields["visualizable"])
         self.runnable_algorithms = list(capability_fields["runnable_algorithms"])
@@ -543,6 +572,7 @@ class MoleculeSummaryResponse(BaseModel):
             multiplicity=multiplicity,
             active_space=active_space if isinstance(active_space, dict) else None,
             atoms=atoms,
+            charge=int(getattr(molecule, "charge", 0) or 0),
         )
         return cls(
             id=getattr(molecule, "id"),
@@ -558,6 +588,7 @@ class MoleculeSummaryResponse(BaseModel):
                 multiplicity=multiplicity,
                 active_space=active_space if isinstance(active_space, dict) else None,
                 atoms=atoms,
+                charge=int(getattr(molecule, "charge", 0) or 0),
             ),
             visualizable=bool(capability_fields["visualizable"]),
             runnable_algorithms=list(capability_fields["runnable_algorithms"]),
