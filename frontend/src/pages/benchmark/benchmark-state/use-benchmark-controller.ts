@@ -446,6 +446,7 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     handleResumeBenchmark,
     handleRestartBenchmark,
     handleBenchmarkEntryAction,
+    handleBenchmarkMoleculeAction,
   } = useBenchmarkControlActions({
     entries,
     selectedSavedBenchmarkId,
@@ -586,6 +587,7 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     handleResumeBenchmark,
     handleRestartBenchmark,
     handleBenchmarkEntryAction,
+    handleBenchmarkMoleculeAction,
     handleCancelBenchmark,
   };
 }
