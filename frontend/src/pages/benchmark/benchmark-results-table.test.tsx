@@ -129,6 +129,30 @@ describe("BenchmarkResultsTable", () => {
     expect(screen.getByText("1.50 mHa")).toBeInTheDocument();
   });
 
+  it("shows the reported execution path for a completed row", async () => {
+    renderBenchmarkResultsTable({
+      grouped: buildGroupedRows({
+        executionMetadata: {
+          actualExecutionTarget: "local_classical",
+          actualPathClass: "sector_matrix_free",
+        } as NonNullable<BenchmarkEntry["executionMetadata"]>,
+      }),
+    });
+
+    expect(await screen.findByText("Execution path")).toBeInTheDocument();
+    expect(screen.getByLabelText("Execution path: Local matrix-free")).toBeInTheDocument();
+  });
+
+  it("marks cancelled rows as unscored for chemical accuracy", async () => {
+    renderBenchmarkResultsTable({ grouped: buildGroupedRows({ status: "cancelled" }) });
+
+    expect(
+      await screen.findByLabelText("Chemical accuracy unavailable: benchmark row cancelled"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Unscored")).toBeInTheDocument();
+    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+  });
+
   it("gives benchmark result panels a subtle surfaced outline", async () => {
     renderBenchmarkResultsTable();
 

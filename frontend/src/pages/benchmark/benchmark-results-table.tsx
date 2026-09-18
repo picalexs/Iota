@@ -133,6 +133,44 @@ function RuntimeCell({ entry }: { entry: BenchmarkEntry }) {
   );
 }
 
+function executionPathLabel(entry: BenchmarkEntry): string {
+  const metadata = entry.executionMetadata;
+  const pathLabels: Record<string, string> = {
+    aer_branch_estimator: "Aer branch estimator",
+    aer_pauli_lie_trotter: "Aer statevector evolution",
+    aer_primitive: "Aer primitive",
+    aer_statevector_evolution: "Aer statevector evolution",
+    dense_classical: "Local dense classical",
+    sector_matrix_free: "Local matrix-free",
+  };
+  if (metadata?.actualPathClass && pathLabels[metadata.actualPathClass]) {
+    return pathLabels[metadata.actualPathClass];
+  }
+  switch (metadata?.actualExecutionTarget) {
+    case "aer_simulator":
+      return "Aer simulator";
+    case "ibm_runtime":
+      return "IBM Runtime";
+    case "local_classical":
+      return "Local classical";
+    default:
+      return "Unknown";
+  }
+}
+
+function ExecutionPathCell({ entry }: { entry: BenchmarkEntry }) {
+  const label = executionPathLabel(entry);
+  return (
+    <span
+      className="text-xs text-muted-foreground"
+      title={`Reported execution path: ${label}`}
+      aria-label={`Execution path: ${label}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function ChemicalAccuracyCell({
   entry,
   chemicalAccuracyHa,
@@ -142,6 +180,16 @@ function ChemicalAccuracyCell({
 }) {
   if (entry.status === "failed") {
     return <span className="text-xs text-muted-foreground">-</span>;
+  }
+  if (entry.status === "cancelled") {
+    return (
+      <StatusIndicator
+        icon={AlertCircle}
+        label="Unscored"
+        ariaLabel="Chemical accuracy unavailable: benchmark row cancelled"
+        iconClassName="text-muted-foreground"
+      />
+    );
   }
   if (entry.status !== "completed") {
     return <StatusIndicator icon={Clock} label="Pending" iconClassName="text-muted-foreground" />;
@@ -297,6 +345,9 @@ function BenchmarkResultRow({
         <RuntimeCell entry={entry} />
       </TableCell>
       <TableCell>
+        <ExecutionPathCell entry={entry} />
+      </TableCell>
+      <TableCell>
         <ChemicalAccuracyCell entry={entry} chemicalAccuracyHa={chemicalAccuracyHa} />
       </TableCell>
       <TableCell>
@@ -381,6 +432,7 @@ function BenchmarkResultGroup({
             <TableHead className="w-28">Status</TableHead>
             <TableHead>Energy (Ha)</TableHead>
             <TableHead className="w-28">Runtime</TableHead>
+            <TableHead className="w-36">Execution path</TableHead>
             <TableHead className="w-48">Chemical accurate</TableHead>
             <TableHead className="w-16">Run</TableHead>
             <TableHead className="w-12 text-right">Actions</TableHead>
