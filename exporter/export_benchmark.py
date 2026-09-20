@@ -1,129 +1,183 @@
 #!/usr/bin/env python3
-"""Export rows, summaries, and an interpretation report for one run."""
+"""Export compact QSS benchmark rows from a folder or the live API."""
 
 from __future__ import annotations
 
 import argparse
-import csv
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
+try:
+    from .benchmark_io import (
+        EXPORT_SCHEMA_VERSION,
+        ExporterError,
+        QssApiClient,
+        compact_benchmark,
+        compact_manifest,
+        load_api_source,
+        load_folder_source,
+        summarize_rows,
+        write_rows_csv,
+        write_rows_json,
+        write_summary_files,
+    )
+except ImportError:  # pragma: no cover - direct script execution
+    from benchmark_io import (
+        EXPORT_SCHEMA_VERSION,
+        ExporterError,
+        QssApiClient,
+        compact_benchmark,
+        compact_manifest,
+        load_api_source,
+        load_folder_source,
+        summarize_rows,
+        write_rows_csv,
+        write_rows_json,
+        write_summary_files,
+    )
 
-BUNDLE_ROOT = Path(__file__).resolve().parent
-ROW_CANDIDATES = (
-    "benchmark_rows_pipeline.json",
-    "benchmark_rows.json",
-    "benchmark_rows_pipeline.csv",
-    "benchmark_rows.csv",
-)
+
+DEFAULT_BASE_URL = "http://localhost:18000"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Export machine-readable rows and summaries from one benchmark run."
+        description="Export compact benchmark data from a folder or a saved QSS benchmark."
     )
     parser.add_argument(
         "input_dir",
+        nargs="?",
         type=Path,
-        help="Run directory containing benchmark row JSON or CSV.",
+        help="Folder containing benchmark rows or a create checkpoint.",
+    )
+    parser.add_argument("--benchmark-id", help="Saved QSS benchmark ID to fetch through the API.")
+    parser.add_argument(
+        "--base-url",
+        default=DEFAULT_BASE_URL,
+        help=f"QSS API base URL for --benchmark-id. Default: {DEFAULT_BASE_URL}",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="Export directory. Default: <input_dir>/export.",
+        help="Output directory. Defaults to <folder>/export or benchmark_exports/<id>.",
     )
+    parser.add_argument(
+        "--include-raw",
+        action="store_true",
+        help="Save the API benchmark/run response payloads under raw/.",
+    )
+    parser.add_argument("--timeout", type=float, default=30.0, help="HTTP timeout in seconds.")
     return parser.parse_args(argv)
 
 
-def _load_rows(input_dir: Path) -> tuple[Path, list[dict[str, Any]]]:
-    for name in ROW_CANDIDATES:
-        path = input_dir / name
-        if not path.is_file():
-            continue
-        if path.suffix == ".json":
-            value = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(value, list) or not all(isinstance(row, dict) for row in value):
-                raise ValueError(f"Expected a JSON list of row objects in {path}")
-            return path, [dict(row) for row in value]
-        with path.open(newline="", encoding="utf-8") as handle:
-            return path, [dict(row) for row in csv.DictReader(handle)]
-    expected = ", ".join(ROW_CANDIDATES)
-    raise FileNotFoundError(f"No benchmark row file found in {input_dir}; expected {expected}")
+def _write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, default=str) + "\n", encoding="utf-8")
 
 
-def _write_rows_csv(rows: list[dict[str, Any]], path: Path) -> None:
-    fields: list[str] = []
-    for row in rows:
-        for field in row:
-            if field not in fields:
-                fields.append(field)
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
+def _output_dir(args: argparse.Namespace) -> Path:
+    if args.output_dir is not None:
+        return args.output_dir.expanduser().resolve()
+    if args.benchmark_id:
+        return (Path("benchmark_exports") / args.benchmark_id).resolve()
+    if args.input_dir is None:
+        raise ExporterError("Provide a folder or --benchmark-id")
+    return (args.input_dir.expanduser().resolve() / "export").resolve()
+
+
+def export_source(
+    *,
+    input_dir: Path | None = None,
+    benchmark_id: str | None = None,
+    base_url: str = DEFAULT_BASE_URL,
+    output_dir: Path,
+    include_raw: bool = False,
+    timeout: float = 30.0,
+    client: QssApiClient | None = None,
+) -> dict[str, Any]:
+    if (input_dir is None) == (benchmark_id is None):
+        raise ExporterError("Choose exactly one source: folder or benchmark ID")
+
+    if benchmark_id is not None:
+        bundle = load_api_source(
+            benchmark_id,
+            base_url=base_url,
+            client=client or QssApiClient(base_url, timeout=timeout),
+            include_raw=include_raw,
+        )
+    else:
+        bundle = load_folder_source(input_dir or Path("."))
+
+    output_dir = output_dir.expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _write_json(output_dir / "benchmark.json", compact_benchmark(bundle.benchmark))
+    write_rows_json(bundle.rows, output_dir / "runs.json")
+    write_rows_csv(bundle.rows, output_dir / "runs.csv")
+    summary = summarize_rows(bundle.rows)
+    write_summary_files(summary, output_dir)
+
+    if include_raw and bundle.source_type == "api":
+        raw_dir = output_dir / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        if bundle.raw_benchmark is not None:
+            _write_json(raw_dir / "benchmark.json", bundle.raw_benchmark)
+        for run_id, payload in sorted(bundle.raw_runs.items()):
+            _write_json(raw_dir / f"run_{run_id}.json", payload)
+
+    files = [
+        "benchmark.json",
+        "runs.json",
+        "runs.csv",
+        "summaries/summary.json",
+        "summaries/by_algorithm.csv",
+        "summaries/by_molecule.csv",
+        "summaries/best_algorithm_by_molecule.csv",
+    ]
+    if include_raw and bundle.source_type == "api":
+        files.extend(
+            [
+                "raw/benchmark.json",
+                *[f"raw/run_{run_id}.json" for run_id in sorted(bundle.raw_runs)],
+            ]
+        )
+    manifest = compact_manifest(bundle, files=files)
+    manifest["schema_version"] = EXPORT_SCHEMA_VERSION
+    _write_json(output_dir / "manifest.json", manifest)
+    result = {
+        "source_type": bundle.source_type,
+        "source_id": bundle.source_id,
+        "output_dir": str(output_dir),
+        "row_count": len(bundle.rows),
+        "successful_result_count": summary["successful_result_count"],
+        "files": files,
+    }
+    print(json.dumps(result, indent=2))
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    input_dir = args.input_dir.expanduser()
-    if not input_dir.is_absolute():
-        input_dir = BUNDLE_ROOT / input_dir
-    input_dir = input_dir.resolve()
-    if args.output_dir is not None:
-        output_dir = args.output_dir.expanduser()
-        if not output_dir.is_absolute():
-            output_dir = BUNDLE_ROOT / output_dir
-        output_dir = output_dir.resolve()
-    else:
-        output_dir = input_dir / "export"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    source_path, rows = _load_rows(input_dir)
-    if not rows:
-        raise ValueError(f"Benchmark row file is empty: {source_path}")
-
-    from quantum_diag.analyze_benchmark_report import _build_markdown
-    from quantum_diag.results_aggregation import (
-        best_method_per_molecule,
-        export_csv,
-        summarize_by_method,
-        summarize_by_molecule,
-        to_dataframe,
-    )
-
-    canonical_json = output_dir / "benchmark_rows.json"
-    canonical_json.write_text(json.dumps(rows, indent=2, default=str) + "\n", encoding="utf-8")
-    _write_rows_csv(rows, output_dir / "benchmark_rows.csv")
-
-    dataframe = to_dataframe(rows)
-    export_csv(summarize_by_method(dataframe), str(output_dir / "summary_by_method.csv"))
-    export_csv(summarize_by_molecule(dataframe), str(output_dir / "summary_by_molecule.csv"))
+    if args.input_dir is None and args.benchmark_id is None:
+        print("error: provide a folder or --benchmark-id", file=sys.stderr)
+        return 2
+    if args.input_dir is not None and args.benchmark_id is not None:
+        print("error: choose a folder or --benchmark-id, not both", file=sys.stderr)
+        return 2
     try:
-        export_csv(
-            best_method_per_molecule(dataframe),
-            str(output_dir / "best_method_per_molecule.csv"),
+        export_source(
+            input_dir=args.input_dir,
+            benchmark_id=args.benchmark_id,
+            base_url=args.base_url,
+            output_dir=_output_dir(args),
+            include_raw=args.include_raw,
+            timeout=max(0.1, args.timeout),
         )
-    except (KeyError, ValueError):
-        # A run with no valid error values has no meaningful best method.
-        (output_dir / "best_method_per_molecule.csv").write_text(
-            "molecule,method,mean_energy_error\n", encoding="utf-8"
-        )
-
-    (output_dir / "benchmark_interpretation.md").write_text(
-        _build_markdown(rows), encoding="utf-8"
-    )
-    manifest = {
-        "source": source_path.name,
-        "row_count": len(rows),
-        "files": sorted(path.name for path in output_dir.iterdir() if path.is_file()),
-    }
-    (output_dir / "export_manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
-    print(f"Exported {len(rows)} rows from {source_path}")
-    print(f"Output directory: {output_dir}")
+    except ExporterError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     return 0
 
 

@@ -453,7 +453,7 @@ def _find_folder_rows(input_dir: Path) -> Path:
     raise ExporterError(f"No benchmark rows found in {input_dir}; expected {expected}")
 
 
-def _compact_benchmark(benchmark: Mapping[str, Any]) -> dict[str, Any]:
+def compact_benchmark(benchmark: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key in (
         "id",
@@ -846,6 +846,7 @@ __all__ = [
     "QssApiClient",
     "SourceBundle",
     "compact_manifest",
+    "compact_benchmark",
     "load_api_source",
     "load_folder_source",
     "normalize_api_row",
