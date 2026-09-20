@@ -21,6 +21,7 @@ import { ProfileQuickSwitch, SIDEBAR_RECENT_PROFILE_STORAGE_KEY } from "./profil
 
 vi.mock("@/api/backends", () => ({
   forceRefreshBackendCapabilities: vi.fn(),
+  getBackendCapabilitiesCached: vi.fn(() => null),
   setActiveBackendCapabilitiesProfile: vi.fn(),
 }));
 
@@ -163,6 +164,31 @@ describe("ProfileQuickSwitch", () => {
     const activeButton = screen.getByRole("button", { name: "Main IBM active" });
     expect(activeButton).toHaveClass("data-[active=true]:!bg-success/10");
     expect(activeButton).toHaveClass("data-[active=true]:!text-success");
+  });
+
+  it("shows backend loading and loaded status for the active profile", async () => {
+    const user = userEvent.setup();
+
+    renderSwitch();
+
+    await user.click(await screen.findByRole("button", { name: /IBM profile: Main IBM/i }));
+    const backendStatus = screen.getByTestId("ibm-profile-backend-status");
+    expect(screen.getByRole("button", { name: "Main IBM active" })).toHaveClass("w-full");
+    expect(backendStatus).toHaveTextContent("Loading IBM backends");
+    expect(backendStatus).toHaveClass("min-w-0", "max-w-[55%]", "truncate");
+
+    act(() => {
+      notifyIbmCredentialProfilesChanged({
+        activeProfileId: "profile-1",
+        backendCapabilitiesRefresh: "completed",
+        backendStatus: "ready",
+        backendName: "ibm_kyiv",
+      });
+    });
+
+    await waitFor(() => {
+      expect(backendStatus).toHaveTextContent("Active · ibm_kyiv");
+    });
   });
 
   it("shows an add profile link when no saved profiles exist", async () => {

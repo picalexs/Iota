@@ -9,7 +9,6 @@ export function InfoHubPage() {
       <InfoCollectionHero
         eyebrow="Reference"
         title="Reference"
-        description="Browse algorithms, core components, execution targets, and noise notes without leaving the app."
         actions={
           <Button asChild variant="outline" size="sm">
             <Link to="/help/parameters">Parameter glossary</Link>

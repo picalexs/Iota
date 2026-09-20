@@ -21,6 +21,7 @@ const capabilities: BackendCapabilitiesResponse = {
             [0, 1],
             [1, 2],
             [2, 3],
+            [0, 2],
           ],
           qubit_errors: [
             { qubit: 0, readout_error: 0.01, t1_us: 120, t2_us: 90 },
@@ -91,6 +92,18 @@ describe("HardwareMappingTile", () => {
     fireEvent.mouseEnter(screen.getByTestId("hardware-map-edge-0-1"));
     expect(screen.queryByText("0 ↔ 1")).not.toBeInTheDocument();
     expect(screen.queryByText("Available device connection")).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(screen.getByTestId("hardware-map-edge-0-2"));
+    expect(
+      screen
+        .getByRole("img", { name: "IBM Runtime physical qubit map" })
+        .querySelector('line[stroke="#ef4444"]'),
+    ).toBeNull();
+    expect(
+      screen
+        .getByRole("img", { name: "IBM Runtime physical qubit map" })
+        .querySelector('line[stroke="#6f8fdc"][stroke-width="7"]'),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Layout" }));
 

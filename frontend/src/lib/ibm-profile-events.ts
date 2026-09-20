@@ -5,11 +5,16 @@ export type IbmBackendWarmupProgress = Readonly<{
   totalProfiles: number;
 }>;
 
+export type IbmBackendStatus = "loading" | "ready" | "inactive" | "unavailable";
+
 export type IbmCredentialProfilesChangedDetail = Readonly<{
   profilesChanged?: boolean;
   activeProfileId?: string | null;
   backendCapabilitiesRefresh?: "started" | "progress" | "completed" | "failed";
   backendWarmupProgress?: IbmBackendWarmupProgress | null;
+  backendStatus?: IbmBackendStatus;
+  backendCount?: number;
+  backendName?: string | null;
 }>;
 
 export function notifyIbmCredentialProfilesChanged(

@@ -18,10 +18,6 @@ export function BenchmarkModeSection({
           <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
           Benchmark mode
         </div>
-        <p className="text-xs text-muted-foreground">
-          Keep the current guided benchmark flow, or switch to row-level advanced controls with
-          duplicate algorithm rows.
-        </p>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <SelectableCard

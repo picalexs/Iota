@@ -343,9 +343,6 @@ export function BenchmarkVariantEditor({
               <div className="space-y-3">
                 <div>
                   <p className="text-sm font-semibold">Guided preset</p>
-                  <p className="text-xs text-muted-foreground">
-                    This row stays compact and uses the shared easy-mode preset family.
-                  </p>
                 </div>
                 <EasyGoalSlider id={`benchmark-variant-easy-${variant.id}`} disabled={disabled} />
               </div>

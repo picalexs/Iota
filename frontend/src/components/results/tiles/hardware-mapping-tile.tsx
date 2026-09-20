@@ -223,7 +223,7 @@ function HardwareMap({
               strokeWidth: highlighted ? 5 : 3.5,
               opacity: highlighted ? 1 : 0.28,
               hoverLines: state.hovered
-                ? [{ stroke: "#ef4444", strokeWidth: 7 }]
+                ? [{ stroke: DEFAULT_TOPOLOGY_COLOR, strokeWidth: 7 }]
                 : undefined,
               testId: `hardware-map-edge-${source}-${target}`,
             };

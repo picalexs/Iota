@@ -5,6 +5,7 @@ import { BackendPicker } from "./backend-picker";
 import { NoiseModelPanel } from "./backend-noise-model-panel";
 import { FormField } from "@/components/forms/form-field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -45,6 +46,7 @@ interface BackendSectionExpandedProps {
   backendOptions: BackendOptions;
   selectedBackendDevice: BackendDeviceSummary | null;
   selectableDevices: BackendDeviceSummary[];
+  capabilitiesLoading?: boolean;
   disabled?: boolean;
   error?: string;
   onBackendChoice: (choice: BackendPickerChoice) => void;
@@ -68,6 +70,7 @@ export function BackendSectionExpanded({
   backendOptions,
   selectedBackendDevice,
   selectableDevices,
+  capabilitiesLoading,
   disabled,
   error,
   onBackendChoice,
@@ -84,6 +87,11 @@ export function BackendSectionExpanded({
   updateNumberOption,
   updateBackendOptions,
 }: BackendSectionExpandedProps) {
+  const topologyLoading =
+    (capabilitiesLoading || capabilitiesRefreshing) &&
+    (value === "ibm_runtime" ||
+      (value === "aer_simulator" && noiseProfile?.source === "backend_derived"));
+
   return (
     <div className="grid gap-4">
       <div className="flex flex-col gap-4">
@@ -142,11 +150,21 @@ export function BackendSectionExpanded({
           defaultNoiseProfile={defaultNoiseProfile}
           referenceDevices={noiseReferenceDevices}
           onRefresh={onRefreshCapabilities}
+          loading={capabilitiesLoading}
           refreshing={capabilitiesRefreshing}
         />
       ) : null}
 
-      {topologyDevice != null && (value !== "aer_simulator" || noiseProfile != null) ? (
+      {topologyLoading ? (
+        <div
+          className="flex items-center gap-2 rounded-lg border border-border/70 bg-card p-5 text-sm text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <Spinner className="size-4" />
+          Loading IBM backend topology…
+        </div>
+      ) : topologyDevice != null && (value !== "aer_simulator" || noiseProfile != null) ? (
         <div className="min-w-0">
           <Suspense
             fallback={

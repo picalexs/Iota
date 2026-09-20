@@ -3,6 +3,7 @@ import { Check, ChevronsUpDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Command,
   CommandEmpty,
@@ -28,6 +29,8 @@ interface BenchmarkBackendPickerProps {
   placeholder: string;
   ariaLabelledBy?: string;
   disabled?: boolean;
+  loading?: boolean;
+  refreshing?: boolean;
   onOpen?: () => void;
   onSelect: (backendName: string) => void;
 }
@@ -84,6 +87,8 @@ export function BenchmarkBackendPicker({
   placeholder,
   ariaLabelledBy,
   disabled,
+  loading = false,
+  refreshing = false,
   onOpen,
   onSelect,
 }: BenchmarkBackendPickerProps) {
@@ -100,9 +105,15 @@ export function BenchmarkBackendPicker({
   ];
 
   if (devices.length === 0) {
+    const status = loading
+      ? "Loading IBM backends…"
+      : refreshing
+        ? "Refreshing IBM backends…"
+        : "No IBM backends are available right now.";
     return (
-      <div className="rounded-lg border border-dashed border-border/80 bg-card p-4 text-sm text-muted-foreground dark:bg-muted/20">
-        No IBM backends are available right now.
+      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-dashed border-border/80 bg-card p-4 text-sm text-muted-foreground dark:bg-muted/20">
+        {(loading || refreshing) && <Spinner />}
+        <span className="min-w-0">{status}</span>
       </div>
     );
   }

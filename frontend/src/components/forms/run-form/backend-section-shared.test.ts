@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildNoiseReferenceOptions,
   filterSuggestedBackendDevices,
+  getNoiseReferenceDevice,
   getSuggestedBackendDevices,
 } from "./backend-section-shared";
 
@@ -62,5 +64,20 @@ describe("backend-section-shared", () => {
     expect(filterSuggestedBackendDevices(devices).map((device) => device.name)).toEqual([
       "ibm_berlin",
     ]);
+  });
+
+  it("does not fabricate a topology device before the noise reference loads", () => {
+    expect(
+      getNoiseReferenceDevice({ source: "backend_derived", reference_backend: "ibm_aachen" }, []),
+    ).toBeNull();
+  });
+
+  it("does not fabricate options for a missing noise reference", () => {
+    expect(
+      buildNoiseReferenceOptions([], {
+        source: "backend_derived",
+        reference_backend: "ibm_aachen",
+      }),
+    ).toEqual([]);
   });
 });

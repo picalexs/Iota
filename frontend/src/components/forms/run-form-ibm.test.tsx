@@ -270,7 +270,7 @@ describe("RunForm IBM capability refresh", () => {
       resolveRefresh = resolve;
     });
     vi.mocked(api.getBackendCapabilitiesCached).mockReturnValue(null);
-    vi.mocked(api.forceRefreshBackendCapabilities).mockReturnValueOnce(refreshPromise);
+    vi.mocked(api.fetchBackendCapabilities).mockReturnValueOnce(refreshPromise);
 
     renderRunForm();
     await screen.findByText("Create Simulation Run");
@@ -333,9 +333,7 @@ describe("RunForm IBM capability refresh", () => {
     await waitFor(() => {
       expect(getButtonById("backend-option-ibm_runtime")).toBeEnabled();
     });
-    expect(getButtonById("backend-option-ibm_runtime")).toHaveTextContent(
-      /1 ibm hardware backend ready/i,
-    );
+    expect(getButtonById("backend-option-ibm_runtime")).toHaveTextContent(/loaded 1 ibm backend/i);
   });
 
   it("refreshes IBM backend choices when the active profile changes while IBM is open", async () => {
@@ -559,7 +557,7 @@ describe("RunForm IBM capability refresh", () => {
     });
 
     expect(getButtonById("backend-option-ibm_runtime")).toHaveTextContent(
-      /refreshing 1 ibm hardware backend/i,
+      /refreshing ibm runtime backends \(1 loaded\)/i,
     );
   });
 });

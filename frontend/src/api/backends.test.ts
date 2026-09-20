@@ -7,6 +7,7 @@ import {
   parseTranspilePreviewResponse,
   previewTranspilation,
   resetBackendCapabilitiesStateForTests,
+  startBackendCapabilitiesAutoRefresh,
 } from "./backends";
 import { getFetchCall, mockJsonResponse } from "./test-helpers";
 
@@ -65,6 +66,7 @@ describe("backend capability transport boundary", () => {
     resetBackendCapabilitiesStateForTests();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it("groups flat server rows into the frontend capability catalog", async () => {
@@ -144,5 +146,22 @@ describe("backend capability transport boundary", () => {
     });
 
     expect(getBackendCapabilitiesCached()).toEqual(first);
+  });
+
+  it("broadcasts periodic active-profile refresh state", async () => {
+    vi.useFakeTimers();
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener("ibm-credential-profiles-changed", listener);
+    vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ backends: backendRows, warnings: [] }));
+
+    startBackendCapabilitiesAutoRefresh();
+    await vi.advanceTimersByTimeAsync(1000 * 60);
+
+    expect(events.map((event) => event.detail.backendCapabilitiesRefresh)).toEqual([
+      "started",
+      "completed",
+    ]);
+    window.removeEventListener("ibm-credential-profiles-changed", listener);
   });
 });
