@@ -1,0 +1,186 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from exporter.benchmark_io import (
+    CANONICAL_FIELDS,
+    load_api_source,
+    load_folder_source,
+    normalize_api_row,
+    summarize_rows,
+    write_rows_csv,
+    write_rows_json,
+)
+
+
+def _benchmark() -> dict:
+    return {
+        "id": "benchmark-1",
+        "name": "seed campaign",
+        "selectedBasis": "sto-3g",
+        "entries": [
+            {
+                "id": "h2:vqe:seed=11",
+                "algorithm": "vqe",
+                "status": "completed",
+                "moleculeId": "molecule-1",
+                "runId": "run-1",
+                "seed": 11,
+                "seedRoles": ["algorithm", "transpiler"],
+                "preset": {"key": "h2", "name": "H2"},
+            }
+        ],
+    }
+
+
+def _run_export() -> dict:
+    return {
+        "run": {
+            "id": "run-1",
+            "molecule_id": "molecule-1",
+            "status": "COMPLETED",
+            "algorithm": "vqe",
+            "basis_set": "sto-3g",
+            "created_at": "2026-09-20T10:00:00Z",
+            "config_json": {
+                "advanced_config": {"seed": 11},
+                "backend_options": {
+                    "backend_name": None,
+                    "seed_transpiler": 11,
+                },
+            },
+        },
+        "molecule": {"name": "H2"},
+        "result": {
+            "final_energy": -1.1,
+            "reference_energy": -1.2,
+            "signed_error": 0.1,
+            "iterations": 7,
+            "converged": True,
+            "created_at": "2026-09-20T10:00:03Z",
+        },
+        "execution_segments": [{"duration_seconds": 2.5}],
+    }
+
+
+def test_api_normalization_selects_compact_result_and_seed_roles() -> None:
+    row, runtime_source = normalize_api_row(
+        benchmark=_benchmark(),
+        entry=_benchmark()["entries"][0],
+        run_export=_run_export(),
+    )
+
+    assert runtime_source == "execution_segments.duration_seconds"
+    assert row["run_id"] == "run-1"
+    assert row["seed"] == 11
+    assert row["seed_roles"] == ["algorithm", "transpiler"]
+    assert row["absolute_error"] == 0.1
+    assert row["runtime_seconds"] == 2.5
+    assert set(row) >= set(CANONICAL_FIELDS)
+    assert "raw_result" not in row
+    assert "execution_segments" not in row
+
+
+class FakeApi:
+    def __init__(self, benchmark: dict, run_export: dict) -> None:
+        self.benchmark = benchmark
+        self.run_export = run_export
+        self.paths: list[str] = []
+
+    def get(self, path: str) -> object:
+        self.paths.append(path)
+        if path == "/api/benchmarks/benchmark-1":
+            return self.benchmark
+        if path == "/api/runs/run-1/export":
+            return self.run_export
+        raise AssertionError(path)
+
+
+def test_api_source_fetches_saved_entries_and_preserves_missing_entries() -> None:
+    benchmark = _benchmark()
+    benchmark["entries"].append(
+        {
+            "id": "h2:vqe:seed=17",
+            "algorithm": "vqe",
+            "status": "planned",
+            "seed": 17,
+            "preset": {"key": "h2", "name": "H2"},
+        }
+    )
+    client = FakeApi(benchmark, _run_export())
+
+    bundle = load_api_source("benchmark-1", base_url="http://unused", client=client)  # type: ignore[arg-type]
+
+    assert client.paths == ["/api/benchmarks/benchmark-1", "/api/runs/run-1/export"]
+    assert [row["entry_id"] for row in bundle.rows] == [
+        "h2:vqe:seed=11",
+        "h2:vqe:seed=17",
+    ]
+    assert bundle.rows[1]["status"] == "planned"
+    assert bundle.rows[1]["run_id"] is None
+
+
+def test_folder_source_accepts_canonical_json_and_csv_round_trip(tmp_path: Path) -> None:
+    rows = [
+        {
+            "benchmark_id": "benchmark-1",
+            "benchmark_name": "seed campaign",
+            "entry_id": "h2:vqe:seed=11",
+            "run_id": "run-1",
+            "molecule_id": "molecule-1",
+            "molecule": "H2",
+            "algorithm": "vqe",
+            "basis_set": "sto-3g",
+            "backend_target": "statevector",
+            "backend_name": None,
+            "seed": 11,
+            "seed_roles": ["algorithm"],
+            "status": "completed",
+            "created_at": None,
+            "result_created_at": None,
+            "runtime_seconds": 2.0,
+            "final_energy": -1.1,
+            "reference_energy": -1.2,
+            "signed_error": 0.1,
+            "absolute_error": 0.1,
+            "iterations": 4,
+            "converged": True,
+            "error_message": None,
+        }
+    ]
+    write_rows_json(rows, tmp_path / "runs.json")
+    (tmp_path / "benchmark.json").write_text(json.dumps(_benchmark()), encoding="utf-8")
+
+    loaded_json = load_folder_source(tmp_path)
+    assert loaded_json.rows[0]["seed_roles"] == ["algorithm"]
+
+    write_rows_csv(rows, tmp_path / "runs.csv")
+    (tmp_path / "runs.json").unlink()
+    loaded_csv = load_folder_source(tmp_path)
+    assert loaded_csv.rows[0]["seed"] == 11
+    assert loaded_csv.rows[0]["converged"] is True
+
+
+def test_summary_uses_successful_results_only_and_handles_all_failed() -> None:
+    rows = [
+        {"algorithm": "vqe", "molecule": "H2", "status": "completed", "absolute_error": 0.2, "converged": True},
+        {"algorithm": "vqe", "molecule": "H2", "status": "failed", "absolute_error": None, "converged": None},
+        {"algorithm": "sqd", "molecule": "H2", "status": "planned", "absolute_error": None, "converged": None},
+    ]
+
+    summary = summarize_rows(rows)
+
+    assert summary["row_count"] == 3
+    assert summary["successful_result_count"] == 1
+    vqe = next(item for item in summary["by_algorithm"] if item["algorithm"] == "vqe")
+    assert vqe["run_count"] == 2
+    assert vqe["successful_count"] == 1
+    best = summary["best_algorithm_by_molecule"][0]
+    assert best["algorithm"] == "vqe"
+
+    failed_summary = summarize_rows(
+        [{"algorithm": "vqe", "molecule": "H2", "status": "failed", "absolute_error": None}]
+    )
+    assert failed_summary["best_algorithm_by_molecule"][0]["algorithm"] is None
+    assert failed_summary["best_algorithm_by_molecule"][0]["reason"]
