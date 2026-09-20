@@ -74,18 +74,6 @@ export function getIbmBackendStatus(
   return "unavailable";
 }
 
-export function formatIbmBackendStatus(
-  status: IbmBackendStatus,
-  backendName: string | null = null,
-): string {
-  if (status === "loading") return "Loading IBM backends…";
-  if (status === "ready") {
-    return `Active · ${backendName ?? "IBM backend"}`;
-  }
-  if (status === "inactive") return "Inactive · credential unavailable";
-  return "No IBM backends available";
-}
-
 export function isBackendSelectable(capability: BackendCapability | undefined): boolean {
   if (capability?.target === "ibm_runtime") {
     return capability?.enabled === true && capability.credentials_usable !== false;

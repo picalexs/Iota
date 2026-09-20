@@ -166,16 +166,16 @@ describe("ProfileQuickSwitch", () => {
     expect(activeButton).toHaveClass("data-[active=true]:!text-success");
   });
 
-  it("shows backend loading and loaded status for the active profile", async () => {
+  it("shows profile status symbols for loading, ready, and inactive states", async () => {
     const user = userEvent.setup();
 
     renderSwitch();
 
     await user.click(await screen.findByRole("button", { name: /IBM profile: Main IBM/i }));
-    const backendStatus = screen.getByTestId("ibm-profile-backend-status");
-    expect(screen.getByRole("button", { name: "Main IBM active" })).toHaveClass("w-full");
-    expect(backendStatus).toHaveTextContent("Loading IBM backends");
-    expect(backendStatus).toHaveClass("min-w-0", "max-w-[55%]", "truncate");
+    const activeButton = screen.getByRole("button", { name: "Main IBM active" });
+    expect(activeButton).toHaveClass("w-full");
+    expect(activeButton).toHaveTextContent("Main IBM");
+    expect(activeButton.querySelector("svg")).toHaveClass("text-warning");
 
     act(() => {
       notifyIbmCredentialProfilesChanged({
@@ -187,7 +187,21 @@ describe("ProfileQuickSwitch", () => {
     });
 
     await waitFor(() => {
-      expect(backendStatus).toHaveTextContent("Active · ibm_kyiv");
+      expect(activeButton).not.toHaveTextContent("ibm_kyiv");
+      expect(activeButton.querySelector("svg")).toHaveClass("text-success");
+    });
+
+    act(() => {
+      notifyIbmCredentialProfilesChanged({
+        activeProfileId: "profile-1",
+        backendCapabilitiesRefresh: "completed",
+        backendStatus: "inactive",
+        backendName: "ibm_kyiv",
+      });
+    });
+
+    await waitFor(() => {
+      expect(activeButton.querySelector("svg")).toHaveClass("text-destructive");
     });
   });
 

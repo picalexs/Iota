@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, ChevronDown, KeyRound, Plus } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, KeyRound, Plus, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import {
@@ -17,10 +17,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  formatIbmBackendStatus,
-  getIbmBackendStatus,
-} from "@/components/forms/run-form/backend-card-state";
+import { getIbmBackendStatus } from "@/components/forms/run-form/backend-card-state";
 import { showErrorToast } from "@/lib/error-handler";
 import {
   notifyIbmCredentialProfilesChanged,
@@ -79,28 +76,30 @@ function ProfileSwitchIcon({
   isActive: boolean;
   backendStatus: IbmBackendStatus;
 }>) {
-  if (isPending || (isActive && backendStatus === "loading")) return <Spinner />;
-  if (isActive) return <Check className="size-4" />;
+  if (isPending) return <Spinner />;
+  if (isActive) return <BackendStatusIcon status={backendStatus} />;
   return <KeyRound className="size-4" />;
+}
+
+function BackendStatusIcon({ status }: Readonly<{ status: IbmBackendStatus }>) {
+  if (status === "ready") return <Check aria-hidden className="size-4 text-success" />;
+  if (status === "inactive") return <X aria-hidden className="size-4 text-destructive" />;
+  return <AlertTriangle aria-hidden className="size-4 text-warning" />;
 }
 
 function readActiveBackendStatus(profileId: string | null): {
   status: IbmBackendStatus;
-  backendName: string | null;
 } {
   if (profileId == null) {
-    return { status: "inactive", backendName: null };
+    return { status: "inactive" };
   }
   const capability = getBackendCapabilitiesCached(profileId)?.backends.find(
     (item) => item.target === "ibm_runtime",
   );
   if (capability == null) {
-    return { status: "loading", backendName: null };
+    return { status: "loading" };
   }
-  return {
-    status: getIbmBackendStatus(capability),
-    backendName: capability.default_backend ?? capability.backends?.[0]?.name ?? null,
-  };
+  return { status: getIbmBackendStatus(capability) };
 }
 
 export function ProfileQuickSwitch() {
@@ -111,7 +110,6 @@ export function ProfileQuickSwitch() {
   const [loading, setLoading] = useState(true);
   const [profileLoadError, setProfileLoadError] = useState(false);
   const [backendStatus, setBackendStatus] = useState<IbmBackendStatus>("loading");
-  const [backendName, setBackendName] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [recentProfileIds, setRecentProfileIds] = useLocalStorage<string[]>(
     SIDEBAR_RECENT_PROFILE_STORAGE_KEY,
@@ -142,7 +140,6 @@ export function ProfileQuickSwitch() {
       setActiveProfileId(response.active_profile_id);
       const activeBackendStatus = readActiveBackendStatus(response.active_profile_id);
       setBackendStatus(activeBackendStatus.status);
-      setBackendName(activeBackendStatus.backendName);
       setRecentProfileIds((current) => rememberRecentProfile(current, response.active_profile_id));
     } catch {
       setProfileLoadError(true);
@@ -167,14 +164,11 @@ export function ProfileQuickSwitch() {
         detail.backendCapabilitiesRefresh === "progress"
       ) {
         setBackendStatus("loading");
-        setBackendName(null);
       } else if (detail.backendCapabilitiesRefresh === "completed") {
         const refreshed = readActiveBackendStatus(detail.activeProfileId ?? activeProfileId);
         setBackendStatus(detail.backendStatus ?? refreshed.status);
-        setBackendName(detail.backendName ?? refreshed.backendName);
       } else if (detail.backendCapabilitiesRefresh === "failed") {
         setBackendStatus("unavailable");
-        setBackendName(null);
       }
       if (detail.profilesChanged === true) {
         setLoading(true);
@@ -209,7 +203,6 @@ export function ProfileQuickSwitch() {
       setActiveBackendCapabilitiesProfile(profile.id);
       setOpen(false);
       setBackendStatus("loading");
-      setBackendName(null);
       notifyIbmCredentialProfilesChanged({
         activeProfileId: profile.id,
         backendCapabilitiesRefresh: "started",
@@ -302,7 +295,7 @@ export function ProfileQuickSwitch() {
             isActive={isActive || isPending}
             className={cn(
               isActive &&
-                "disabled:!opacity-100 data-[active=true]:!bg-success/10 data-[active=true]:!text-success data-[active=true]:[&>svg]:!text-success dark:data-[active=true]:!bg-success/15",
+                "disabled:!opacity-100 data-[active=true]:!bg-success/10 data-[active=true]:!text-success dark:data-[active=true]:!bg-success/15",
             )}
             aria-busy={isPending}
           >
@@ -318,17 +311,6 @@ export function ProfileQuickSwitch() {
                 backendStatus={backendStatus}
               />
               <span className="flex-1 truncate">{profile.name}</span>
-              {isActive ? (
-                <span
-                  className={cn(
-                    "min-w-0 max-w-[55%] shrink truncate text-right text-xs font-medium",
-                    backendStatus === "ready" ? "text-success" : "text-muted-foreground",
-                  )}
-                  data-testid="ibm-profile-backend-status"
-                >
-                  {formatIbmBackendStatus(backendStatus, backendName)}
-                </span>
-              ) : null}
             </button>
           </SidebarMenuSubButton>
         </SidebarMenuSubItem>
@@ -345,13 +327,7 @@ export function ProfileQuickSwitch() {
         onClick={() => setOpen((current) => !current)}
         isActive={open}
       >
-        {loading || backendStatus === "loading" ? (
-          <Spinner />
-        ) : activeProfile != null && backendStatus === "ready" ? (
-          <Check className="size-4" />
-        ) : (
-          <KeyRound className="size-4" />
-        )}
+        {loading ? <Spinner /> : <KeyRound className="size-4" />}
         <span className="min-w-0 flex-1 truncate whitespace-nowrap group-data-[collapsible=icon]:hidden">
           {buttonLabel}
         </span>
