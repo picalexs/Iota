@@ -416,6 +416,59 @@ def _read_json(path: Path) -> Any:
         raise ExporterError(f"Cannot read JSON file {path}: {exc}") from exc
 
 
+def _submission_rows(path: Path, benchmark: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Build status-only rows from a create_benchmark checkpoint."""
+
+    payload = _read_json(path)
+    if not isinstance(payload, Mapping):
+        raise ExporterError(f"Expected an object in {path}")
+    entries = payload.get("entries")
+    if not isinstance(entries, list) or not all(isinstance(item, Mapping) for item in entries):
+        raise ExporterError(f"Expected checkpoint entries in {path}")
+    molecules = {
+        str(item.get("id")): item
+        for item in payload.get("molecules", [])
+        if isinstance(item, Mapping) and item.get("id") is not None
+    }
+
+    rows: list[dict[str, Any]] = []
+    for index, item in enumerate(entries):
+        snapshot = _record(item.get("snapshot"))
+        config = _record(item.get("run_config", item.get("runConfig")))
+        molecule_id = _text(
+            _first(snapshot, "moleculeId", "molecule_id")
+            or _first(config, "molecule_id", "moleculeId")
+        )
+        molecule_record = _record(molecules.get(molecule_id or ""))
+        preset = _record(_first(snapshot, "preset"))
+        options = _record(_first(config, "backend_options", "backendOptions"))
+        rows.append(
+            {
+                "benchmark_id": _text(_first(benchmark, "id")) or _text(payload.get("benchmark_id")),
+                "benchmark_name": _text(_first(benchmark, "name")),
+                "entry_id": _text(item.get("entry_id"))
+                or _text(_first(snapshot, "id", "entry_id", "entryId"))
+                or f"checkpoint:{index:04d}",
+                "run_id": _text(item.get("run_id")) or _text(_first(snapshot, "runId", "run_id")),
+                "molecule_id": molecule_id,
+                "molecule": _text(_first(molecule_record, "name"))
+                or _text(_first(preset, "name", "formula")),
+                "algorithm": _text(_first(snapshot, "algorithm"))
+                or _text(_first(config, "algorithm")),
+                "basis_set": _text(_first(config, "basis_set_override", "basisSetOverride"))
+                or _text(_first(benchmark, "selectedBasis", "selected_basis")),
+                "backend_target": _text(_first(config, "backend_target", "backendTarget")),
+                "backend_name": _text(_first(options, "backend_name", "backendName")),
+                "seed": item.get("seed", _first(snapshot, "seed")),
+                "seed_roles": item.get("seed_roles", _first(snapshot, "seedRoles", "seed_roles")),
+                "status": item.get("status") or _first(snapshot, "status"),
+                "error_message": item.get("error_message")
+                or _first(snapshot, "errorMessage", "error_message"),
+            }
+        )
+    return rows
+
+
 def _read_rows_file(path: Path) -> list[dict[str, Any]]:
     if path.suffix.lower() == ".json":
         value = _read_json(path)
@@ -449,6 +502,9 @@ def _find_folder_rows(input_dir: Path) -> Path:
     nested_export = input_dir / "export"
     if nested_export.is_dir():
         return _find_folder_rows(nested_export)
+    submission = input_dir / "submission.json"
+    if submission.is_file():
+        return submission
     expected = ", ".join(candidates)
     raise ExporterError(f"No benchmark rows found in {input_dir}; expected {expected}")
 
@@ -520,7 +576,11 @@ def load_folder_source(input_dir: Path) -> SourceBundle:
         raise ExporterError(f"Expected an object in {benchmark_path}")
 
     rows_path = _find_folder_rows(input_dir)
-    raw_rows = _read_rows_file(rows_path)
+    raw_rows = (
+        _submission_rows(rows_path, benchmark)
+        if rows_path.name == "submission.json"
+        else _read_rows_file(rows_path)
+    )
     rows: list[dict[str, Any]] = []
     runtime_sources: Counter[str] = Counter()
     for index, raw_row in enumerate(raw_rows):
@@ -811,11 +871,20 @@ def write_records_csv(records: list[Mapping[str, Any]], path: Path) -> None:
 
 def compact_manifest(bundle: SourceBundle, *, files: list[str]) -> dict[str, Any]:
     summary = summarize_rows(bundle.rows)
+    source_metadata = {
+        "source_type": bundle.source_type,
+        "source_id": bundle.source_id,
+        "exported_at": datetime.now().astimezone().isoformat(),
+        "schema_version": EXPORT_SCHEMA_VERSION,
+        "row_count": len(bundle.rows),
+        "source_signature": source_signature(bundle.rows),
+    }
     return {
         "schema_version": EXPORT_SCHEMA_VERSION,
         "source_type": bundle.source_type,
         "source_id": bundle.source_id,
-        "exported_at": datetime.now().astimezone().isoformat(),
+        "exported_at": source_metadata["exported_at"],
+        "source_metadata": source_metadata,
         "row_count": len(bundle.rows),
         "successful_result_count": summary["successful_result_count"],
         "status_counts": summary["status_counts"],

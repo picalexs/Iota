@@ -162,6 +162,50 @@ def test_folder_source_accepts_canonical_json_and_csv_round_trip(tmp_path: Path)
     assert loaded_csv.rows[0]["converged"] is True
 
 
+def test_folder_source_accepts_create_checkpoint_status_rows(tmp_path: Path) -> None:
+    (tmp_path / "benchmark.json").write_text(
+        json.dumps({"id": "benchmark-1", "name": "seed campaign", "selectedBasis": "sto-3g"}),
+        encoding="utf-8",
+    )
+    (tmp_path / "submission.json").write_text(
+        json.dumps(
+            {
+                "benchmark_id": "benchmark-1",
+                "molecules": [{"id": "molecule-1", "name": "H2"}],
+                "entries": [
+                    {
+                        "entry_id": "h2:vqe:seed=11",
+                        "run_id": "run-1",
+                        "seed": 11,
+                        "seed_roles": ["algorithm"],
+                        "status": "queued",
+                        "run_config": {
+                            "molecule_id": "molecule-1",
+                            "algorithm": "vqe",
+                            "backend_target": "statevector",
+                            "basis_set_override": "sto-3g",
+                        },
+                        "snapshot": {
+                            "id": "h2:vqe:seed=11",
+                            "algorithm": "vqe",
+                            "moleculeId": "molecule-1",
+                            "status": "queued",
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    bundle = load_folder_source(tmp_path)
+
+    assert bundle.rows[0]["run_id"] == "run-1"
+    assert bundle.rows[0]["status"] == "queued"
+    assert bundle.rows[0]["final_energy"] is None
+    assert bundle.rows[0]["molecule"] == "H2"
+
+
 def test_summary_uses_successful_results_only_and_handles_all_failed() -> None:
     rows = [
         {"algorithm": "vqe", "molecule": "H2", "status": "completed", "absolute_error": 0.2, "converged": True},

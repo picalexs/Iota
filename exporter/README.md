@@ -97,6 +97,9 @@ You can also export from an existing campaign or export folder:
   --output-dir output/local-h2-seeds/export
 ```
 
+A create checkpoint exports the run IDs and current statuses that it knows.
+Use the benchmark-ID form after runs finish to fetch result fields.
+
 The exporter keeps only the fields needed for comparison and audit:
 
 - benchmark and entry identifiers;
