@@ -55,7 +55,7 @@ def _canonical_symbol(value: Any) -> str | None:
 
 
 def minimum_basis_active_orbital_limit(
-    atoms: Sequence[Mapping[str, Any]],
+    atoms: Sequence[Mapping[str, Any] | Any],
     *,
     active_electrons: int,
     charge: int = 0,
@@ -66,7 +66,12 @@ def minimum_basis_active_orbital_limit(
     minimal_basis_orbitals = 0
 
     for atom in atoms:
-        symbol = _canonical_symbol(atom.get("symbol"))
+        symbol_value = (
+            atom.get("symbol")
+            if isinstance(atom, Mapping)
+            else getattr(atom, "symbol", None)
+        )
+        symbol = _canonical_symbol(symbol_value)
         if symbol is None:
             return None
         valence_electrons = _VALENCE_ELECTRONS.get(symbol)
