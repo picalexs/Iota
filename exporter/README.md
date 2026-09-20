@@ -1,84 +1,175 @@
-# Quantum Diag fast benchmark bundle
+# QSS benchmark exporter
 
-This folder is a standalone copy of the quantum-diag benchmark tools.
+This folder provides three independent commands. Run them in this order:
 
-The fast profile runs a bounded local matrix:
+1. Create a benchmark and submit its runs to the QSS API.
+2. Export compact results from the API or from a saved folder.
+3. Create plots from the API or from the exported folder.
 
-- VQE, KQD, and SQD;
-- H2 and LiH;
-- seeds 11 and 17;
-- four iterations per run.
-
-The profile is for quick local checks. It is not a final scientific benchmark.
+The commands use separate output directories. You can repeat export and plot
+steps without submitting runs again.
 
 ## Install
 
-Use Python 3.11 or newer. Create an environment in the target repository and
-install the bundle dependencies:
+Use Python 3.11 or newer. Install the exporter dependencies in an environment:
 
 ```sh
 python -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-The dependency list includes the plotting packages used by the exporter.
+Use the Python executable from that environment for all commands below.
 
-## Run the fast benchmark
+## 1. Create a benchmark
 
-Run from any directory:
+Start the QSS API. The default API URL is `http://localhost:18000`.
 
-```sh
-python /path/to/quantum-diag-fast-bundle/run_fast_benchmark.py
+Create a campaign file. The campaign expands to one QSS run for each molecule,
+algorithm variant, and seed.
+
+```json
+{
+  "name": "local-h2-seeds",
+  "campaign_id": "local-h2-seeds",
+  "molecules": [
+    {"id": "<molecule-id>"}
+  ],
+  "algorithms": [
+    {"algorithm": "vqe", "mode": "advanced", "advanced_config": {}},
+    {"algorithm": "sqd", "mode": "advanced", "advanced_config": {}}
+  ],
+  "seeds": [11, 17, 23],
+  "basis_set": "sto-3g",
+  "backend": {
+    "target": "aer_simulator",
+    "options": {"optimization_level": 1}
+  },
+  "metadata": {"purpose": "local seed check"}
+}
 ```
 
-The command writes all run files to `output/fast/<UTC timestamp>` inside the
-bundle. Use an explicit directory when another repository owns the output:
+Save the file as `campaign.json`, then run:
 
 ```sh
-python run_fast_benchmark.py --output-dir output/fast/example
+.venv/bin/python create_benchmark.py campaign.json \
+  --output-dir output/local-h2-seeds
 ```
 
-The command writes raw rows, CSV summaries, plots, runtime metadata, and a
-Markdown interpretation report.
+The command writes `campaign.json`, `benchmark.json`, `submission.json`, and
+`submission_summary.json` to the checkpoint directory. It updates the
+checkpoint after each run. Run the same command again to resume an interrupted
+campaign. Add `--wait` when the command must wait for terminal run states.
 
-## Regenerate plots
+The command does not acquire molecule data unless the campaign sets
+`"acquire_molecules": true`. Use molecule IDs when possible.
 
-Regenerate plots without running the benchmark again:
+### Seed handling
+
+Each seed is a separate QSS run. The checkpoint records the seed and its roles.
+
+- `simulator` sets `backend_options.seed_simulator`.
+- `transpiler` sets `backend_options.seed_transpiler`.
+- `algorithm` sets the algorithm seed in advanced VQE, SQD, or SKQD options.
+
+QSE, KQD, and QFD do not expose an algorithm-level seed in this workflow. Their
+default seed roles are simulator and transpiler for local targets. Set
+`seed_roles` explicitly on a variant when the campaign needs a different
+supported combination.
+
+The default workflow targets `statevector` or `aer_simulator`. IBM Runtime
+submission is blocked unless the caller passes `--allow-ibm`. Do not pass that
+flag for local tests or this workflow.
+
+## 2. Export benchmark results
+
+Export a saved QSS benchmark through the API:
 
 ```sh
-python plot_benchmark.py output/fast/example
+.venv/bin/python export_benchmark.py \
+  --benchmark-id <benchmark-id> \
+  --output-dir output/local-h2-seeds/export
 ```
 
-The command writes plots to `output/fast/example/plots_regenerated`.
-Use `--error-view signed` when signed energy errors are required.
-
-## Export an existing run
-
-Create canonical row files, grouped summaries, a best-method table, and a
-Markdown interpretation report:
+You can also export from an existing campaign or export folder:
 
 ```sh
-python export_benchmark.py output/fast/example
+.venv/bin/python export_benchmark.py output/local-h2-seeds \
+  --output-dir output/local-h2-seeds/export
 ```
 
-The command writes these files to `output/fast/example/export`.
-Use `--output-dir` to select another directory.
+The exporter keeps only the fields needed for comparison and audit:
+
+- benchmark and entry identifiers;
+- molecule, algorithm, basis, backend, and seed metadata;
+- run status and error message;
+- final energy, reference energy, signed error, absolute error, iterations,
+  convergence, and runtime.
+
+The default output contains:
+
+- `benchmark.json`: compact benchmark metadata;
+- `runs.json` and `runs.csv`: one compact row per campaign entry;
+- `summaries/`: status-aware algorithm and molecule summaries;
+- `manifest.json`: schema version, counts, runtime source, and source digest.
+
+The exporter does not include event streams or raw result payloads by default.
+Use `--include-raw` only when those API payloads are required for an audit.
+
+The API source uses QSS read endpoints. It does not connect to the database
+directly. This keeps API and database-backed exports consistent.
+
+## 3. Create plots
+
+Create plots from an exported folder:
+
+```sh
+.venv/bin/python plot_benchmark.py output/local-h2-seeds/export \
+  --output-dir output/local-h2-seeds/plots
+```
+
+Create the same plots directly from a saved QSS benchmark:
+
+```sh
+.venv/bin/python plot_benchmark.py \
+  --benchmark-id <benchmark-id> \
+  --output-dir output/local-h2-seeds/plots
+```
+
+The command writes four plots and `plot_manifest.json`:
+
+- `error_by_algorithm`: absolute or signed error distributions;
+- `convergence_by_algorithm`: completed-row convergence rates;
+- `runtime_by_algorithm`: completed-row runtime distributions;
+- `error_vs_runtime`: positive runtime and error points on log axes.
+
+Use `--error-view signed` for signed error plots. Use `--format svg` for
+editable vector output or `--format both` for PNG and SVG. The plot writer
+reserves legend space and saves with a tight bounding box to keep text visible.
+
+Rows without the required values are excluded from the relevant plot and are
+reported in `plot_manifest.json`.
 
 ## Tests
 
-Run the bundle tests from the bundle root:
+Run the exporter tests from the repository root:
 
 ```sh
-python -m pytest -q
+PYTHONPATH=exporter .venv/bin/python -m pytest -q exporter/tests
 ```
 
-## Layout
+The tests use fake API clients and local rows. They do not submit QSS runs.
 
-- `run_fast_benchmark.py`: fast benchmark starter;
-- `plot_benchmark.py`: plots-only entry point;
-- `export_benchmark.py`: row and summary exporter;
-- `quantum_diag/`: benchmark runners, chemistry helpers, plotting, and
-  aggregation code;
-- `tests/`: copied regression tests;
-- `output/`: generated artifacts. This folder is ignored by the bundle's
-  package-level `.gitignore` when the bundle is copied into a repository.
+## Files
+
+- `create_benchmark.py`: campaign validation, molecule resolution, run
+  submission, checkpointing, and optional polling;
+- `export_benchmark.py`: compact export from a folder or QSS API;
+- `plot_benchmark.py`: plot generation from a folder or QSS API;
+- `benchmark_io.py`: shared row normalization, API access, summaries, and
+  manifest helpers;
+- `benchmark_plots.py`: layout-safe Matplotlib plot builders;
+- `tests/`: focused exporter tests;
+- `quantum_diag/`: older local benchmark and diagnostic tools.
+
+The older local tools remain available for development diagnostics. They are
+not required by the three-step API workflow.
