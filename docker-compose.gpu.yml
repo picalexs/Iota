@@ -1,0 +1,57 @@
+services:
+  worker-gpu:
+    image: ${QSS_GPU_WORKER_IMAGE:?Set QSS_GPU_WORKER_IMAGE to a verified CUDA/Aer worker image}
+    profiles: [gpu]
+    command: python -m worker.main
+    volumes:
+      - credentialkeys:/app/local-state
+    environment:
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-vqe}
+      DB_USER: ${DB_USER:-vqe}
+      DB_PASSWORD: ${DB_PASSWORD:-dev-password-not-secret} # pragma: allowlist secret
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD:-dev-redis-not-secret}@redis:6379/0} # pragma: allowlist secret
+      QUEUE_NAME: ${GPU_QUEUE_NAME:-quantum-gpu}
+      REQUIRED_AER_DEVICE: GPU
+      QUANTUM_JOB_TIMEOUT_SECONDS: ${QUANTUM_JOB_TIMEOUT_SECONDS:-14400}
+      LOCAL_CREDENTIALS_KEYS: ${LOCAL_CREDENTIALS_KEYS:-}
+      LOCAL_CREDENTIALS_KEY_FILE: ${LOCAL_CREDENTIALS_KEY_FILE:-/app/local-state/credential-fernet.key}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_VERSION: ${APP_VERSION:-dev}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      secret-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - from worker.chemistry.aer_runtime import probe_aer_runtime; assert probe_aer_runtime().gpu_available
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - vqe-network
+    restart: unless-stopped
+    cpus: "8.00"
+    mem_limit: 8192M
+    mem_reservation: 2048M
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "8.00"
+          memory: 8192M
+        reservations:
+          cpus: "4.00"
+          memory: 2048M
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

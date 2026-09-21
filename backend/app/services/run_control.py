@@ -384,6 +384,7 @@ class RunControlService:
                 run.id,
                 redis_client,
                 execution_generation=int(run.execution_generation or 1),
+                queue_name=queue_service.queue_name_for_run(run),
             )
         except Exception:
             logger.warning(

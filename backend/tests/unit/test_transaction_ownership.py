@@ -98,6 +98,7 @@ def test_created_run_enqueue_rolls_back_and_cancels_orphan_job() -> None:
         run_id,
         redis,
         execution_generation=3,
+        queue_name="quantum",
     )
     db.rollback.assert_called_once_with()
     cancel.assert_called_once_with("rq-job-id", redis)

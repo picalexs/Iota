@@ -5,9 +5,12 @@ import math
 import threading
 from unittest.mock import MagicMock, patch
 
+import pytest
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from worker import main as main_module
+from worker.chemistry.aer_runtime import AerRuntimeInfo
+from worker.exceptions import BackendError
 
 
 class TestLogQueueDepth:
@@ -175,8 +178,9 @@ class TestMain:
             mock_settings_instance.redis_url = "redis://localhost"
             mock_settings.return_value = mock_settings_instance
 
-            with patch.object(main_module, "_log_queue_depth"):
-                main_module.main()
+            with patch.object(main_module, "_log_aer_runtime"):
+                with patch.object(main_module, "_log_queue_depth"):
+                    main_module.main()
 
         mock_settings.assert_called_once()
 
@@ -188,8 +192,9 @@ class TestMain:
             mock_settings_instance.redis_url = "redis://localhost"
             mock_settings.return_value = mock_settings_instance
 
-            with patch.object(main_module, "_log_queue_depth") as mock_log_queue_depth:
-                main_module.main()
+            with patch.object(main_module, "_log_aer_runtime"):
+                with patch.object(main_module, "_log_queue_depth") as mock_log_queue_depth:
+                    main_module.main()
 
             mock_log_queue_depth.assert_called_once()
 
@@ -201,11 +206,21 @@ class TestMain:
             mock_settings_instance.redis_url = "redis://localhost"
             mock_settings.return_value = mock_settings_instance
 
-            with patch.object(main_module, "_log_queue_depth"):
-                with caplog.at_level(logging.INFO):
-                    main_module.main()
+            with patch.object(main_module, "_log_aer_runtime"):
+                with patch.object(main_module, "_log_queue_depth"):
+                    with caplog.at_level(logging.INFO):
+                        main_module.main()
 
         assert "Worker initialized for queue 'default'" in caplog.text
+
+    def test_gpu_preflight_fails_when_required_device_is_unavailable(self):
+        with patch.object(
+            main_module,
+            "probe_aer_runtime",
+            return_value=AerRuntimeInfo(aer_version="0.17.2", available_devices=("CPU",)),
+        ):
+            with pytest.raises(BackendError, match="requires Aer GPU support"):
+                main_module._log_aer_runtime("GPU")
 
 
 class TestRedisClientConfig:

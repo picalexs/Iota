@@ -292,6 +292,7 @@ def _enqueue_created_run(db: Session, *, run: Run, redis_client) -> None:
             run.id,
             redis_client,
             execution_generation=run.execution_generation,
+            queue_name=queue_service.queue_name_for_run(run),
         )
         run.run_metadata = {
             **(run.run_metadata or {}),

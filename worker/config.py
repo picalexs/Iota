@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from shared.contracts.queue import DEFAULT_QUEUE_NAME
@@ -37,11 +37,22 @@ class WorkerSettings(BaseSettings):
     db_user: str = ""
     db_password: str = ""
     queue_name: str = DEFAULT_QUEUE_NAME
+    required_aer_device: str | None = None
     log_level: str = "INFO"
     worker_ttl_seconds: int = 420
     redis_socket_connect_timeout_seconds: float = 5.0
     redis_socket_timeout_buffer_seconds: float = 60.0
     redis_health_check_interval_seconds: int = 30
+
+    @field_validator("required_aer_device", mode="before")
+    @classmethod
+    def normalize_required_aer_device(cls, value: Any) -> str | None:
+        """Normalize the optional worker startup device requirement."""
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        if not isinstance(value, str) or value.strip().upper() not in {"CPU", "GPU"}:
+            raise ValueError("REQUIRED_AER_DEVICE must be CPU or GPU")
+        return value.strip().upper()
 
     @model_validator(mode="after")
     def validate_required_urls(self) -> "WorkerSettings":

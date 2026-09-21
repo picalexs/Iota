@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 from enum import StrEnum
+from typing import Any
 from uuid import UUID
 
 from redis import Redis
@@ -74,7 +75,24 @@ def _log_queue_failure(
     )
 
 
-def enqueue_run(run_id: UUID, redis_client, *, execution_generation: int = 1) -> str:
+def queue_name_for_run(run: object, *, settings: Any | None = None) -> str:
+    """Route explicit GPU requests to the GPU-only worker queue."""
+    resolved_settings = settings or get_settings()
+    config_snapshot = getattr(run, "config_json", None)
+    if isinstance(config_snapshot, dict):
+        backend_options = config_snapshot.get("backend_options")
+        if isinstance(backend_options, dict) and backend_options.get("device") == "GPU":
+            return str(resolved_settings.gpu_queue_name)
+    return str(resolved_settings.queue_name)
+
+
+def enqueue_run(
+    run_id: UUID,
+    redis_client,
+    *,
+    execution_generation: int = 1,
+    queue_name: str | None = None,
+) -> str:
     """
     Enqueue a run for execution on the quantum worker queue.
 
@@ -91,8 +109,8 @@ def enqueue_run(run_id: UUID, redis_client, *, execution_generation: int = 1) ->
     from rq import Queue
 
     settings = get_settings()
-    queue_name = settings.queue_name
-    queue = Queue(queue_name, connection=redis_client)
+    selected_queue_name = queue_name or settings.queue_name
+    queue = Queue(selected_queue_name, connection=redis_client)
     job_timeout = max(1, int(settings.quantum_job_timeout_seconds))
     job = queue.enqueue(
         "worker.tasks.enqueueable_execute_run",
@@ -105,7 +123,7 @@ def enqueue_run(run_id: UUID, redis_client, *, execution_generation: int = 1) ->
         "Enqueued run %s as RQ job %s on queue '%s' with timeout=%ss",
         run_id,
         job.id,
-        queue_name,
+        selected_queue_name,
         job_timeout,
     )
     return job.id

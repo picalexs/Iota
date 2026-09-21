@@ -14,6 +14,8 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 from rq import Queue, Worker
 
 from worker.config import get_settings
+from worker.chemistry.aer_runtime import probe_aer_runtime
+from worker.exceptions import BackendError
 from worker.jobs.recovery import recover_interrupted_runs
 
 
@@ -134,6 +136,28 @@ def _log_queue_depth(redis_url: str, queue_name: str) -> None:
         logger.warning("Failed to read queue depth: %s", exc)
 
 
+def _log_aer_runtime(required_device: str | None = None) -> None:
+    """Log Aer capabilities and fail a worker that requires an unavailable GPU."""
+    try:
+        runtime = probe_aer_runtime()
+    except BackendError as exc:
+        if required_device == "GPU":
+            raise
+        logger.warning("Aer runtime preflight unavailable: %s", exc)
+        return
+
+    logger.info(
+        "Aer runtime preflight: version=%s available_devices=%s gpu_required=%s",
+        runtime.aer_version or "unknown",
+        ",".join(runtime.available_devices) or "none",
+        required_device or "none",
+    )
+    if required_device == "GPU" and not runtime.gpu_available:
+        raise BackendError(
+            "This worker requires Aer GPU support, but Aer reports no GPU device."
+        )
+
+
 def main() -> None:
     """Initialize worker process logging and settings."""
     settings = get_settings()
@@ -147,6 +171,8 @@ def main() -> None:
         handler.setLevel(numeric_level)
         handler.setFormatter(_JsonFormatter())
         root_logger.addHandler(handler)
+    required_device = getattr(settings, "required_aer_device", None)
+    _log_aer_runtime(required_device if isinstance(required_device, str) else None)
     logger.info("Worker initialized for queue '%s'", settings.queue_name)
 
     _log_queue_depth(settings.redis_url, settings.queue_name)

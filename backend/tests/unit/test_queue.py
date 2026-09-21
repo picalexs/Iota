@@ -13,6 +13,7 @@ from app.services.queue_service import (
     check_redis_health,
     count_workers,
     enqueue_run,
+    queue_name_for_run,
 )
 from redis.exceptions import ConnectionError as RedisConnectionError
 from rq.exceptions import InvalidJobOperation, NoSuchJobError
@@ -123,6 +124,20 @@ def test_enqueue_run_uses_configured_job_timeout():
     assert job_id == "job-1"
     mock_queue.enqueue.assert_called_once()
     assert mock_queue.enqueue.call_args.kwargs["job_timeout"] == 42
+
+
+def test_queue_name_for_run_routes_explicit_gpu_requests():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(config_json={"backend_options": {"device": "GPU"}})
+
+    assert queue_name_for_run(run, settings=settings) == "quantum-gpu"
+
+
+def test_queue_name_for_run_keeps_cpu_default_queue():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(config_json={"backend_options": {"device": "CPU"}})
+
+    assert queue_name_for_run(run, settings=settings) == "quantum"
 
 
 def test_enqueue_run_uses_configured_queue_name():

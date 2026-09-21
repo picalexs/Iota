@@ -67,6 +67,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-dev-password-not-secret} # pragma: allowlist secret - dev placeholder, not a real secret
       REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD:-dev-redis-not-secret}@redis:6379/0} # pragma: allowlist secret - dev placeholder
       QUEUE_NAME: ${QUEUE_NAME:-quantum}
+      GPU_QUEUE_NAME: ${GPU_QUEUE_NAME:-quantum-gpu}
       QUANTUM_JOB_TIMEOUT_SECONDS: ${QUANTUM_JOB_TIMEOUT_SECONDS:-14400}
       LOCAL_CREDENTIALS_KEYS: ${LOCAL_CREDENTIALS_KEYS:-}
       LOCAL_CREDENTIALS_KEY_FILE: ${LOCAL_CREDENTIALS_KEY_FILE:-/app/local-state/credential-fernet.key}

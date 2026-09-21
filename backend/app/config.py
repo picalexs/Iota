@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = ""
     queue_name: str = DEFAULT_QUEUE_NAME
+    gpu_queue_name: str = "quantum-gpu"
 
     # CORS (flexible: accepts comma-separated string or JSON list)
     cors_origins: str | list[str] = _default_cors_origins()

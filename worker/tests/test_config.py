@@ -22,3 +22,24 @@ def test_worker_queue_name_can_be_configured():
     )
 
     assert settings.queue_name == "custom-queue"
+
+
+def test_worker_required_aer_device_defaults_to_unset():
+    settings = WorkerSettings(
+        _env_file=None,
+        database_url="postgresql://localhost/test",
+        redis_url="redis://localhost:6379/0",
+    )
+
+    assert settings.required_aer_device is None
+
+
+def test_worker_required_aer_device_normalizes_gpu():
+    settings = WorkerSettings(
+        _env_file=None,
+        database_url="postgresql://localhost/test",
+        redis_url="redis://localhost:6379/0",
+        required_aer_device="gpu",
+    )
+
+    assert settings.required_aer_device == "GPU"
