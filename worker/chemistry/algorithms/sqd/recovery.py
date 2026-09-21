@@ -230,6 +230,10 @@ def run_selected_ci_batches(
         np.mean(np.stack([values[0] for values in batch_occupancy_values]), axis=0),
         np.mean(np.stack([values[1] for values in batch_occupancy_values]), axis=0),
     )
+    occupancy_std = (
+        np.std(np.stack([values[0] for values in batch_occupancy_values]), axis=0),
+        np.std(np.stack([values[1] for values in batch_occupancy_values]), axis=0),
+    )
     last_selected_ci_summary = {
         **options.selected_ci_limit_summary,
         **best_batch_summary,
@@ -265,6 +269,9 @@ def run_selected_ci_batches(
         "solver_convergence_status": "not_reported_by_qiskit_addon",
         "solver_options": dict(options.sci_solver_options),
         "occupancies_source": "mean_over_batches",
+        "occupancy_spread_estimator": "per_orbital_standard_deviation_over_batches",
+        "batch_occupancy_std_alpha": [round(float(value), 8) for value in occupancy_std[0]],
+        "batch_occupancy_std_beta": [round(float(value), 8) for value in occupancy_std[1]],
         "average_occupancies_alpha": average_occupancies[0].tolist(),
         "average_occupancies_beta": average_occupancies[1].tolist(),
         "selected_ci_strings_alpha": best_batch_ci_strings[0].tolist(),

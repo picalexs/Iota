@@ -1048,6 +1048,17 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
     assert result.sci_result_package["selected_ci"]["batch_energy_min"] == pytest.approx(-1.2)
     assert result.sci_result_package["selected_ci"]["batch_energy_max"] == pytest.approx(-0.8)
     assert result.sci_result_package["selected_ci"]["batch_energy_spread"] == pytest.approx(0.4)
+    assert result.sci_result_package["selected_ci"]["occupancy_spread_estimator"] == (
+        "per_orbital_standard_deviation_over_batches"
+    )
+    assert result.sci_result_package["selected_ci"]["batch_occupancy_std_alpha"] == pytest.approx(
+        [0.4, 0.4]
+    )
+    assert result.sci_result_package["selected_ci"]["batch_occupancy_std_beta"] == pytest.approx(
+        [0.325, 0.325]
+    )
+    assert result.sci_result_package["convergence_mode"] == "self_consistent_recovery"
+    assert result.sci_result_package["convergence_energy_estimator"] == "best_batch_energy"
     assert result.configuration_recovery_trace[-1]["selected_ci_dimension"] == 1
     assert result.best_sci_state is selected_states[0]
     assert effective_batch_sizes == [2]
