@@ -45,6 +45,68 @@ docker run --rm --gpus all "$QSS_GPU_WORKER_IMAGE" \
 
 The output must include `GPU` in `available_devices`.
 
+## Chemistry accelerator settings
+
+Set `chemistry_options` in a run request when a classical chemistry stage must
+use the GPU:
+
+```json
+{
+  "chemistry_options": {
+    "reference_device": "AUTO",
+    "selected_ci_device": "GPU"
+  }
+}
+```
+
+The available values are `CPU`, `GPU`, and `AUTO`.
+
+- `CPU` keeps the existing CPU path.
+- `GPU` requires the selected provider. The run fails when the provider is not
+  installed or the GPU backend is not available.
+- `AUTO` uses the provider when it is available. It records a CPU fallback
+  reason when it is not available.
+
+`reference_device` controls the PySCF reference stage. The GPU path uses
+GPU4PySCF for restricted Hartree-Fock with density fitting. The worker then
+copies the mean-field result to the CPU before CASCI and ffsim processing.
+
+`selected_ci_device` controls SQD selected-CI batches and the legacy SKQD path
+that reuses SQD recovery. The GPU path uses the optional SBD provider. The
+SKQD `sample_union_exact` path keeps its arbitrary determinant union on CPU.
+An explicit GPU request for that mode fails because the current SBD adapter
+supports Cartesian selected-CI batches, not arbitrary determinant unions.
+
+The run metadata includes the requested device, actual device, provider, and
+fallback reason under `reference_device_*` or `selected_ci_execution`.
+
+## Install optional chemistry providers
+
+The standard GPU image includes Aer GPU support only. It does not install
+GPU4PySCF or SBD. Install each provider in a verified GPU image that matches
+the host CUDA and compiler stack.
+
+For GPU4PySCF, follow the package instructions for the CUDA version on the
+host. The project provides CUDA 11, CUDA 12, and CUDA 13 package variants:
+<https://github.com/pyscf/gpu4pyscf>.
+
+For SBD, install the source package in an MPI-enabled environment. SBD needs
+an MPI toolchain, BLAS, and NVIDIA HPC SDK for its GPU backend. SBD does not
+provide pre-built wheels. The SBD SQD integration requires
+`qiskit-addon-sqd>=0.13.1`; this repository's standard worker lock remains
+CPU-compatible and does not install SBD automatically:
+<https://github.com/Qiskit/sbd-eigensolver-python>.
+
+Verify optional providers before selecting `GPU`:
+
+```sh
+python -c 'from gpu4pyscf.scf import RHF; print(RHF)'
+python -c 'import sbd; print(sbd.available_backends())'
+```
+
+The SBD output must contain `gpu` or `gpu-omp`. Use `AUTO` when the same image
+must run on hosts with and without the optional chemistry providers.
+
 ## Start the GPU profile
 
 Use the GPU profile with the normal Compose file. Build the image first when
