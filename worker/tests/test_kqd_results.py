@@ -98,7 +98,7 @@ def test_emit_kqd_completion_writes_canonical_event() -> None:
             "residual_tolerance": 0.01,
             "termination_reason": "converged",
             "projected_solver_converged": True,
-            "scientific_converged": True,
+            "scientific_converged": None,
             "matrix_element_strategy": None,
             "wall_seconds": 0.1,
         }

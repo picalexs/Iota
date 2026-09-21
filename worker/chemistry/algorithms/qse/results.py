@@ -9,7 +9,10 @@ import numpy as np
 
 from worker.chemistry.algorithms.qse.basis import real_scalar
 from worker.chemistry.progress import ProgressCallback
-from worker.chemistry.projected_subspace import projected_convergence_reason
+from worker.chemistry.projected_subspace import (
+    projected_convergence_reason,
+    projected_matrix_converged,
+)
 from worker.chemistry.reference_descriptor import build_reference_descriptor
 from worker.chemistry.types import QSEResult
 
@@ -29,6 +32,9 @@ class QSECompletionPayload:
     residual_tolerance: float
     termination_reason: str
     basis_termination_reason: str | None = None
+    numerical_stable: bool = False
+    projected_solver_converged: bool = False
+    scientific_converged: bool | None = None
     execution_mode: str | None = None
     sector_dimension: int | None = None
     num_spatial_orbitals: int | None = None
@@ -60,6 +66,19 @@ def build_qse_completion_payload(
     resolved_termination_reason = termination_reason or diagnostics.get("termination_reason")
     if resolved_termination_reason is None and execution_mode == "measured_matrix_elements":
         resolved_termination_reason = "measured_matrix_elements_diagnostic"
+    numerical_stable = projected_matrix_converged(diagnostics)
+    projected_solver_converged = bool(
+        numerical_stable
+        and np.isfinite(relative_residual)
+        and relative_residual <= residual_tolerance
+    )
+    scientific_converged = (
+        False
+        if execution_mode == "measured_matrix_elements"
+        else None
+        if projected_solver_converged
+        else False
+    )
     return QSECompletionPayload(
         subspace_dim=subspace_dim,
         primary_energy=primary_energy,
@@ -77,6 +96,9 @@ def build_qse_completion_payload(
             residual_tolerance=residual_tolerance,
         ),
         basis_termination_reason=basis_termination_reason,
+        numerical_stable=numerical_stable,
+        projected_solver_converged=projected_solver_converged,
+        scientific_converged=scientific_converged,
         execution_mode=execution_mode,
         sector_dimension=sector_dimension,
         num_spatial_orbitals=num_spatial_orbitals,
@@ -107,6 +129,9 @@ def emit_qse_completion(
         "relative_residual": payload.relative_residual,
         "residual_tolerance": payload.residual_tolerance,
         "termination_reason": payload.termination_reason,
+        "numerical_stable": payload.numerical_stable,
+        "projected_solver_converged": payload.projected_solver_converged,
+        "scientific_converged": payload.scientific_converged,
     }
     if payload.basis_termination_reason is not None:
         event["basis_termination_reason"] = payload.basis_termination_reason
