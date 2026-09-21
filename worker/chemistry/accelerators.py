@@ -36,8 +36,12 @@ def resolve_gpu4pyscf(device: Any) -> tuple[AcceleratorResolution, Any | None]:
 
     try:
         from gpu4pyscf.scf import RHF as gpu_rhf
-    except ImportError as exc:
-        reason = "gpu4pyscf is not installed on this worker"
+    except (ImportError, OSError) as exc:
+        reason = (
+            "gpu4pyscf is not installed on this worker"
+            if isinstance(exc, ImportError)
+            else f"gpu4pyscf could not initialize: {exc}"
+        )
         if requested == "GPU":
             raise RuntimeError(
                 "GPU chemistry was requested, but GPU4PySCF is not installed. "

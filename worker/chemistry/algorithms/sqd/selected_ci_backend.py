@@ -177,7 +177,14 @@ def resolve_selected_ci_solver(
         from sbd.device_config import DeviceConfig
 
         backend = _sbd_gpu_backend(sbd)
-    except (ImportError, ModuleNotFoundError, OSError, RuntimeError) as exc:
+    except (
+        AttributeError,
+        ImportError,
+        ModuleNotFoundError,
+        OSError,
+        RuntimeError,
+        TypeError,
+    ) as exc:
         backend = None
         import_error = exc
     else:
