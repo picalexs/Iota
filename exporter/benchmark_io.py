@@ -364,7 +364,20 @@ def _benchmark_quality_fields(
     energy = _record(_first(provenance, "energy"))
     convergence = _record(_first(metrics, "convergence"))
     policy = _record(_first(metrics, "energy_policy", "energyPolicy"))
-    reference = _record(_first(metrics, "reference_provenance", "referenceProvenance"))
+    reference = _record(
+        _first(
+            metrics,
+            "reference_provenance",
+            "referenceProvenance",
+            default=_first(provenance, "reference", "reference_provenance"),
+        )
+    )
+    explicit_eligible = _boolean(
+        _first(provenance, "benchmark_eligible", "benchmarkEligible")
+    )
+    explicit_exclusion_reason = _text(
+        _first(provenance, "benchmark_exclusion_reason", "benchmarkExclusionReason")
+    )
 
     reported_valid = _boolean(
         _first(
@@ -438,6 +451,8 @@ def _benchmark_quality_fields(
         reason = "reference_provenance_invalid"
     elif reference_method is not None and reference_method.upper() != "CASCI":
         reason = "reference_method_unsupported"
+    if explicit_eligible is not None:
+        reason = None if explicit_eligible else explicit_exclusion_reason or reason
 
     return {
         "reference_method": reference_method,
