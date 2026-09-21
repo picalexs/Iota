@@ -193,9 +193,13 @@ def _energy_provenance(result: AlgorithmResult) -> dict[str, Any]:
                 "reported_energy": None,
             }
         if _projected_energy_is_diagnostic(result):
-            return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
+            return _primary_energy_provenance(result, "stabilized_projected_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         if _is_branch_estimator_result(result):
-            return _primary_energy_provenance(result, "projected_branch_diagnostic")
+            return _primary_energy_provenance(result, "projected_branch_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         return _primary_energy_provenance(result, "lowest_krylov_ritz_value")
 
     if isinstance(result, QFDResult):
@@ -206,9 +210,13 @@ def _energy_provenance(result: AlgorithmResult) -> dict[str, Any]:
                 "reported_energy": None,
             }
         if _projected_energy_is_diagnostic(result):
-            return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
+            return _primary_energy_provenance(result, "stabilized_projected_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         if _is_branch_estimator_result(result):
-            return _primary_energy_provenance(result, "projected_branch_diagnostic")
+            return _primary_energy_provenance(result, "projected_branch_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         return _primary_energy_provenance(result, "lowest_filter_eigenvalue")
 
     if isinstance(result, QSEResult):
@@ -219,9 +227,13 @@ def _energy_provenance(result: AlgorithmResult) -> dict[str, Any]:
                 "reported_energy": None,
             }
         if _projected_energy_is_diagnostic(result):
-            return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
+            return _primary_energy_provenance(result, "stabilized_projected_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         if _is_branch_estimator_result(result):
-            return _primary_energy_provenance(result, "projected_branch_diagnostic")
+            return _primary_energy_provenance(result, "projected_branch_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         return _primary_energy_provenance(result, "lowest_qse_projected_eigenvalue")
 
     if isinstance(result, SKQDResult):

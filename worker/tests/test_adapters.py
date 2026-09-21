@@ -1301,6 +1301,7 @@ def test_normalize_result_accepts_stable_branch_projected_spectrum(algorithm: st
 
     assert normalized["reported_energy"] == pytest.approx(result.primary_energy)
     assert normalized["reported_energy_source"] == source
+    assert normalized["projected_solve_is_diagnostic"] is True
 
 
 def test_normalize_result_does_not_infer_projected_convergence_without_residual() -> None:
