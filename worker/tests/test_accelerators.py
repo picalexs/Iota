@@ -120,6 +120,10 @@ def test_selected_ci_sbd_adapter_preserves_sqd_solver_contract(
 
     from worker.chemistry.algorithms.sqd.selected_ci_backend import resolve_selected_ci_solver
 
+    monkeypatch.setattr(
+        "worker.chemistry.algorithms.sqd.selected_ci_backend._sbd_addon_compatibility_error",
+        lambda: None,
+    )
     resolution = resolve_selected_ci_solver(
         lambda *_args, **_kwargs: (0.0, None, ([], []), 0.0),
         "GPU",

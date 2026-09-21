@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Callable
 
 import numpy as np
+from packaging.version import Version
 
 from worker.chemistry.accelerators import normalize_chemistry_device
 from worker.chemistry.sector_basis import sector_dimension
@@ -20,6 +22,17 @@ class SelectedCIResolution:
     actual_device: str
     provider: str
     fallback_reason: str | None = None
+
+
+def _sbd_addon_compatibility_error() -> str | None:
+    """Return a clear error when the SQD/SBD integration contract is too old."""
+    try:
+        addon_version = Version(version("qiskit-addon-sqd"))
+    except PackageNotFoundError:
+        return "qiskit-addon-sqd is not installed"
+    if addon_version < Version("0.13.1"):
+        return f"qiskit-addon-sqd {addon_version} is too old; SBD requires >= 0.13.1"
+    return None
 
 
 def _sbd_gpu_backend(sbd: Any) -> str | None:
@@ -169,6 +182,11 @@ def resolve_selected_ci_solver(
         import_error = exc
     else:
         import_error = None
+
+    compatibility_error = _sbd_addon_compatibility_error() if backend is not None else None
+    if compatibility_error is not None:
+        backend = None
+        import_error = RuntimeError(compatibility_error)
 
     if backend is None:
         reason = (
