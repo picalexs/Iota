@@ -5,7 +5,7 @@ import type {
   EasyGoal,
   RunAlgorithm,
 } from "@/types/run";
-import type { BenchmarkExecutionSettings } from "@/types/benchmark";
+import { getDefaultBenchmarkShots, type BenchmarkExecutionSettings } from "@/types/benchmark";
 
 type BenchmarkRunConfigBase = Omit<AlgorithmAwareRunCreate, "easy_options" | "advanced_config">;
 
@@ -15,26 +15,20 @@ function resolveBackendTarget(
   return execution.mode === "aer_simulator_backend_noise" ? "aer_simulator" : execution.mode;
 }
 
-function resolveBackendName(
+function buildBackendOptions(
   execution: BenchmarkExecutionSettings,
   backendTarget: AlgorithmAwareRunCreate["backend_target"],
-): string | null {
-  if (backendTarget === "statevector") {
-    return null;
-  }
-
-  return execution.backendName;
-}
-
-function buildBackendOptions(backendName: string | null): BackendOptions {
+): BackendOptions {
+  const isAer = backendTarget === "aer_simulator";
   return {
     selection_policy: "manual",
-    backend_name: backendName,
-    shots: 4096,
+    backend_name: execution.backendName,
+    shots: execution.shots ?? getDefaultBenchmarkShots(execution.mode),
     optimization_level: 1,
     seed_simulator: null,
     seed_transpiler: null,
-    aer_method: "automatic",
+    aer_method: isAer ? (execution.aerMethod ?? "automatic") : "automatic",
+    device: isAer ? (execution.device ?? null) : null,
   };
 }
 
@@ -58,7 +52,6 @@ function buildBaseRunConfig(
   options: { ibmRuntimeConfirmed?: boolean; clientRequestId?: string },
 ): BenchmarkRunConfigBase {
   const backendTarget = resolveBackendTarget(execution);
-  const backendName = resolveBackendName(execution, backendTarget);
 
   return {
     molecule_id: "",
@@ -66,7 +59,7 @@ function buildBaseRunConfig(
     algorithm,
     mode: "easy",
     backend_target: backendTarget,
-    backend_options: buildBackendOptions(backendName),
+    backend_options: buildBackendOptions(execution, backendTarget),
     basis_set_override: basis,
     noise_profile: buildNoiseProfile(execution),
     ibm_runtime_confirmed: options.ibmRuntimeConfirmed ?? false,

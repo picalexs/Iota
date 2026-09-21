@@ -17,6 +17,17 @@ BenchmarkBackendMode = Literal[
     "ibm_runtime",
 ]
 
+BenchmarkAerMethod = Literal[
+    "automatic",
+    "statevector",
+    "density_matrix",
+    "matrix_product_state",
+    "stabilizer",
+    "extended_stabilizer",
+    "unitary",
+    "superop",
+]
+
 
 class BenchmarkRunBase(BaseModel):
     """Shared persisted benchmark batch payload."""
@@ -71,6 +82,17 @@ class BenchmarkRunBase(BaseModel):
         max_length=255,
         validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
         serialization_alias="selectedBackendName",
+    )
+    shots: int = Field(1024, ge=1, le=1_000_000)
+    selected_aer_method: BenchmarkAerMethod | None = Field(
+        None,
+        validation_alias=AliasChoices("selectedAerMethod", "selected_aer_method"),
+        serialization_alias="selectedAerMethod",
+    )
+    selected_device: Literal["CPU", "GPU"] | None = Field(
+        None,
+        validation_alias=AliasChoices("selectedDevice", "selected_device"),
+        serialization_alias="selectedDevice",
     )
     chemical_accuracy_ha: float = Field(
         1.6e-3,
@@ -148,6 +170,17 @@ class BenchmarkRunUpdate(BaseModel):
         max_length=255,
         validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
         serialization_alias="selectedBackendName",
+    )
+    shots: int | None = Field(None, ge=1, le=1_000_000)
+    selected_aer_method: BenchmarkAerMethod | None = Field(
+        None,
+        validation_alias=AliasChoices("selectedAerMethod", "selected_aer_method"),
+        serialization_alias="selectedAerMethod",
+    )
+    selected_device: Literal["CPU", "GPU"] | None = Field(
+        None,
+        validation_alias=AliasChoices("selectedDevice", "selected_device"),
+        serialization_alias="selectedDevice",
     )
     chemical_accuracy_ha: float | None = Field(
         None,

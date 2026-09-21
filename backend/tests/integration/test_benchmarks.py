@@ -90,6 +90,7 @@ def test_create_list_get_update_delete_benchmark(client: ASGISyncTestClient) -> 
     assert created["name"] == "Saved H2 VQE"
     assert created["selectedMoleculeKeys"] == ["h2"]
     assert created["selectedAlgorithms"] == ["vqe"]
+    assert created["shots"] == 1024
     assert created["chemicalAccuracyHa"] == pytest.approx(0.0016)
     assert created["entries"][0]["status"] == "completed"
 
@@ -122,6 +123,26 @@ def test_create_list_get_update_delete_benchmark(client: ASGISyncTestClient) -> 
 
     missing_response = client.get(f"/api/benchmarks/{created['id']}")
     assert missing_response.status_code == 404
+
+
+def test_benchmark_persists_aer_execution_settings(client: ASGISyncTestClient) -> None:
+    payload = _benchmark_payload("GPU Aer benchmark")
+    payload.update(
+        {
+            "selectedBackendMode": "aer_simulator",
+            "shots": 256,
+            "selectedAerMethod": "statevector",
+            "selectedDevice": "GPU",
+        }
+    )
+
+    response = client.post(BENCHMARKS_API, json=payload)
+
+    assert response.status_code == 201
+    created = response.json()
+    assert created["shots"] == 256
+    assert created["selectedAerMethod"] == "statevector"
+    assert created["selectedDevice"] == "GPU"
 
 
 def test_benchmark_list_is_paginated(client: ASGISyncTestClient) -> None:

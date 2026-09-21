@@ -8,7 +8,13 @@ import {
 } from "react";
 import { BENCHMARK_ALGORITHMS, DEFAULT_CHEMICAL_ACCURACY_HA } from "@/lib/benchmark-presets";
 import type { RunAlgorithm, MoleculeResponse } from "@/types/run";
-import type { BenchmarkBackendMode, BenchmarkEntry, SavedBenchmarkRun } from "@/types/benchmark";
+import type { AerMethod } from "@/types/run-config";
+import {
+  getDefaultBenchmarkShots,
+  type BenchmarkBackendMode,
+  type BenchmarkEntry,
+  type SavedBenchmarkRun,
+} from "@/types/benchmark";
 import type { BenchmarkAlgorithmVariant, BenchmarkVariantMode } from "./benchmark-variants";
 import {
   DEFAULT_BENCHMARK_BACKEND_MODE,
@@ -37,6 +43,9 @@ export interface BenchmarkWorkspaceStateSnapshot {
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   selectedBackendName: string | null;
+  shots?: number;
+  selectedAerMethod?: AerMethod | null;
+  selectedDevice?: "CPU" | "GPU" | null;
   chemicalAccuracyHa: number;
   customMolecules: MoleculeResponse[];
   entries: BenchmarkEntry[];
@@ -157,6 +166,12 @@ export function useBenchmarkStorage(
   setSelectedBackendMode: Dispatch<SetStateAction<BenchmarkBackendMode>>;
   selectedBackendName: string | null;
   setSelectedBackendName: Dispatch<SetStateAction<string | null>>;
+  shots: number;
+  setShots: Dispatch<SetStateAction<number>>;
+  selectedAerMethod: AerMethod | null;
+  setSelectedAerMethod: Dispatch<SetStateAction<AerMethod | null>>;
+  selectedDevice: "CPU" | "GPU" | null;
+  setSelectedDevice: Dispatch<SetStateAction<"CPU" | "GPU" | null>>;
   customMolecules: MoleculeResponse[];
   setCustomMolecules: Dispatch<SetStateAction<MoleculeResponse[]>>;
   chemicalAccuracyHa: number;
@@ -186,6 +201,15 @@ export function useBenchmarkStorage(
   );
   const [selectedBackendName, setSelectedBackendName] = useState<string | null>(
     () => initialSnapshot?.selectedBackendName ?? null,
+  );
+  const [shots, setShots] = useState<number>(
+    () => initialSnapshot?.shots ?? getDefaultBenchmarkShots(storedBackendMode),
+  );
+  const [selectedAerMethod, setSelectedAerMethod] = useState<AerMethod | null>(
+    () => initialSnapshot?.selectedAerMethod ?? "automatic",
+  );
+  const [selectedDevice, setSelectedDevice] = useState<"CPU" | "GPU" | null>(
+    () => initialSnapshot?.selectedDevice ?? null,
   );
   const [customMolecules, setCustomMolecules] = useState<MoleculeResponse[]>(
     () => initialSnapshot?.customMolecules ?? [],
@@ -225,6 +249,12 @@ export function useBenchmarkStorage(
     setSelectedBackendMode,
     selectedBackendName,
     setSelectedBackendName,
+    shots,
+    setShots,
+    selectedAerMethod,
+    setSelectedAerMethod,
+    selectedDevice,
+    setSelectedDevice,
     customMolecules,
     setCustomMolecules,
     chemicalAccuracyHa,

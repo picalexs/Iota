@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { BENCHMARK_MOLECULE_PRESETS } from "@/lib/benchmark-presets";
+import { getDefaultBenchmarkShots, type BenchmarkBackendMode } from "@/types/benchmark";
 import { logAppError } from "@/lib/app-logger";
 import { showErrorToast } from "@/lib/error-handler";
 import type { MoleculeResponse, RunAlgorithm, UUID } from "@/types/run";
@@ -97,6 +98,12 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     setSelectedBackendMode,
     selectedBackendName,
     setSelectedBackendName,
+    shots,
+    setShots,
+    selectedAerMethod,
+    setSelectedAerMethod,
+    selectedDevice,
+    setSelectedDevice,
     customMolecules,
     setCustomMolecules,
     chemicalAccuracyHa,
@@ -129,6 +136,16 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
 
   const selectedMolecules = useMemo(() => new Set(selectedMoleculeKeys), [selectedMoleculeKeys]);
 
+  const handleSelectedBackendModeChange = useCallback(
+    (nextMode: BenchmarkBackendMode) => {
+      if (shots === getDefaultBenchmarkShots(selectedBackendMode)) {
+        setShots(getDefaultBenchmarkShots(nextMode));
+      }
+      setSelectedBackendMode(nextMode);
+    },
+    [selectedBackendMode, setSelectedBackendMode, setShots, shots],
+  );
+
   useEffect(() => {
     primeCustomMoleculeCache(customMolecules);
   }, [customMolecules]);
@@ -142,6 +159,9 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     selectedBasis,
     selectedBackendMode,
     selectedBackendName,
+    shots,
+    selectedAerMethod,
+    selectedDevice,
     chemicalAccuracyHa,
     customMolecules,
     entries,
@@ -245,6 +265,9 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
         setSelectedBasis,
         setSelectedBackendMode,
         setSelectedBackendName,
+        setShots,
+        setSelectedAerMethod,
+        setSelectedDevice,
         setChemicalAccuracyHa,
         setCustomMolecules,
         setEntries,
@@ -263,9 +286,12 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
       setAlgorithmVariants,
       setSelectedBackendMode,
       setSelectedBackendName,
+      setSelectedAerMethod,
+      setSelectedDevice,
       setSelectedBasis,
       setSelectedMoleculeKeys,
       setSelectedSavedBenchmarkId,
+      setShots,
       startPolling,
     ],
   );
@@ -287,6 +313,9 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     setSelectedBasis,
     setSelectedBackendMode,
     setSelectedBackendName,
+    setShots,
+    setSelectedAerMethod,
+    setSelectedDevice,
     setChemicalAccuracyHa,
     setCustomMolecules,
     setSavedBenchmarkLoadError,
@@ -340,6 +369,9 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
           selectedBasis,
           selectedBackendMode,
           selectedBackendName: resolvedBackendName,
+          shots,
+          selectedAerMethod,
+          selectedDevice,
           chemicalAccuracyHa,
           customMolecules,
         },
@@ -349,6 +381,9 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
       chemicalAccuracyHa,
       customMolecules,
       resolvedBackendName,
+      selectedAerMethod,
+      selectedDevice,
+      shots,
       activeAlgorithmSet,
       activeVariants.length,
       benchmarkMode,
@@ -367,6 +402,9 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
           selectedBasis,
           selectedBackendMode,
           selectedBackendName: resolvedBackendName,
+          shots,
+          selectedAerMethod,
+          selectedDevice,
           chemicalAccuracyHa,
           customMolecules,
         },
@@ -376,6 +414,9 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
       chemicalAccuracyHa,
       customMolecules,
       resolvedBackendName,
+      selectedAerMethod,
+      selectedDevice,
+      shots,
       activeAlgorithmSet,
       selectedBackendMode,
       selectedBasis,
@@ -407,6 +448,9 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     selectedBasis,
     selectedBackendMode,
     resolvedBackendName,
+    shots,
+    selectedAerMethod,
+    selectedDevice,
     stopPolling,
     startPolling,
     runGenerationRef,
@@ -541,8 +585,14 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     selectedBasis,
     setSelectedBasis,
     selectedBackendMode,
-    setSelectedBackendMode,
+    setSelectedBackendMode: handleSelectedBackendModeChange,
     selectedBackendName: resolvedBackendName,
+    shots,
+    setShots,
+    selectedAerMethod,
+    setSelectedAerMethod,
+    selectedDevice,
+    setSelectedDevice,
     setSelectedBackendName,
     ensureBackendCapabilitiesLoaded,
     backendOptions,

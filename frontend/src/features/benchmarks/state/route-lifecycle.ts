@@ -4,6 +4,7 @@ import { getBenchmarkRun } from "@/api/benchmarks";
 import { logAppError } from "@/lib/app-logger";
 import { getErrorMessage } from "@/lib/error-handler";
 import type { MoleculeResponse, RunAlgorithm } from "@/types/run";
+import type { AerMethod } from "@/types/run-config";
 
 import {
   type BenchmarkWorkspaceStateSnapshot,
@@ -50,6 +51,9 @@ export function useBenchmarkRouteReset({
   setSelectedBasis,
   setSelectedBackendMode,
   setSelectedBackendName,
+  setShots,
+  setSelectedAerMethod,
+  setSelectedDevice,
   setChemicalAccuracyHa,
   setCustomMolecules,
   setSavedBenchmarkLoadError,
@@ -69,6 +73,9 @@ export function useBenchmarkRouteReset({
   setSelectedBasis: Dispatch<SetStateAction<string>>;
   setSelectedBackendMode: Dispatch<SetStateAction<BenchmarkBackendMode>>;
   setSelectedBackendName: Dispatch<SetStateAction<string | null>>;
+  setShots: Dispatch<SetStateAction<number>>;
+  setSelectedAerMethod: Dispatch<SetStateAction<AerMethod | null>>;
+  setSelectedDevice: Dispatch<SetStateAction<"CPU" | "GPU" | null>>;
   setChemicalAccuracyHa: Dispatch<SetStateAction<number>>;
   setCustomMolecules: Dispatch<SetStateAction<MoleculeResponse[]>>;
   setSavedBenchmarkLoadError: Dispatch<SetStateAction<string | null>>;
@@ -92,6 +99,9 @@ export function useBenchmarkRouteReset({
       setSelectedBasis,
       setSelectedBackendMode,
       setSelectedBackendName,
+      setShots,
+      setSelectedAerMethod,
+      setSelectedDevice,
       setChemicalAccuracyHa,
       setCustomMolecules,
     });
@@ -109,10 +119,13 @@ export function useBenchmarkRouteReset({
     setAlgorithmVariants,
     setSelectedBackendMode,
     setSelectedBackendName,
+    setSelectedAerMethod,
+    setSelectedDevice,
     setSelectedBasis,
     setSelectedMoleculeKeys,
     setSelectedSavedBenchmarkId,
     setSavedBenchmarkLoadError,
+    setShots,
     stopPolling,
   ]);
 }

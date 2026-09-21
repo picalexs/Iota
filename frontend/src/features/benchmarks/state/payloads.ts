@@ -12,6 +12,9 @@ export interface BenchmarkPayloadContext {
   selectedBasis: string;
   selectedBackendMode: BenchmarkRunCreate["selectedBackendMode"];
   selectedBackendName: string | null;
+  shots?: number;
+  selectedAerMethod?: BenchmarkRunCreate["selectedAerMethod"];
+  selectedDevice?: BenchmarkRunCreate["selectedDevice"];
   chemicalAccuracyHa: number;
   customMolecules: readonly MoleculeResponse[];
 }
@@ -34,6 +37,9 @@ export function buildBenchmarkPayload(
     selectedBasis: context.selectedBasis,
     selectedBackendMode: context.selectedBackendMode,
     selectedBackendName: context.selectedBackendName,
+    shots: context.shots,
+    selectedAerMethod: context.selectedAerMethod,
+    selectedDevice: context.selectedDevice,
     chemicalAccuracyHa: context.chemicalAccuracyHa,
     customMolecules: [...context.customMolecules],
     entries: nextEntries,
@@ -50,6 +56,9 @@ export function buildBenchmarkSignature(
     selectedBasis: context.selectedBasis,
     selectedBackendMode: context.selectedBackendMode,
     selectedBackendName: context.selectedBackendName,
+    shots: context.shots,
+    selectedAerMethod: context.selectedAerMethod,
+    selectedDevice: context.selectedDevice,
     chemicalAccuracyHa: context.chemicalAccuracyHa,
     customMolecules: context.customMolecules.map((molecule) => molecule.id),
     entries: nextEntries.map(entrySaveSignature),

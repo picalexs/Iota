@@ -2,6 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 
 import { BENCHMARK_ALGORITHMS, DEFAULT_CHEMICAL_ACCURACY_HA } from "@/lib/benchmark-presets";
 import type { MoleculeResponse, RunAlgorithm } from "@/types/run";
+import type { AerMethod } from "@/types/run-config";
+import { getDefaultBenchmarkShots } from "@/types/benchmark";
 
 import {
   buildBenchmarkWorkspaceSnapshotFromSavedRun,
@@ -35,6 +37,9 @@ export function hydrateSavedBenchmarkState({
   setSelectedBasis,
   setSelectedBackendMode,
   setSelectedBackendName,
+  setShots,
+  setSelectedAerMethod,
+  setSelectedDevice,
   setChemicalAccuracyHa,
   setCustomMolecules,
   setEntries,
@@ -51,6 +56,9 @@ export function hydrateSavedBenchmarkState({
   setSelectedBasis: Dispatch<SetStateAction<string>>;
   setSelectedBackendMode: Dispatch<SetStateAction<BenchmarkBackendMode>>;
   setSelectedBackendName: Dispatch<SetStateAction<string | null>>;
+  setShots: Dispatch<SetStateAction<number>>;
+  setSelectedAerMethod: Dispatch<SetStateAction<AerMethod | null>>;
+  setSelectedDevice: Dispatch<SetStateAction<"CPU" | "GPU" | null>>;
   setChemicalAccuracyHa: Dispatch<SetStateAction<number>>;
   setCustomMolecules: Dispatch<SetStateAction<MoleculeResponse[]>>;
   setEntries: BenchmarkEntriesSetter;
@@ -66,6 +74,9 @@ export function hydrateSavedBenchmarkState({
   setSelectedBasis(snapshot.selectedBasis);
   setSelectedBackendMode(snapshot.selectedBackendMode);
   setSelectedBackendName(snapshot.selectedBackendName);
+  setShots(snapshot.shots ?? getDefaultBenchmarkShots(snapshot.selectedBackendMode));
+  setSelectedAerMethod(snapshot.selectedAerMethod ?? "automatic");
+  setSelectedDevice(snapshot.selectedDevice ?? null);
   setChemicalAccuracyHa(snapshot.chemicalAccuracyHa);
   setCustomMolecules((current) => mergeCustomMolecules(current, snapshot.customMolecules));
 
@@ -94,6 +105,9 @@ export function resetBenchmarkWorkspaceState({
   setSelectedBasis,
   setSelectedBackendMode,
   setSelectedBackendName,
+  setShots,
+  setSelectedAerMethod,
+  setSelectedDevice,
   setChemicalAccuracyHa,
   setCustomMolecules,
 }: {
@@ -110,6 +124,9 @@ export function resetBenchmarkWorkspaceState({
   setSelectedBasis: Dispatch<SetStateAction<string>>;
   setSelectedBackendMode: Dispatch<SetStateAction<BenchmarkBackendMode>>;
   setSelectedBackendName: Dispatch<SetStateAction<string | null>>;
+  setShots: Dispatch<SetStateAction<number>>;
+  setSelectedAerMethod: Dispatch<SetStateAction<AerMethod | null>>;
+  setSelectedDevice: Dispatch<SetStateAction<"CPU" | "GPU" | null>>;
   setChemicalAccuracyHa: Dispatch<SetStateAction<number>>;
   setCustomMolecules: Dispatch<SetStateAction<MoleculeResponse[]>>;
 }): void {
@@ -126,6 +143,9 @@ export function resetBenchmarkWorkspaceState({
   setSelectedBasis(DEFAULT_BENCHMARK_BASIS);
   setSelectedBackendMode("statevector");
   setSelectedBackendName(null);
+  setShots(getDefaultBenchmarkShots("statevector"));
+  setSelectedAerMethod("automatic");
+  setSelectedDevice(null);
   setChemicalAccuracyHa(DEFAULT_CHEMICAL_ACCURACY_HA);
   setCustomMolecules([]);
 }

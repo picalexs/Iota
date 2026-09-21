@@ -71,5 +71,29 @@ describe("benchmark-run-config", () => {
       source: "backend_derived",
       reference_backend: "ibm_kyiv",
     });
+    expect(config.backend_options?.shots).toBe(256);
+    expect(config.backend_options?.aer_method).toBe("automatic");
+    expect(config.backend_options?.device).toBeNull();
+  });
+
+  it("keeps explicit low-shot GPU settings on Aer benchmark rows", () => {
+    const config = buildSimpleBenchmarkRunConfig(
+      "vqe",
+      "sto-3g",
+      {
+        mode: "aer_simulator_backend_noise",
+        backendName: "ibm_kyiv",
+        shots: 256,
+        aerMethod: "statevector",
+        device: "GPU",
+      },
+      "fastest",
+    );
+
+    expect(config.backend_options).toMatchObject({
+      shots: 256,
+      aer_method: "statevector",
+      device: "GPU",
+    });
   });
 });

@@ -857,8 +857,8 @@ def test_ibm_precision_estimator_metadata_does_not_claim_configured_shots() -> N
     assert metadata["measurement_mode"] == "precision_sampled"
     assert metadata["requested_shots"] == 512
     assert metadata["effective_estimator_precision"] == 0.25
-    assert metadata["shots"] == 512
-    assert metadata["effective_shots"] == 512
+    assert metadata["shots"] is None
+    assert metadata["effective_shots"] is None
 
 
 def test_ibm_adapter_uses_least_error_selection_policy_for_resolution() -> None:

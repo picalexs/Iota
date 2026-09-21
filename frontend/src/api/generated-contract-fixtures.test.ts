@@ -370,6 +370,7 @@ const benchmarkCreateRequest = {
   selectedBasis: "sto-3g",
   selectedBackendMode: "statevector",
   selectedBackendName: null,
+  shots: 4096,
   chemicalAccuracyHa: 0.0016,
 } satisfies ApiBenchmarkRunCreate;
 

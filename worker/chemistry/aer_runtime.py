@@ -54,7 +54,7 @@ def probe_aer_runtime() -> AerRuntimeInfo:
     """Inspect the installed Aer package without creating a simulator job."""
     aer_module, simulator_class = _load_aer_runtime()
     try:
-        raw_devices = simulator_class.available_devices()
+        raw_devices = simulator_class().available_devices()
     except Exception as exc:
         raise BackendError(f"Aer device discovery failed: {exc}") from exc
 

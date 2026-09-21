@@ -60,6 +60,12 @@ export function BenchmarkPage() {
     setSelectedBackendMode,
     selectedBackendName,
     setSelectedBackendName,
+    shots,
+    setShots,
+    selectedAerMethod,
+    setSelectedAerMethod,
+    selectedDevice,
+    setSelectedDevice,
     ensureBackendCapabilitiesLoaded,
     backendOptions,
     ibmBackends,
@@ -247,6 +253,12 @@ export function BenchmarkPage() {
         backendReady={backendReady}
         chemicalAccuracyHa={chemicalAccuracyHa}
         chemicalAccuracyTargetOptions={chemicalAccuracyTargetOptions}
+        shots={shots}
+        onShotsChange={setShots}
+        aerMethod={selectedAerMethod}
+        device={selectedDevice}
+        onAerMethodChange={setSelectedAerMethod}
+        onDeviceChange={setSelectedDevice}
         customMolecules={customMolecules}
         running={running}
         hasPausedBenchmark={hasPausedBenchmark}

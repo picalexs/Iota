@@ -20,6 +20,7 @@ import { getErrorMessage } from "@/lib/error-handler";
 import type { MoleculeResponse, RunAlgorithm } from "@/types/run";
 import type { BenchmarkEntry } from "@/pages/benchmark/benchmark-utils";
 import type { BenchmarkBackendMode } from "@/types/benchmark";
+import type { AerMethod } from "@/types/run-config";
 import type {
   BenchmarkAlgorithmVariant,
   BenchmarkVariantMode,
@@ -138,6 +139,9 @@ export function useBenchmarkWorkspaceCacheSync({
   selectedBasis,
   selectedBackendMode,
   selectedBackendName,
+  shots,
+  selectedAerMethod,
+  selectedDevice,
   chemicalAccuracyHa,
   customMolecules,
   entries,
@@ -150,6 +154,9 @@ export function useBenchmarkWorkspaceCacheSync({
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   selectedBackendName: string | null;
+  shots: number;
+  selectedAerMethod: AerMethod | null;
+  selectedDevice: "CPU" | "GPU" | null;
   chemicalAccuracyHa: number;
   customMolecules: MoleculeResponse[];
   entries: BenchmarkEntry[];
@@ -165,6 +172,9 @@ export function useBenchmarkWorkspaceCacheSync({
       selectedBasis,
       selectedBackendMode,
       selectedBackendName,
+      shots,
+      selectedAerMethod,
+      selectedDevice,
       chemicalAccuracyHa,
       customMolecules,
       entries,
@@ -179,8 +189,11 @@ export function useBenchmarkWorkspaceCacheSync({
     selectedAlgorithms,
     selectedBackendMode,
     selectedBackendName,
+    selectedAerMethod,
+    selectedDevice,
     selectedBasis,
     selectedMoleculeKeys,
+    shots,
   ]);
 }
 

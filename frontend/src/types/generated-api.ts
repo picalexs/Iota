@@ -1193,6 +1193,8 @@ export interface components {
             name: string;
             /** Registrationdigest */
             registrationDigest: string;
+            /** Selectedaermethod */
+            selectedAerMethod?: ("automatic" | "statevector" | "density_matrix" | "matrix_product_state" | "stabilizer" | "extended_stabilizer" | "unitary" | "superop") | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1208,8 +1210,15 @@ export interface components {
              * @default sto-3g
              */
             selectedBasis: string;
+            /** Selecteddevice */
+            selectedDevice?: ("CPU" | "GPU") | null;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 1024
+             */
+            shots: number;
         };
         /**
          * BenchmarkRunCreate
@@ -1239,6 +1248,8 @@ export interface components {
             name: string;
             /** Registrationdigest */
             registrationDigest?: string | null;
+            /** Selectedaermethod */
+            selectedAerMethod?: ("automatic" | "statevector" | "density_matrix" | "matrix_product_state" | "stabilizer" | "extended_stabilizer" | "unitary" | "superop") | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1254,8 +1265,15 @@ export interface components {
              * @default sto-3g
              */
             selectedBasis: string;
+            /** Selecteddevice */
+            selectedDevice?: ("CPU" | "GPU") | null;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 1024
+             */
+            shots: number;
         };
         /**
          * BenchmarkRunListResponse
@@ -1309,6 +1327,8 @@ export interface components {
             name: string;
             /** Registrationdigest */
             registrationDigest?: string | null;
+            /** Selectedaermethod */
+            selectedAerMethod?: ("automatic" | "statevector" | "density_matrix" | "matrix_product_state" | "stabilizer" | "extended_stabilizer" | "unitary" | "superop") | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1324,8 +1344,15 @@ export interface components {
              * @default sto-3g
              */
             selectedBasis: string;
+            /** Selecteddevice */
+            selectedDevice?: ("CPU" | "GPU") | null;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 1024
+             */
+            shots: number;
             /**
              * Updatedat
              * Format: date-time
@@ -1353,6 +1380,8 @@ export interface components {
             }[] | null;
             /** Name */
             name?: string | null;
+            /** Selectedaermethod */
+            selectedAerMethod?: ("automatic" | "statevector" | "density_matrix" | "matrix_product_state" | "stabilizer" | "extended_stabilizer" | "unitary" | "superop") | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][] | null;
             /** Selectedbackendmode */
@@ -1361,8 +1390,12 @@ export interface components {
             selectedBackendName?: string | null;
             /** Selectedbasis */
             selectedBasis?: string | null;
+            /** Selecteddevice */
+            selectedDevice?: ("CPU" | "GPU") | null;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[] | null;
+            /** Shots */
+            shots?: number | null;
         };
         /**
          * ConfigChoiceMetadata

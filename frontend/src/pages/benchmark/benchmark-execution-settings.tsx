@@ -5,6 +5,7 @@ import {
   type ChemicalAccuracyTargetOption,
 } from "@/lib/run-form-recommendations";
 import type { BackendDeviceSummary, BasisSetMetadata } from "@/types/run";
+import type { AerMethod } from "@/types/run-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,6 +87,164 @@ function BenchmarkChemicalAccuracyControl({
   );
 }
 
+const BENCHMARK_SHOT_PRESETS = [256, 1024, 4096] as const;
+const BENCHMARK_AER_METHODS: readonly { value: AerMethod; label: string }[] = [
+  { value: "automatic", label: "Automatic" },
+  { value: "statevector", label: "Statevector" },
+  { value: "density_matrix", label: "Density matrix" },
+  { value: "matrix_product_state", label: "Matrix product state" },
+  { value: "stabilizer", label: "Stabilizer" },
+];
+const GPU_AER_METHODS = new Set<AerMethod>(["statevector", "density_matrix"]);
+
+function isAerBenchmarkMode(mode: BenchmarkBackendMode): boolean {
+  return mode === "aer_simulator" || mode === "aer_simulator_backend_noise";
+}
+
+function BenchmarkShotsControl({
+  shots,
+  selectedBackendMode,
+  workspaceLocked,
+  onShotsChange,
+}: Readonly<{
+  shots: number;
+  selectedBackendMode: BenchmarkBackendMode;
+  workspaceLocked: boolean;
+  onShotsChange: (shots: number) => void;
+}>) {
+  return (
+    <div className="flex min-w-0 flex-col justify-center gap-2">
+      <Label htmlFor="benchmark-shots" className="text-xs text-muted-foreground">
+        Shots per evaluation
+      </Label>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card p-2">
+        <Input
+          id="benchmark-shots"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={1_000_000}
+          step={1}
+          value={shots}
+          disabled={workspaceLocked}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isInteger(next) && next >= 1 && next <= 1_000_000) {
+              onShotsChange(next);
+            }
+          }}
+          className="h-9 w-28 bg-surface-raised [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+        <div className="flex flex-wrap gap-1">
+          {BENCHMARK_SHOT_PRESETS.map((preset) => (
+            <Button
+              key={preset}
+              type="button"
+              size="sm"
+              variant={shots === preset ? "secondary" : "outline"}
+              className="h-9 px-2.5 tabular-nums"
+              disabled={workspaceLocked}
+              onClick={() => onShotsChange(preset)}
+            >
+              {preset}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {selectedBackendMode === "aer_simulator_backend_noise"
+          ? "Default for backend-derived noise: 256 shots. Increase for lower sampling error."
+          : "Lower shots reduce sampling work but increase statistical error."}
+      </p>
+    </div>
+  );
+}
+
+function BenchmarkAerExecutionControl({
+  selectedBackendMode,
+  aerMethod,
+  device,
+  workspaceLocked,
+  onAerMethodChange,
+  onDeviceChange,
+}: Readonly<{
+  selectedBackendMode: BenchmarkBackendMode;
+  aerMethod: AerMethod | null;
+  device: "CPU" | "GPU" | null;
+  workspaceLocked: boolean;
+  onAerMethodChange: (method: AerMethod) => void;
+  onDeviceChange: (device: "CPU" | "GPU" | null) => void;
+}>) {
+  if (!isAerBenchmarkMode(selectedBackendMode)) return null;
+
+  const availableMethods = BENCHMARK_AER_METHODS.filter(
+    (method) => device !== "GPU" || GPU_AER_METHODS.has(method.value),
+  );
+  const selectedMethod = aerMethod ?? "automatic";
+
+  return (
+    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+      <div className="flex min-w-0 flex-col justify-center gap-2">
+        <Label htmlFor="benchmark-aer-device" className="text-xs text-muted-foreground">
+          Aer execution device
+        </Label>
+        <Select
+          value={device ?? "CPU"}
+          onValueChange={(value) => {
+            if (value === "GPU") {
+              onDeviceChange("GPU");
+              if (!GPU_AER_METHODS.has(selectedMethod)) onAerMethodChange("statevector");
+            } else {
+              onDeviceChange(null);
+            }
+          }}
+          disabled={workspaceLocked}
+        >
+          <SelectTrigger id="benchmark-aer-device" className="h-9 w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="CPU">CPU worker</SelectItem>
+            <SelectItem value="GPU">GPU worker required</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex min-w-0 flex-col justify-center gap-2">
+        <Label htmlFor="benchmark-aer-method" className="text-xs text-muted-foreground">
+          Aer method
+        </Label>
+        <Select
+          value={
+            availableMethods.some((method) => method.value === selectedMethod)
+              ? selectedMethod
+              : "statevector"
+          }
+          onValueChange={(value) => {
+            if (BENCHMARK_AER_METHODS.some((method) => method.value === value)) {
+              onAerMethodChange(value as AerMethod);
+            }
+          }}
+          disabled={workspaceLocked}
+        >
+          <SelectTrigger id="benchmark-aer-method" className="h-9 w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {availableMethods.map((method) => (
+              <SelectItem key={method.value} value={method.value}>
+                {method.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-[11px] text-muted-foreground sm:col-span-2">
+        GPU mode uses one dedicated worker and requires an explicit GPU-compatible method.
+      </p>
+    </div>
+  );
+}
+
 export function BenchmarkExecutionSettings({
   backendSelectionRequired,
   basisIds,
@@ -107,6 +266,12 @@ export function BenchmarkExecutionSettings({
   chemicalAccuracyHa,
   chemicalAccuracyTargetOptions = getChemicalAccuracyTargetOptions(undefined),
   onChemicalAccuracyChange,
+  shots,
+  onShotsChange,
+  aerMethod,
+  device,
+  onAerMethodChange,
+  onDeviceChange,
 }: Readonly<{
   backendSelectionRequired: boolean;
   basisIds: ReadonlySet<string>;
@@ -128,6 +293,12 @@ export function BenchmarkExecutionSettings({
   chemicalAccuracyHa: number;
   chemicalAccuracyTargetOptions?: readonly ChemicalAccuracyTargetOption[];
   onChemicalAccuracyChange: (thresholdHa: number) => void;
+  shots: number;
+  onShotsChange: (shots: number) => void;
+  aerMethod: AerMethod | null;
+  device: "CPU" | "GPU" | null;
+  onAerMethodChange: (method: AerMethod) => void;
+  onDeviceChange: (device: "CPU" | "GPU" | null) => void;
 }>) {
   return (
     <div
@@ -219,6 +390,24 @@ export function BenchmarkExecutionSettings({
         workspaceLocked={workspaceLocked}
         onChemicalAccuracyChange={onChemicalAccuracyChange}
       />
+      <div className="xl:col-span-full">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <BenchmarkShotsControl
+            shots={shots}
+            selectedBackendMode={selectedBackendMode}
+            workspaceLocked={workspaceLocked}
+            onShotsChange={onShotsChange}
+          />
+          <BenchmarkAerExecutionControl
+            selectedBackendMode={selectedBackendMode}
+            aerMethod={aerMethod}
+            device={device}
+            workspaceLocked={workspaceLocked}
+            onAerMethodChange={onAerMethodChange}
+            onDeviceChange={onDeviceChange}
+          />
+        </div>
+      </div>
     </div>
   );
 }

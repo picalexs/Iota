@@ -55,6 +55,9 @@ describe("benchmark state hydration", () => {
     const setSelectedBasis = makeSetter();
     const setSelectedBackendMode = makeSetter();
     const setSelectedBackendName = makeSetter();
+    const setShots = makeSetter();
+    const setSelectedAerMethod = makeSetter();
+    const setSelectedDevice = makeSetter();
     const setChemicalAccuracyHa = makeSetter();
     const setCustomMolecules = makeSetter();
     const setActiveSavedBenchmarkId = makeSetter();
@@ -71,6 +74,9 @@ describe("benchmark state hydration", () => {
       setSelectedBasis,
       setSelectedBackendMode,
       setSelectedBackendName,
+      setShots,
+      setSelectedAerMethod,
+      setSelectedDevice,
       setChemicalAccuracyHa,
       setCustomMolecules,
       setEntries,
@@ -101,6 +107,9 @@ describe("benchmark state hydration", () => {
     const setSelectedBasis = makeSetter();
     const setSelectedBackendMode = makeSetter();
     const setSelectedBackendName = makeSetter();
+    const setShots = makeSetter();
+    const setSelectedAerMethod = makeSetter();
+    const setSelectedDevice = makeSetter();
     const setChemicalAccuracyHa = makeSetter();
     const setCustomMolecules = makeSetter();
 
@@ -118,6 +127,9 @@ describe("benchmark state hydration", () => {
       setSelectedBasis,
       setSelectedBackendMode,
       setSelectedBackendName,
+      setShots,
+      setSelectedAerMethod,
+      setSelectedDevice,
       setChemicalAccuracyHa,
       setCustomMolecules,
     });

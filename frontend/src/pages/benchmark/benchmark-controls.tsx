@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { BackendDeviceSummary, MoleculeResponse, RunAlgorithm, UUID } from "@/types/run";
+import type { AerMethod } from "@/types/run-config";
 import {
   getChemicalAccuracyTargetOptions,
   type ChemicalAccuracyTargetOption,
@@ -79,6 +80,12 @@ interface BenchmarkControlsProps {
   onBackendNameChange: (backendName: string) => void;
   onBackendOptionsOpen: () => void;
   onChemicalAccuracyChange: (thresholdHa: number) => void;
+  shots?: number;
+  onShotsChange?: (shots: number) => void;
+  aerMethod?: AerMethod | null;
+  device?: "CPU" | "GPU" | null;
+  onAerMethodChange?: (method: AerMethod) => void;
+  onDeviceChange?: (device: "CPU" | "GPU" | null) => void;
   onAddCustomMolecule: (molecule: MoleculeResponse) => void;
   onRemoveCustomMolecule: (id: UUID) => void;
   onRunBenchmark: () => void;
@@ -138,6 +145,12 @@ export function BenchmarkControls({
   onBackendNameChange,
   onBackendOptionsOpen,
   onChemicalAccuracyChange,
+  shots = 4096,
+  onShotsChange = () => undefined,
+  aerMethod = "automatic",
+  device = null,
+  onAerMethodChange = () => undefined,
+  onDeviceChange = () => undefined,
   onAddCustomMolecule,
   onRemoveCustomMolecule,
   onRunBenchmark,
@@ -300,6 +313,12 @@ export function BenchmarkControls({
           chemicalAccuracyHa={chemicalAccuracyHa}
           chemicalAccuracyTargetOptions={chemicalAccuracyTargetOptions}
           onChemicalAccuracyChange={onChemicalAccuracyChange}
+          shots={shots}
+          onShotsChange={onShotsChange}
+          aerMethod={aerMethod}
+          device={device}
+          onAerMethodChange={onAerMethodChange}
+          onDeviceChange={onDeviceChange}
         />
 
         {backendHelperText ? (

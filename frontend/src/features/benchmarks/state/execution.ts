@@ -34,6 +34,7 @@ import type { BenchmarkAlgorithmVariant } from "@/pages/benchmark/benchmark-vari
 
 import type { BenchmarkEntriesSetter } from "@/features/benchmarks/state/polling";
 import type { BenchmarkEntry, BenchmarkSubmitResult } from "@/pages/benchmark/benchmark-utils";
+import type { BenchmarkExecutionSettings } from "@/types/benchmark";
 
 export async function mapWithConcurrencyLimit<T, R>(
   items: readonly T[],
@@ -106,6 +107,9 @@ export function useBenchmarkExecutionStartActions({
   selectedBasis,
   selectedBackendMode,
   resolvedBackendName,
+  shots,
+  selectedAerMethod,
+  selectedDevice,
   stopPolling,
   startPolling,
   runGenerationRef,
@@ -132,6 +136,9 @@ export function useBenchmarkExecutionStartActions({
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   resolvedBackendName: string | null;
+  shots: number;
+  selectedAerMethod: BenchmarkExecutionSettings["aerMethod"];
+  selectedDevice: BenchmarkExecutionSettings["device"];
   stopPolling: () => void;
   startPolling: (entries?: BenchmarkEntry[]) => void;
   runGenerationRef: RefObject<number>;
@@ -171,6 +178,9 @@ export function useBenchmarkExecutionStartActions({
         selectedBasis,
         selectedBackendMode,
         resolvedBackendName,
+        shots,
+        selectedAerMethod,
+        selectedDevice,
         stopPolling,
         startPolling,
         runGenerationRef,
@@ -199,7 +209,10 @@ export function useBenchmarkExecutionStartActions({
       buildBenchmarkSignature,
       queryClient,
       resolvedBackendName,
+      selectedAerMethod,
+      selectedDevice,
       runGenerationRef,
+      shots,
       selectedBackendMode,
       selectedBasis,
       selectedPresets,
@@ -351,6 +364,9 @@ async function submitInitialBenchmarkEntries({
   selectedBasis,
   selectedBackendMode,
   resolvedBackendName,
+  shots,
+  selectedAerMethod,
+  selectedDevice,
   guardedSetEntries,
   persistSubmittedEntries,
   options,
@@ -362,6 +378,9 @@ async function submitInitialBenchmarkEntries({
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   resolvedBackendName: string | null;
+  shots: number;
+  selectedAerMethod: BenchmarkExecutionSettings["aerMethod"];
+  selectedDevice: BenchmarkExecutionSettings["device"];
   guardedSetEntries: (updater: (entries: BenchmarkEntry[]) => BenchmarkEntry[]) => void;
   persistSubmittedEntries?: (
     snapshot: SavedBenchmarkRun,
@@ -386,6 +405,9 @@ async function submitInitialBenchmarkEntries({
         {
           mode: selectedBackendMode,
           backendName: resolvedBackendName,
+          shots,
+          aerMethod: selectedAerMethod,
+          device: selectedDevice,
         },
         guardedSetEntries,
         options,
@@ -442,6 +464,9 @@ export async function executeBenchmarkRun({
   selectedBasis,
   selectedBackendMode,
   resolvedBackendName,
+  shots,
+  selectedAerMethod,
+  selectedDevice,
   stopPolling,
   startPolling,
   runGenerationRef,
@@ -467,6 +492,9 @@ export async function executeBenchmarkRun({
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   resolvedBackendName: string | null;
+  shots: number;
+  selectedAerMethod: BenchmarkExecutionSettings["aerMethod"];
+  selectedDevice: BenchmarkExecutionSettings["device"];
   stopPolling: () => void;
   startPolling: (entries?: BenchmarkEntry[]) => void;
   runGenerationRef: RefObject<number>;
@@ -532,6 +560,9 @@ export async function executeBenchmarkRun({
     selectedBasis,
     selectedBackendMode,
     resolvedBackendName,
+    shots,
+    selectedAerMethod,
+    selectedDevice,
     guardedSetEntries,
     persistSubmittedEntries,
     options,
