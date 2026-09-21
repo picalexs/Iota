@@ -27,6 +27,8 @@ class QSECompletionPayload:
     overlap_condition: float
     relative_residual: float
     residual_tolerance: float
+    termination_reason: str
+    basis_termination_reason: str | None = None
     execution_mode: str | None = None
     sector_dimension: int | None = None
     num_spatial_orbitals: int | None = None
@@ -43,11 +45,21 @@ def build_qse_completion_payload(
     diagnostics: dict[str, Any],
     relative_residual: float,
     residual_tolerance: float,
+    termination_reason: str | None = None,
     execution_mode: str | None = None,
     sector_dimension: int | None = None,
     num_spatial_orbitals: int | None = None,
 ) -> QSECompletionPayload:
     """Build the completed QSE progress payload object."""
+    basis_selection = diagnostics.get("basis_selection")
+    basis_termination_reason = (
+        basis_selection.get("basis_termination_reason")
+        if isinstance(basis_selection, dict)
+        else None
+    )
+    resolved_termination_reason = termination_reason or diagnostics.get("termination_reason")
+    if resolved_termination_reason is None and execution_mode == "measured_matrix_elements":
+        resolved_termination_reason = "measured_matrix_elements_diagnostic"
     return QSECompletionPayload(
         subspace_dim=subspace_dim,
         primary_energy=primary_energy,
@@ -58,6 +70,13 @@ def build_qse_completion_payload(
         overlap_condition=float(diagnostics.get("overlap_condition", 0.0)),
         relative_residual=relative_residual,
         residual_tolerance=residual_tolerance,
+        termination_reason=resolved_termination_reason
+        or projected_convergence_reason(
+            diagnostics,
+            relative_residual=relative_residual,
+            residual_tolerance=residual_tolerance,
+        ),
+        basis_termination_reason=basis_termination_reason,
         execution_mode=execution_mode,
         sector_dimension=sector_dimension,
         num_spatial_orbitals=num_spatial_orbitals,
@@ -87,7 +106,10 @@ def emit_qse_completion(
         "overlap_condition": payload.overlap_condition,
         "relative_residual": payload.relative_residual,
         "residual_tolerance": payload.residual_tolerance,
+        "termination_reason": payload.termination_reason,
     }
+    if payload.basis_termination_reason is not None:
+        event["basis_termination_reason"] = payload.basis_termination_reason
     if payload.execution_mode is not None:
         event["execution_mode"] = payload.execution_mode
     if payload.sector_dimension is not None:
@@ -192,6 +214,10 @@ def build_qse_result(
         key: value for key, value in diagnostics.items() if key != "basis_selection"
     }
     conditioning_summary["termination_reason"] = termination_reason
+    if isinstance(basis_selection, dict):
+        conditioning_summary["basis_termination_reason"] = basis_selection.get(
+            "basis_termination_reason"
+        )
     return QSEResult(
         algorithm="qse",
         primary_energy=normalized_eigenvalues[0],

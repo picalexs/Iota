@@ -51,6 +51,7 @@ def test_emit_qse_completion_keeps_dense_event_shape() -> None:
             "overlap_condition": 2.0,
             "relative_residual": 0.002,
             "residual_tolerance": 0.01,
+            "termination_reason": "projected_metric_unstable",
         }
     ]
 
