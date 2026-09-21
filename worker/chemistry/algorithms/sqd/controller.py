@@ -8,6 +8,7 @@ from collections.abc import Callable
 import numpy as np
 
 from worker.chemistry.algorithms.sqd.config import SQDOptions
+from worker.chemistry.algorithms.sqd.convergence import iteration_values_are_finite
 from worker.chemistry.algorithms.sqd.iteration import SQDIterationOutcome
 from worker.chemistry.algorithms.sqd.recovery import SQDDependencies
 from worker.chemistry.algorithms.sqd.state import SQDRunState
@@ -56,13 +57,24 @@ def run_sqd_recovery_loop(
             100.0 * outcome.sampling.postselection_weight,
             outcome.iter_elapsed,
         )
-        converged = is_converged(
-            iteration=iteration,
+        numerically_valid = iteration_values_are_finite(
+            energy_value=outcome.batch_outcome.energy_value,
             delta_energy=outcome.delta_energy,
             occupancy_delta=outcome.occupancy_delta,
-            selected_count=int(outcome.sampling.selected_bits.shape[0]),
-            options=options,
+            occupancy_vector=outcome.occupancy_vector,
         )
+        converged = False
+        if not numerically_valid:
+            state.termination_reason = "invalid_numerics"
+            state.converged = False
+        else:
+            converged = is_converged(
+                iteration=iteration,
+                delta_energy=outcome.delta_energy,
+                occupancy_delta=outcome.occupancy_delta,
+                selected_count=int(outcome.sampling.selected_bits.shape[0]),
+                options=options,
+            )
         if converged:
             state.termination_reason = "converged"
             state.converged = True
