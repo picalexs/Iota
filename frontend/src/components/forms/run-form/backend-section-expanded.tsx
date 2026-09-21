@@ -37,6 +37,7 @@ const AER_METHODS: Array<{ value: AerMethod; label: string }> = [
   { value: "matrix_product_state", label: "Matrix product state" },
   { value: "stabilizer", label: "Stabilizer" },
 ];
+const GPU_AER_METHODS = new Set<AerMethod>(["statevector", "density_matrix"]);
 
 type NumberOptionKey = "shots" | "seed_simulator" | "seed_transpiler";
 
@@ -259,6 +260,42 @@ function BackendExecutionOptions({
 
       {value === "aer_simulator" && (
         <FormField
+          label="Execution device"
+          htmlFor="aer-device-select"
+          help={{
+            short:
+              "Use CPU by default. GPU requires a GPU-enabled worker and an explicit GPU method.",
+            anchor: "device",
+          }}
+        >
+          <Select
+            value={backendOptions.device ?? "CPU"}
+            onValueChange={(next) => {
+              if (next === "GPU") {
+                updateBackendOptions({
+                  device: "GPU",
+                  aer_method: GPU_AER_METHODS.has(backendOptions.aer_method ?? "automatic")
+                    ? backendOptions.aer_method
+                    : "statevector",
+                });
+                return;
+              }
+              updateBackendOptions({ device: "CPU" });
+            }}
+          >
+            <SelectTrigger id="aer-device-select" disabled={disabled}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="CPU">CPU (default)</SelectItem>
+              <SelectItem value="GPU">GPU (worker required)</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormField>
+      )}
+
+      {value === "aer_simulator" && (
+        <FormField
           label="Aer Method"
           htmlFor="aer-method-select"
           help={{
@@ -275,7 +312,9 @@ function BackendExecutionOptions({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {AER_METHODS.map((method) => (
+              {AER_METHODS.filter(
+                (method) => backendOptions.device !== "GPU" || GPU_AER_METHODS.has(method.value),
+              ).map((method) => (
                 <SelectItem key={method.value} value={method.value}>
                   {method.label}
                 </SelectItem>

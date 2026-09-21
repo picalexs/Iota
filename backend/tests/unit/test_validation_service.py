@@ -81,6 +81,48 @@ def test_run_create_backend_options_defaults_are_stable() -> None:
     assert run.noise_profile is None
 
 
+def test_validate_run_request_accepts_gpu_aer_with_explicit_statevector() -> None:
+    run = _make_kqd_run_create(
+        backend_target=BackendTarget.AER_SIMULATOR,
+        backend_options={"device": "GPU", "aer_method": "statevector"},
+    )
+
+    response = validate_run_request(run)
+
+    assert not any(error.field == "backend_options.aer_method" for error in response.errors)
+
+
+def test_validate_run_request_rejects_gpu_aer_automatic_method() -> None:
+    run = _make_kqd_run_create(
+        backend_target=BackendTarget.AER_SIMULATOR,
+        backend_options={"device": "GPU"},
+    )
+
+    response = validate_run_request(run)
+
+    assert response.valid is False
+    assert any(error.field == "backend_options.aer_method" for error in response.errors)
+
+
+def test_validate_run_request_rejects_aer_device_options_for_ibm_target() -> None:
+    run = _make_kqd_run_create(
+        backend_target=BackendTarget.IBM_RUNTIME,
+        backend_options={"device": "GPU", "backend_name": "ibm_brisbane"},
+        advanced_config={
+            "algorithm": RunAlgorithm.KQD,
+            "krylov_dim": 4,
+            "time_step": 0.2,
+            "evolution_method": "trotter",
+            "trotter_steps": 2,
+        },
+        ibm_runtime_confirmed=True,
+    )
+
+    response = validate_run_request(run, ibm_credentials_available=True)
+
+    assert any(error.field == "backend_options.device" for error in response.errors)
+
+
 def test_validate_run_request_accepts_kqd_aer_without_noise_profile() -> None:
     run = _make_kqd_run_create(
         backend_target=BackendTarget.AER_SIMULATOR,

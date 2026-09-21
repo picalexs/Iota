@@ -178,6 +178,7 @@ export function backendDefaultsForTarget(
       backend_name: null,
       seed_simulator: null,
       seed_transpiler: null,
+      device: null,
     };
   }
 
@@ -195,6 +196,7 @@ export function backendDefaultsForTarget(
     selection_policy: "least_error",
     backend_name: null,
     seed_simulator: null,
+    device: null,
   };
 }
 

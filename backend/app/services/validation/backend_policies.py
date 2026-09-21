@@ -26,6 +26,18 @@ _IBM_RUNTIME_ALGORITHMS = frozenset(
 )
 _DENSE_CLASSICAL_ALGORITHMS = frozenset({RunAlgorithm.KQD, RunAlgorithm.QFD})
 _AER_STATEVECTOR_METHODS = frozenset({"automatic", "statevector", "matrix_product_state"})
+_GPU_AER_METHODS = frozenset({"statevector", "density_matrix", "unitary"})
+_AER_GPU_OPTION_FIELDS = (
+    "device",
+    "batched_shots_gpu",
+    "runtime_parameter_bind_enable",
+    "shot_branching_enable",
+    "blocking_enable",
+    "cuStateVec_enable",
+    "max_parallel_threads",
+    "max_parallel_experiments",
+    "max_parallel_shots",
+)
 _MAX_HARDWARE_MATRIX_DIM = 8
 _MAX_NOISY_AER_PROJECTED_MATRIX_ORBITALS = 6
 _MAX_IBM_PROJECTED_MATRIX_ORBITALS = _MAX_NOISY_AER_PROJECTED_MATRIX_ORBITALS
@@ -42,12 +54,47 @@ _QFD_EASY_DIMS = {
 
 __all__ = [
     "_append_aer_matrix_validation_messages",
+    "_append_aer_device_validation_messages",
     "_append_backend_credential_validation_messages",
     "_append_backend_target_validation_messages",
     "_append_basis_set_validation_messages",
     "_append_ibm_runtime_validation_messages",
     "_append_projected_matrix_validation_messages",
 ]
+
+
+def _append_aer_device_validation_messages(
+    payload: RunCreate,
+    *,
+    errors: list[RunValidationErrorDetail],
+) -> None:
+    """Validate Aer device options before a run enters the queue."""
+    options = payload.backend_options
+    if payload.backend_target != BackendTarget.AER_SIMULATOR:
+        for field in _AER_GPU_OPTION_FIELDS:
+            if getattr(options, field, None) is not None:
+                errors.append(
+                    RunValidationErrorDetail(
+                        field=f"backend_options.{field}",
+                        code=ValidationErrorCode.UNSUPPORTED_OPTION,
+                        message=(
+                            f"backend_options.{field} is only supported for the local Aer simulator."
+                        ),
+                        suggestion="Select aer_simulator before using Aer execution options.",
+                    )
+                )
+        return
+
+    if options.device == "GPU" and options.aer_method not in _GPU_AER_METHODS:
+        methods = ", ".join(sorted(_GPU_AER_METHODS))
+        errors.append(
+            RunValidationErrorDetail(
+                field="backend_options.aer_method",
+                code=ValidationErrorCode.UNSUPPORTED_OPTION,
+                message=f"GPU Aer execution requires an explicit supported method: {methods}.",
+                suggestion="Choose statevector or density_matrix for GPU execution.",
+            )
+        )
 
 
 def _append_basis_set_validation_messages(

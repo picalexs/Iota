@@ -14,6 +14,7 @@ import type { SimulationRunFormData } from "@/types/run";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const AER_STATEVECTOR_METHODS = new Set(["automatic", "statevector", "matrix_product_state"]);
+const GPU_AER_METHODS = new Set(["statevector", "density_matrix", "unitary"]);
 const HARDWARE_MATRIX_DIM_LIMIT = 8;
 const KQD_EASY_DIMS = { fastest: 2, balanced: 8, best_accuracy: 8 } as const;
 const QFD_EASY_DIMS = { fastest: 2, balanced: 8, best_accuracy: 8 } as const;
@@ -209,6 +210,21 @@ function validateManualIbmBackendSelection(data: RunFormData, ctx: z.RefinementC
       ctx,
       ["backend_options", "backend_name"],
       "Backend name is required for manual IBM selection",
+    );
+  }
+}
+
+function validateAerDeviceRules(data: RunFormData, ctx: z.RefinementCtx) {
+  if (data.backend_target !== "aer_simulator" || data.backend_options.device !== "GPU") {
+    return;
+  }
+
+  const aerMethod = data.backend_options.aer_method ?? "automatic";
+  if (!GPU_AER_METHODS.has(aerMethod)) {
+    addCustomIssue(
+      ctx,
+      ["backend_options", "aer_method"],
+      "GPU Aer execution requires Statevector, Density matrix, or Unitary.",
     );
   }
 }
@@ -813,6 +829,7 @@ export const runFormSchema = z
           "superop",
         ])
         .nullable(),
+      device: z.enum(["CPU", "GPU"]).nullable().optional(),
     }),
     noise_profile: z
       .union([
@@ -958,6 +975,7 @@ export const runFormSchema = z
   .superRefine((data, ctx) => {
     validateRequiredSelections(data, ctx);
     validateManualIbmBackendSelection(data, ctx);
+    validateAerDeviceRules(data, ctx);
 
     if (data.algorithm == null) {
       return;

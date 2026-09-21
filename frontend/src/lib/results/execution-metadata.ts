@@ -18,6 +18,10 @@ export interface RunExecutionMetadata {
   backendName: string | null;
   actualExecutionTarget?: string | null;
   actualPathClass?: string | null;
+  requestedDevice?: string | null;
+  actualDevice?: string | null;
+  aerVersion?: string | null;
+  aerPreflight?: string | null;
   backendPrimitivesUsed?: boolean | null;
   selectionPolicy: string | null;
   shots: number | null;
@@ -399,6 +403,10 @@ function getExecutionScalarFields({
   RunExecutionMetadata,
   | "actualExecutionTarget"
   | "actualPathClass"
+  | "requestedDevice"
+  | "actualDevice"
+  | "aerVersion"
+  | "aerPreflight"
   | "backendPrimitivesUsed"
   | "selectionPolicy"
   | "shots"
@@ -431,6 +439,27 @@ function getExecutionScalarFields({
       resultExecution?.actual_path_class,
       execution?.actual_path_class,
       transpilation?.actual_path_class,
+    ),
+    requestedDevice: firstString(
+      resultExecution?.requested_device,
+      execution?.requested_device,
+      transpilation?.requested_device,
+      backendOptions?.device,
+    ),
+    actualDevice: firstString(
+      resultExecution?.actual_device,
+      execution?.actual_device,
+      transpilation?.actual_device,
+    ),
+    aerVersion: firstString(
+      resultExecution?.aer_version,
+      execution?.aer_version,
+      transpilation?.aer_version,
+    ),
+    aerPreflight: firstString(
+      resultExecution?.aer_preflight,
+      execution?.aer_preflight,
+      transpilation?.aer_preflight,
     ),
     backendPrimitivesUsed: firstBoolean(
       resultExecution?.backend_primitives_used,

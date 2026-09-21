@@ -245,6 +245,7 @@ function appendBackendRows(rows: ConfigRow[], config: Record<string, unknown>, r
   pushRow(rows, "Backend", "Shots", config.backend_options.shots);
   pushRow(rows, "Backend", "Optimization level", config.backend_options.optimization_level);
   pushRow(rows, "Backend", "Aer method", config.backend_options.aer_method, formatEnumNode);
+  pushRow(rows, "Backend", "Execution device", config.backend_options.device, formatEnumNode);
 }
 
 function appendNoiseProfileRows(rows: ConfigRow[], config: Record<string, unknown>) {

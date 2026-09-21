@@ -251,6 +251,35 @@ export function buildAlgorithmAwareRunCreate(
     throw new Error("backend_target is required");
   }
 
+  const {
+    device,
+    batched_shots_gpu,
+    runtime_parameter_bind_enable,
+    shot_branching_enable,
+    blocking_enable,
+    cuStateVec_enable,
+    max_parallel_threads,
+    max_parallel_experiments,
+    max_parallel_shots,
+    aer_pub_chunk_size,
+    ...commonBackendOptions
+  } = values.backend_options;
+  const backendOptions =
+    values.backend_target === "aer_simulator"
+      ? {
+          ...commonBackendOptions,
+          device,
+          batched_shots_gpu,
+          runtime_parameter_bind_enable,
+          shot_branching_enable,
+          blocking_enable,
+          cuStateVec_enable,
+          max_parallel_threads,
+          max_parallel_experiments,
+          max_parallel_shots,
+          aer_pub_chunk_size,
+        }
+      : commonBackendOptions;
   const payloadBase: Omit<AlgorithmAwareRunCreate, "easy_options" | "advanced_config"> = {
     molecule_id: values.molecule_id,
     algorithm: values.algorithm,
@@ -258,7 +287,7 @@ export function buildAlgorithmAwareRunCreate(
     backend_target: values.backend_target,
     chemical_accuracy_target_ha: values.chemical_accuracy_target_ha,
     backend_options: {
-      ...values.backend_options,
+      ...backendOptions,
       backend_name:
         values.backend_options.backend_name != null &&
         values.backend_options.backend_name.trim().length > 0

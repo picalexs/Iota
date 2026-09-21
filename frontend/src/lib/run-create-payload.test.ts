@@ -132,6 +132,40 @@ describe("buildAlgorithmAwareRunCreate", () => {
     });
   });
 
+  it("preserves GPU Aer controls for local simulation", () => {
+    const payload = buildAlgorithmAwareRunCreate({
+      ...baseValues,
+      backend_options: {
+        ...baseValues.backend_options,
+        device: "GPU",
+        aer_method: "statevector",
+        batched_shots_gpu: true,
+      },
+    });
+
+    expect(payload.backend_options).toMatchObject({
+      device: "GPU",
+      aer_method: "statevector",
+      batched_shots_gpu: true,
+    });
+  });
+
+  it("does not send Aer GPU controls to IBM Runtime", () => {
+    const payload = buildAlgorithmAwareRunCreate({
+      ...baseValues,
+      backend_target: "ibm_runtime",
+      backend_options: {
+        ...baseValues.backend_options,
+        device: "GPU",
+        batched_shots_gpu: true,
+        backend_name: "ibm_brisbane",
+      },
+    });
+
+    expect(payload.backend_options).not.toHaveProperty("device");
+    expect(payload.backend_options).not.toHaveProperty("batched_shots_gpu");
+  });
+
   it("includes the correlated SQD sampling-state configuration", () => {
     const payload = buildAlgorithmAwareRunCreate({
       ...baseValues,

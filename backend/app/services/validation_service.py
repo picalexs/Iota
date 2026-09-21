@@ -29,6 +29,7 @@ from app.services.validation.algorithm_policies import (
     _append_vqe_validation_messages,
 )
 from app.services.validation.backend_policies import (
+    _append_aer_device_validation_messages,
     _append_aer_matrix_validation_messages,
     _append_backend_credential_validation_messages,
     _append_backend_target_validation_messages,
@@ -105,6 +106,7 @@ def validate_run_request(
     capability = settings.backend_capabilities[payload.backend_target]
     _append_basis_set_validation_messages(payload, errors=errors)
     _append_backend_target_validation_messages(payload, errors=errors, capability=capability)
+    _append_aer_device_validation_messages(payload, errors=errors)
     _append_projected_matrix_validation_messages(
         payload,
         errors=errors,

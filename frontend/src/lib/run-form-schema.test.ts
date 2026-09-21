@@ -132,6 +132,35 @@ describe("runFormSchema", () => {
     ).toBe(true);
   });
 
+  it("accepts GPU Aer only with an explicit GPU-supported method", () => {
+    expect(
+      runFormSchema.safeParse({
+        ...validFormData,
+        backend_target: "aer_simulator",
+        backend_options: {
+          ...validFormData.backend_options,
+          device: "GPU",
+          aer_method: "statevector",
+        },
+      }).success,
+    ).toBe(true);
+
+    const invalid = runFormSchema.safeParse({
+      ...validFormData,
+      backend_target: "aer_simulator",
+      backend_options: {
+        ...validFormData.backend_options,
+        device: "GPU",
+        aer_method: "automatic",
+      },
+    });
+
+    expect(invalid.success).toBe(false);
+    expect(invalid.error?.issues.map((issue) => issue.path.join("."))).toContain(
+      "backend_options.aer_method",
+    );
+  });
+
   it("rejects simulator names as backend-derived noise references", () => {
     const result = runFormSchema.safeParse({
       ...validFormData,

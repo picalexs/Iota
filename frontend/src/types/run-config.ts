@@ -151,6 +151,16 @@ export interface BackendOptions {
   seed_simulator: number | null;
   seed_transpiler: number | null;
   aer_method: AerMethod | null;
+  device?: "CPU" | "GPU" | null;
+  batched_shots_gpu?: boolean | null;
+  runtime_parameter_bind_enable?: boolean | null;
+  shot_branching_enable?: boolean | null;
+  blocking_enable?: boolean | null;
+  cuStateVec_enable?: boolean | null;
+  max_parallel_threads?: number | null;
+  max_parallel_experiments?: number | null;
+  max_parallel_shots?: number | null;
+  aer_pub_chunk_size?: number | null;
   credential_profile_id?: UUID | null;
 }
 

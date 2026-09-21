@@ -309,6 +309,15 @@ function getSimulatorMethodMetric(
   return null;
 }
 
+function getExecutionDeviceMetric(execution: ExecutionMetadata): SummaryMetricProps | null {
+  if (!hasValue(execution.actualDevice)) return null;
+  const requested =
+    hasValue(execution.requestedDevice) && execution.requestedDevice !== execution.actualDevice
+      ? ` (requested ${execution.requestedDevice})`
+      : "";
+  return { label: "Execution device", value: `${execution.actualDevice}${requested}` };
+}
+
 function renderCredentialProfileValue(run: RunResponse, profileLabel: string): ReactNode {
   if (hasValue(run.credential_profile_id)) {
     return (
@@ -347,6 +356,7 @@ function buildCoreExecutionDetails({
   const details: SummaryMetricProps[] = [{ label: "Policy", value: policyLabel }];
 
   pushMetric(details, getBackendDeviceMetric(execution, run));
+  pushMetric(details, getExecutionDeviceMetric(execution));
   pushMetric(
     details,
     metricFromValue(execution.shots, (shots) => ({
