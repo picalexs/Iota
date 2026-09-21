@@ -71,7 +71,8 @@ export type BenchmarkEligibilityReason =
   | "not_completed"
   | "reported_energy_invalid"
   | "projected_solve_diagnostic"
-  | "scientific_convergence_not_established";
+  | "scientific_convergence_not_established"
+  | "reference_provenance_unavailable";
 export const TERMINAL: Set<EntryStatus> = new Set(["completed", "failed", "cancelled"]);
 export const NON_EXECUTING: Set<EntryStatus> = new Set(["planned", "excluded"]);
 export const RUNNING_POLL_INTERVAL_MS = 3000;
@@ -497,6 +498,9 @@ export function getBenchmarkEligibility(entry: BenchmarkEntry): {
   if (metadata?.reportedEnergyIsValid === false) {
     return { eligible: false, reason: "reported_energy_invalid" };
   }
+  if (entry.classicalRefs === null) {
+    return { eligible: false, reason: "reference_provenance_unavailable" };
+  }
   if (metadata?.projectedSolveIsDiagnostic === true) {
     return { eligible: false, reason: "projected_solve_diagnostic" };
   }
@@ -517,6 +521,8 @@ export function benchmarkEligibilityMessage(reason: BenchmarkEligibilityReason |
       return "projected solve is diagnostic only";
     case "scientific_convergence_not_established":
       return "scientific convergence was not established";
+    case "reference_provenance_unavailable":
+      return "runtime CASCI reference provenance is unavailable";
     default:
       return "reference or energy data is unavailable";
   }

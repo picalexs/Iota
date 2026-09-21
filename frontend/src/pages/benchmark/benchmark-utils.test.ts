@@ -74,7 +74,7 @@ function makeEntry(overrides: Partial<BenchmarkEntry>): BenchmarkEntry {
     currentEnergy: -1.1372,
     converged: true,
     errorMessage: null,
-    classicalRefs: null,
+    classicalRefs: { hf: -1.116, fci: -1.137 },
     elapsedSeconds: null,
     latestEventSequence: 0,
     ...overrides,
@@ -327,6 +327,7 @@ describe("benchmark molecule utilities", () => {
         algorithm: "kqd",
         preset: { ...preset, key: "custom", references: { hf: 0, fci: null, source: "test" } },
         energy: -1.12,
+        classicalRefs: null,
       }),
       makeEntry({ id: "not-converged", algorithm: "sqd", energy: -1.1371, converged: false }),
     ];
@@ -372,6 +373,16 @@ describe("benchmark molecule utilities", () => {
     expect(assessBenchmarkEntry(entry, 0.0016).verdict).toBe("unscored");
   });
 
+  it("does not fall back to a preset reference for a completed row", () => {
+    const entry = makeEntry({ classicalRefs: null });
+
+    expect(getBenchmarkEligibility(entry)).toEqual({
+      eligible: false,
+      reason: "reference_provenance_unavailable",
+    });
+    expect(assessBenchmarkEntry(entry, 0.0016).isScorable).toBe(false);
+  });
+
   it("filters and sorts benchmark rows by verdict and absolute error", () => {
     const accurate = makeEntry({ id: "accurate", algorithm: "vqe", energy: -1.1372 });
     const inaccurate = makeEntry({ id: "inaccurate", algorithm: "qse", energy: -1.12 });
@@ -380,6 +391,7 @@ describe("benchmark molecule utilities", () => {
       algorithm: "kqd",
       preset: { ...preset, key: "custom", references: { hf: 0, fci: null, source: "test" } },
       energy: -1.12,
+      classicalRefs: null,
     });
 
     expect(filterBenchmarkRows([accurate, inaccurate, unscored], 0.0016, "accurate")).toEqual([
