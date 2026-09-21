@@ -102,6 +102,26 @@ def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
     }
 
 
+def test_normalize_result_preserves_indeterminate_scientific_status() -> None:
+    normalized = normalize_result_for_persistence(
+        {
+            "algorithm": "kqd",
+            "energy": -1.0,
+            "iterations": 1,
+            "converged": True,
+            "algorithm_metrics": {
+                "convergence": {
+                    "scientific_converged": None,
+                    "convergence_failure_reason": "full_space_residual_unavailable",
+                }
+            },
+        }
+    )
+
+    assert normalized[-1]["scientific_converged"] is None
+    assert normalized[5]["benchmark_provenance"]["energy"]["scientific_converged"] is None
+
+
 @pytest.mark.parametrize(
     "result",
     [

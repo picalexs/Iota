@@ -1278,7 +1278,7 @@ def test_normalize_result_accepts_stable_branch_projected_spectrum(algorithm: st
                 "dropped_rank": 0,
             },
         )
-        source = "lowest_krylov_ritz_value"
+        source = "projected_branch_diagnostic"
     else:
         result = QFDResult(
             algorithm=algorithm,
@@ -1295,7 +1295,7 @@ def test_normalize_result_accepts_stable_branch_projected_spectrum(algorithm: st
                 "dropped_rank": 0,
             },
         )
-        source = "lowest_filter_eigenvalue"
+        source = "projected_branch_diagnostic"
 
     normalized = normalize_result(result)
 

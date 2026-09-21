@@ -372,6 +372,11 @@ def _extract_energy_provenance(
     if not isinstance(reference_basis, str):
         reference_basis = None
 
+    convergence = metrics.get("convergence")
+    convergence = convergence if isinstance(convergence, dict) else {}
+    canonical_scientific_status = convergence.get("scientific_converged")
+    canonical_diagnostic = convergence.get("projected_solve_is_diagnostic") is True
+
     if not _projected_energy_is_reportable(result=result, metrics=metrics):
         return {
             "final_energy": None,
@@ -399,16 +404,23 @@ def _extract_energy_provenance(
             "signed_error": signed_error,
         }
 
-    return {
+    provenance = {
         "final_energy": final_energy,
         "best_observed_energy": best_observed_energy,
         "reported_energy": reported_energy,
         "reported_energy_is_valid": reported_energy is not None,
-        "reported_energy_source": source,
+        "reported_energy_source": (
+            "projected_branch_diagnostic" if canonical_diagnostic else source
+        ),
         "reference_energy": reference_energy,
         "reference_basis": reference_basis,
         "signed_error": signed_error,
     }
+    if "scientific_converged" in convergence:
+        provenance["scientific_converged"] = canonical_scientific_status
+    if canonical_diagnostic:
+        provenance["projected_solve_is_diagnostic"] = True
+    return provenance
 
 
 def _first_mapping(*values: Any) -> dict[str, Any]:
