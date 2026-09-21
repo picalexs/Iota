@@ -279,12 +279,11 @@ function completedAccuracyState(
 }
 
 function getDisplayReferences({ preset, rows }: BenchmarkGroupedRows) {
-  return (
-    rows.find((entry) => entry.classicalRefs)?.classicalRefs ?? {
-      hf: preset.references.hf,
-      fci: preset.references.fci,
-    }
-  );
+  const runtimeReferences = rows.find((entry) => entry.classicalRefs)?.classicalRefs;
+  if (runtimeReferences) {
+    return { ...runtimeReferences, label: "CASCI active-space" };
+  }
+  return { ...preset.references, label: "Preset reference" };
 }
 
 function runRowClassName({
@@ -451,7 +450,11 @@ function BenchmarkResultGroup({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground md:shrink-0">
           {displayRefs.hf !== 0 && <span>HF: {displayRefs.hf.toFixed(5)} Ha</span>}
-          {displayRefs.fci !== null && <span>Ref: {displayRefs.fci.toFixed(5)} Ha</span>}
+          {displayRefs.fci !== null && (
+            <span>
+              {displayRefs.label}: {displayRefs.fci.toFixed(5)} Ha
+            </span>
+          )}
           {onMoleculeAction ? (
             <BenchmarkMoleculeActions
               entries={getMoleculeActionEntries?.(preset.key) ?? rows}

@@ -302,7 +302,7 @@ function CompletedOutcome({ outcome }: Readonly<{ outcome: BuiltRunOutcome }>) {
       <OutcomeStat
         label="Chemical accuracy"
         value={accuracy ? formatAccuracyVerdict(accuracy.verdict) : "Unscored"}
-        helper={accuracy?.isScorable ? undefined : "No FCI/Exact reference available."}
+        helper={accuracy?.isScorable ? undefined : "No CASCI active-space reference available."}
       />
       <OutcomeStat label="Energy" value={`${result.energy.toFixed(6)} Ha`} />
       <IterationStat

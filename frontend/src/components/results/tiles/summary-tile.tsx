@@ -176,7 +176,7 @@ function formatAccuracyDeltaText(
       return `+${deltaFromThresholdMha.toFixed(2)} mHa over ${thresholdMha.toFixed(2)} mHa threshold`;
     }
 
-    return `${absErrorMha.toFixed(2)} mHa difference from FCI/Exact · ${Math.abs(
+    return `${absErrorMha.toFixed(2)} mHa difference from CASCI active-space · ${Math.abs(
       deltaFromThresholdMha,
     ).toFixed(2)} mHa under ${thresholdMha.toFixed(2)} mHa threshold`;
   }

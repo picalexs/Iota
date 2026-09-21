@@ -126,9 +126,9 @@ function getDeltaAxisLabels(fciEnergy: number | undefined) {
   }
 
   return {
-    deltaLabel: "|E-FCI|",
-    logAxisLabel: "log10|E-FCI|",
-    logReferenceLabel: "FCI/Exact",
+    deltaLabel: "|E-CASCI|",
+    logAxisLabel: "log10|E-CASCI|",
+    logReferenceLabel: "CASCI active-space",
   };
 }
 
@@ -217,7 +217,7 @@ function buildReferenceLines(
   if (fciEnergy !== undefined) {
     lines.push({
       y: fciEnergy,
-      label: `FCI ${fciEnergy.toFixed(5)} Ha`,
+      label: `CASCI ${fciEnergy.toFixed(5)} Ha`,
       color: theme.chart3,
       dashed: true,
     });
@@ -258,7 +258,7 @@ function buildLegendItems({
 
   if (energyAxisMode === "linear" && fciEnergy !== undefined) {
     items.push({
-      label: `FCI/Exact ${fciEnergy.toFixed(5)} Ha`,
+      label: `CASCI active-space ${fciEnergy.toFixed(5)} Ha`,
       color: theme.chart3,
       dashed: true,
     });
@@ -623,7 +623,7 @@ export function ConvergenceTile({
   return (
     <DashboardTile
       title="Convergence"
-      helpText="Energy vs iteration: solid line tracks the best energy seen so far. Convergence is diagnostic; chemical accuracy is the outcome target. Because Hartree energies are often negative, the log scale plots log10 distance to FCI/Exact when available, otherwise to the best visible energy."
+      helpText="Energy vs iteration: solid line tracks the best energy seen so far. Convergence is diagnostic; chemical accuracy is the outcome target. Because Hartree energies are often negative, the log scale plots log10 distance to the CASCI active-space reference when available, otherwise to the best visible energy."
       editMode={editMode}
     >
       {pending ? (
