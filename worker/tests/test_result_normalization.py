@@ -77,7 +77,7 @@ def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
     metrics = normalized[5]
     assert metrics is not None
     assert metrics["benchmark_provenance"] == {
-        "schema_version": 1,
+        "schema_version": 2,
         "execution": {
             "requested_target": "ibm_runtime",
             "actual_execution_target": "local_classical",
@@ -94,6 +94,9 @@ def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
             "noise_fingerprint": None,
         },
         "work_ledger": {"ledger_version": 1, "primitive_run_calls": 2},
+        "reference": {},
+        "benchmark_eligible": False,
+        "benchmark_exclusion_reason": "reference_provenance_unavailable",
         "energy": {
             "reported_energy": -1.2,
             "reported_energy_is_valid": True,
@@ -102,6 +105,28 @@ def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
             "scientific_converged": False,
         },
     }
+
+
+def test_normalize_marks_valid_casci_result_benchmark_eligible() -> None:
+    normalized = normalize_result_for_persistence(
+        {
+            "algorithm": "vqe",
+            "energy": -1.13,
+            "iterations": 3,
+            "converged": True,
+            "algorithm_metrics": {
+                "classical_references": {"fci": -1.15},
+                "reference_provenance": {
+                    "method": "CASCI",
+                    "validity_status": "valid",
+                },
+            },
+        }
+    )
+
+    benchmark_provenance = normalized[5]["benchmark_provenance"]
+    assert benchmark_provenance["benchmark_eligible"] is True
+    assert benchmark_provenance["benchmark_exclusion_reason"] is None
 
 
 def test_normalize_result_preserves_indeterminate_scientific_status() -> None:

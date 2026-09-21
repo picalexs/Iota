@@ -495,6 +495,19 @@ export function getBenchmarkEligibility(entry: BenchmarkEntry): {
   }
 
   const metadata = entry.executionMetadata;
+  if (metadata?.benchmarkEligible === false) {
+    const directReason = metadata.benchmarkExclusionReason;
+    if (directReason === "projected_solve_diagnostic") {
+      return { eligible: false, reason: "projected_solve_diagnostic" };
+    }
+    if (directReason === "reported_energy_invalid") {
+      return { eligible: false, reason: "reported_energy_invalid" };
+    }
+    if (directReason === "reference_provenance_unavailable") {
+      return { eligible: false, reason: "reference_provenance_unavailable" };
+    }
+    return { eligible: false, reason: "scientific_convergence_not_established" };
+  }
   if (metadata?.reportedEnergyIsValid === false) {
     return { eligible: false, reason: "reported_energy_invalid" };
   }

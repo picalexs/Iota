@@ -29,6 +29,8 @@ export interface RunExecutionMetadata {
   reportedEnergyIsValid?: boolean | null;
   projectedSolveIsDiagnostic?: boolean | null;
   scientificConverged?: boolean | null;
+  benchmarkEligible?: boolean | null;
+  benchmarkExclusionReason?: string | null;
   noiseSource?: string | null;
   noiseFingerprint?: string | null;
   workLedger?: Record<string, unknown> | null;
@@ -279,6 +281,7 @@ interface ExecutionMetadataSources {
   transpilationSummary: Record<string, unknown> | null;
   resultExecution: Record<string, unknown> | null;
   resultEnergy: Record<string, unknown> | null;
+  benchmarkProvenance: Record<string, unknown> | null;
   ibmSubmittedPayload: Record<string, unknown> | null;
   ibmStatusPayload: Record<string, unknown> | null;
 }
@@ -334,6 +337,7 @@ function getExecutionMetadataSources(
     transpilationSummary,
     resultExecution,
     resultEnergy,
+    benchmarkProvenance: resultProvenance,
     ibmSubmittedPayload,
     ibmStatusPayload,
   };
@@ -390,6 +394,7 @@ function getExecutionScalarFields({
   execution,
   transpilationSummary,
   resultExecution,
+  benchmarkProvenance,
 }: ExecutionMetadataSources): Pick<
   RunExecutionMetadata,
   | "actualExecutionTarget"
@@ -405,6 +410,8 @@ function getExecutionScalarFields({
   | "reportedEnergyIsValid"
   | "projectedSolveIsDiagnostic"
   | "scientificConverged"
+  | "benchmarkEligible"
+  | "benchmarkExclusionReason"
   | "noiseSource"
   | "noiseFingerprint"
   | "optimizationLevel"
@@ -472,6 +479,14 @@ function getExecutionScalarFields({
     reportedEnergyIsValid: firstBoolean(resultEnergy?.reported_energy_is_valid),
     projectedSolveIsDiagnostic: firstBoolean(resultEnergy?.projected_solve_is_diagnostic),
     scientificConverged: firstBoolean(resultEnergy?.scientific_converged, result?.converged),
+    benchmarkEligible: firstBoolean(
+      benchmarkProvenance?.benchmark_eligible,
+      benchmarkProvenance?.benchmarkEligible,
+    ),
+    benchmarkExclusionReason: firstString(
+      benchmarkProvenance?.benchmark_exclusion_reason,
+      benchmarkProvenance?.benchmarkExclusionReason,
+    ),
     noiseSource: firstString(
       pickNestedRecord(resultExecution?.noise_summary)?.source,
       pickNestedRecord(execution?.noise_summary)?.source,

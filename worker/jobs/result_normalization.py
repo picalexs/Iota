@@ -458,8 +458,27 @@ def _build_benchmark_provenance(
 ) -> dict[str, Any]:
     execution = _first_mapping(metrics.get("backend_execution"))
     noise_summary = _first_mapping(execution.get("noise_summary"))
+    reference = _first_mapping(metrics.get("reference_provenance"))
+    reported_energy_is_valid = energy_provenance.get("reported_energy_is_valid") is True
+    projected_solve_is_diagnostic = bool(
+        energy_provenance.get("projected_solve_is_diagnostic", False)
+    )
+    scientific_converged = energy_provenance.get("scientific_converged", converged)
+    benchmark_exclusion_reason: str | None = None
+    if reference.get("validity_status") != "valid":
+        benchmark_exclusion_reason = "reference_provenance_unavailable"
+    elif str(reference.get("method") or "").upper() != "CASCI":
+        benchmark_exclusion_reason = "reference_method_unsupported"
+    elif energy_provenance.get("reference_energy") is None:
+        benchmark_exclusion_reason = "missing_reference_energy"
+    elif not reported_energy_is_valid:
+        benchmark_exclusion_reason = "reported_energy_invalid"
+    elif projected_solve_is_diagnostic:
+        benchmark_exclusion_reason = "projected_solve_diagnostic"
+    elif scientific_converged is not True:
+        benchmark_exclusion_reason = "scientific_convergence_not_established"
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "execution": {
             "requested_target": result.get("backend_target")
             or execution.get("backend_target"),
@@ -477,13 +496,14 @@ def _build_benchmark_provenance(
             "noise_fingerprint": noise_summary.get("model_fingerprint_sha256"),
         },
         "work_ledger": _benchmark_work_ledger(metrics),
+        "reference": reference,
+        "benchmark_eligible": benchmark_exclusion_reason is None,
+        "benchmark_exclusion_reason": benchmark_exclusion_reason,
         "energy": {
             "reported_energy": energy_provenance.get("reported_energy"),
             "reported_energy_is_valid": energy_provenance.get("reported_energy_is_valid"),
             "reported_energy_source": energy_provenance.get("reported_energy_source"),
-            "projected_solve_is_diagnostic": bool(
-                energy_provenance.get("projected_solve_is_diagnostic", False)
-            ),
-            "scientific_converged": energy_provenance.get("scientific_converged", converged),
+            "projected_solve_is_diagnostic": projected_solve_is_diagnostic,
+            "scientific_converged": scientific_converged,
         },
     }

@@ -139,6 +139,8 @@ describe("execution metadata helpers", () => {
           },
         },
         benchmark_provenance: {
+          benchmark_eligible: false,
+          benchmark_exclusion_reason: "projected_solve_diagnostic",
           energy: {
             reported_energy_source: "stabilized_projected_diagnostic",
             reported_energy_is_valid: true,
@@ -170,6 +172,8 @@ describe("execution metadata helpers", () => {
     expect(metadata.reportedEnergyIsValid).toBe(true);
     expect(metadata.projectedSolveIsDiagnostic).toBe(true);
     expect(metadata.scientificConverged).toBe(false);
+    expect(metadata.benchmarkEligible).toBe(false);
+    expect(metadata.benchmarkExclusionReason).toBe("projected_solve_diagnostic");
     expect(metadata.ibmJobId).toBe("job-from-result");
     expect(metadata.optimizationLevel).toBe(3);
     expect(metadata.depth).toBe(42);
