@@ -235,6 +235,12 @@ def run_selected_ci_batches(
         **best_batch_summary,
         "best_batch": int(best_batch_index + 1),
         "best_batch_energy": round(energy_value, 8),
+        "batch_energy_min": round(float(min(batch_energies)), 8),
+        "batch_energy_max": round(float(max(batch_energies)), 8),
+        "batch_energy_spread": round(
+            float(max(batch_energies) - min(batch_energies)),
+            8,
+        ),
         "selected_ci_dimension": int(best_batch_summary["sci_dimension"]),
         "selected_ci_fraction": round(best_batch_fraction, 6),
         "batch_sci_dimensions": [int(summary["sci_dimension"]) for summary in batch_summaries],
@@ -256,6 +262,8 @@ def run_selected_ci_batches(
         "exact_sector_solve": bool(
             int(best_batch_summary["sci_dimension"]) >= int(full_sci_dimension)
         ),
+        "solver_convergence_status": "not_reported_by_qiskit_addon",
+        "solver_options": dict(options.sci_solver_options),
         "occupancies_source": "mean_over_batches",
         "average_occupancies_alpha": average_occupancies[0].tolist(),
         "average_occupancies_beta": average_occupancies[1].tolist(),
