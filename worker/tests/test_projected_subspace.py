@@ -5,6 +5,7 @@ import pytest
 
 from worker.chemistry.projected_subspace import (
     orthonormalize_candidate,
+    projected_convergence_reason,
     projected_matrix_converged,
 )
 
@@ -51,6 +52,34 @@ def test_projected_matrix_converged_applies_the_shared_stability_gate(
     expected: bool,
 ) -> None:
     assert projected_matrix_converged(diagnostics) is expected
+
+
+@pytest.mark.parametrize(
+    ("relative_residual", "expected_reason"),
+    [
+        (1e-6, "converged"),
+        (np.nextafter(1e-6, 0.0), "converged"),
+        (np.nextafter(1e-6, np.inf), "residual_tolerance_not_met"),
+        (np.nan, "residual_tolerance_not_met"),
+        (np.inf, "residual_tolerance_not_met"),
+    ],
+)
+def test_projected_convergence_reason_has_explicit_residual_boundaries(
+    relative_residual: float,
+    expected_reason: str,
+) -> None:
+    assert (
+        projected_convergence_reason(
+            {
+                "stability_state": "stable",
+                "overlap_condition": 1.0,
+                "overlap_min_eigenvalue": 1.0,
+            },
+            relative_residual=relative_residual,
+            residual_tolerance=1e-6,
+        )
+        == expected_reason
+    )
 
 
 def test_orthonormalize_candidate_projects_and_normalizes() -> None:
