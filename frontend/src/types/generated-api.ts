@@ -1398,6 +1398,22 @@ export interface components {
             shots?: number | null;
         };
         /**
+         * ChemistryOptions
+         * @description Optional classical chemistry accelerator choices.
+         */
+        ChemistryOptions: {
+            /**
+             * Reference Device
+             * @description Device for the PySCF reference SCF stage. GPU uses optional GPU4PySCF; AUTO uses it when installed and otherwise keeps the CPU path.
+             */
+            reference_device?: ("CPU" | "GPU" | "AUTO") | null;
+            /**
+             * Selected Ci Device
+             * @description Device for SQD selected-CI stages. GPU uses optional SBD; AUTO falls back to the CPU selected-CI solver when SBD is unavailable.
+             */
+            selected_ci_device?: ("CPU" | "GPU" | "AUTO") | null;
+        };
+        /**
          * ConfigChoiceMetadata
          * @description Metadata for a selectable run-configuration registry item.
          */
@@ -2261,6 +2277,7 @@ export interface components {
             basis_set_override?: string | null;
             /** Chemical Accuracy Target Ha */
             chemical_accuracy_target_ha?: number | null;
+            chemistry_options?: components["schemas"]["ChemistryOptions"] | null;
             /**
              * Client Request Id
              * @description Optional idempotency key
