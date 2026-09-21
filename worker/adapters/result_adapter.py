@@ -1008,8 +1008,13 @@ def _projected_convergence_metadata(
             )
         else:
             scientific_converged = bool(result.converged) and projected_converged
-            metadata["scientific_converged"] = scientific_converged
-            if not scientific_converged:
+            if scientific_converged:
+                metadata["scientific_converged"] = None
+                metadata["convergence_failure_reason"] = (
+                    "scientific_completeness_evidence_unavailable"
+                )
+            else:
+                metadata["scientific_converged"] = False
                 metadata["convergence_failure_reason"] = "solver_reported_not_converged"
     return metadata
 
@@ -1063,8 +1068,13 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
             )
             return metadata
         scientific_converged = bool(result.converged) and projected_converged
-        metadata["scientific_converged"] = scientific_converged
-        if not scientific_converged:
+        if scientific_converged:
+            metadata["scientific_converged"] = None
+            metadata["convergence_failure_reason"] = (
+                "scientific_completeness_evidence_unavailable"
+            )
+        else:
+            metadata["scientific_converged"] = False
             metadata["convergence_failure_reason"] = "solver_reported_not_converged"
     return metadata
 
