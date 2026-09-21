@@ -6,6 +6,7 @@ import numpy as np
 
 from worker.chemistry.algorithms.qse.basis import (
     accept_basis_candidate,
+    build_basis_selection_summary,
     build_excitation_basis,
 )
 
@@ -70,3 +71,16 @@ def test_build_excitation_basis_emits_basis_progress() -> None:
     assert events[0]["step"] == "build_basis"
     assert events[0]["completed_iterations"] == 1
     assert events[0]["excitation_kind"] == "reference"
+
+
+def test_basis_selection_summary_distinguishes_exhausted_pool() -> None:
+    summary = build_basis_selection_summary(
+        [("reference", (), ())],
+        candidate_selection_policy="fermionic_generator_order",
+        excitation_level="singles",
+        dimension_cap=2,
+        actual_dimension=1,
+    )
+
+    assert summary["dimension_cap_reached"] is False
+    assert summary["basis_termination_reason"] == "candidate_pool_exhausted"

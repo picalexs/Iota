@@ -107,6 +107,7 @@ def test_execute_dense_qse_collects_basis_without_enabling_progress_work() -> No
     selection = outcome.diagnostics["basis_selection"]
     assert selection["selected_specs_complete"] is True
     assert selection["selected_excitation_specs"][1]["kind"] == "single"
+    assert selection["basis_termination_reason"] == "target_rank_reached"
 
 
 def test_execute_sector_qse_preserves_matrix_free_metadata() -> None:
