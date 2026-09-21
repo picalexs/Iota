@@ -133,6 +133,7 @@ def export_source(
         "runs.csv",
         "summaries/summary.json",
         "summaries/by_algorithm.csv",
+        "summaries/by_algorithm_path.csv",
         "summaries/by_molecule.csv",
         "summaries/best_algorithm_by_molecule.csv",
     ]

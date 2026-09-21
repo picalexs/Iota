@@ -102,8 +102,8 @@ def test_plot_from_folder_writes_manifest_and_all_formats(tmp_path: Path) -> Non
     assert result["source_type"] == "folder"
     manifest = json.loads((output_dir / "plot_manifest.json").read_text(encoding="utf-8"))
     assert manifest["source_row_count"] == 3
-    assert manifest["plots"]["error_vs_runtime"]["plotted_count"] == 2
-    assert manifest["plots"]["error_vs_runtime"]["excluded_count"] == 0
+    assert manifest["plots"]["error_vs_runtime"]["plotted_count"] == 1
+    assert manifest["plots"]["error_vs_runtime"]["excluded_count"] == 2
     assert len(manifest["files"]) == 8
     for filename in manifest["files"]:
         path = output_dir / filename

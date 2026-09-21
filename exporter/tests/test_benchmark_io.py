@@ -104,6 +104,31 @@ def test_api_normalization_selects_compact_result_and_seed_roles() -> None:
     assert "execution_segments" not in row
 
 
+def test_api_normalization_excludes_projected_diagnostics_from_comparison() -> None:
+    run_export = _run_export()
+    run_export["result"]["algorithm_metrics"]["benchmark_provenance"]["energy"] = {
+        "reported_energy_is_valid": True,
+        "projected_solve_is_diagnostic": True,
+        "reported_energy_source": "projected_branch_diagnostic",
+    }
+    run_export["result"]["algorithm_metrics"]["convergence"] = {
+        "scientific_converged": False,
+        "convergence_failure_reason": "projected_metric_rank_reduced",
+    }
+
+    row, _ = normalize_api_row(
+        benchmark=_benchmark(),
+        entry=_benchmark()["entries"][0],
+        run_export=run_export,
+    )
+
+    assert row["projected_solve_is_diagnostic"] is True
+    assert row["scientific_converged"] is False
+    assert row["primary_energy_source"] == "projected_branch_diagnostic"
+    assert row["benchmark_eligible"] is False
+    assert row["benchmark_exclusion_reason"] == "projected_solve_diagnostic"
+
+
 class FakeApi:
     def __init__(self, benchmark: dict, run_export: dict) -> None:
         self.benchmark = benchmark
@@ -250,3 +275,31 @@ def test_summary_uses_successful_results_only_and_handles_all_failed() -> None:
     )
     assert failed_summary["best_algorithm_by_molecule"][0]["algorithm"] is None
     assert failed_summary["best_algorithm_by_molecule"][0]["reason"]
+
+
+def test_summary_excludes_completed_diagnostic_rows_from_successes() -> None:
+    rows = [
+        {
+            "algorithm": "vqe",
+            "molecule": "H2",
+            "status": "completed",
+            "absolute_error": 0.2,
+            "converged": True,
+            "benchmark_eligible": True,
+        },
+        {
+            "algorithm": "kqd",
+            "molecule": "H2",
+            "status": "completed",
+            "absolute_error": 0.001,
+            "converged": False,
+            "projected_solve_is_diagnostic": True,
+            "benchmark_eligible": False,
+            "benchmark_exclusion_reason": "projected_solve_diagnostic",
+        },
+    ]
+
+    summary = summarize_rows(rows)
+
+    assert summary["successful_result_count"] == 1
+    assert summary["best_algorithm_by_molecule"][0]["algorithm"] == "vqe"

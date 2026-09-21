@@ -17,7 +17,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v1"
+EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v2"
 CANONICAL_FIELDS = (
     "benchmark_id",
     "benchmark_name",
@@ -39,10 +39,23 @@ CANONICAL_FIELDS = (
     "noise_fingerprint",
     "actual_execution_target",
     "actual_path_class",
+    "reference_method",
+    "reference_solver_path",
+    "reference_basis",
+    "reference_active_space",
+    "reference_backend_target",
+    "reference_validity_status",
+    "reference_hamiltonian_sha256",
     "sampler_requested_shots_total",
     "seed",
     "seed_roles",
+    "seed_algorithm",
+    "seed_sampling",
+    "seed_simulator",
+    "seed_transpiler",
     "status",
+    "execution_generation",
+    "restarted_from_run_id",
     "created_at",
     "result_created_at",
     "runtime_seconds",
@@ -52,6 +65,13 @@ CANONICAL_FIELDS = (
     "absolute_error",
     "iterations",
     "converged",
+    "reported_energy_is_valid",
+    "projected_solve_is_diagnostic",
+    "scientific_converged",
+    "primary_energy_source",
+    "convergence_failure_reason",
+    "benchmark_eligible",
+    "benchmark_exclusion_reason",
     "error_message",
 )
 
@@ -309,6 +329,138 @@ def _config_seed(config: Mapping[str, Any], algorithm: str | None) -> tuple[int 
     return None, roles
 
 
+def _config_seeds(config: Mapping[str, Any], algorithm: str | None) -> dict[str, int | None]:
+    """Extract all reproducibility seed roles without collapsing them."""
+    advanced = _record(_first(config, "advanced_config", "advancedConfig"))
+    options = _record(_first(config, "backend_options", "backendOptions"))
+    algorithm_name = (algorithm or "").lower()
+    sampling = _record(_first(advanced, "base_sampling_options", "baseSamplingOptions"))
+    return {
+        "seed_algorithm": _integer(_first(advanced, "seed"))
+        if algorithm_name == "vqe"
+        else None,
+        "seed_sampling": _integer(
+            _first(sampling, "seed") if algorithm_name == "skqd" else _first(advanced, "seed")
+        )
+        if algorithm_name in {"sqd", "skqd"}
+        else None,
+        "seed_simulator": _integer(_first(options, "seed_simulator", "seedSimulator")),
+        "seed_transpiler": _integer(_first(options, "seed_transpiler", "seedTranspiler")),
+    }
+
+
+def _benchmark_quality_fields(
+    *,
+    result: Mapping[str, Any] | None,
+    status: str,
+    final_energy: float | None,
+    reference_energy: float | None,
+    converged: bool | None,
+) -> dict[str, Any]:
+    """Extract scientific eligibility without deleting diagnostic results."""
+    result_record = _record(result)
+    metrics = _record(_first(result_record, "algorithm_metrics", "algorithmMetrics"))
+    provenance = _record(_first(metrics, "benchmark_provenance", "benchmarkProvenance"))
+    energy = _record(_first(provenance, "energy"))
+    convergence = _record(_first(metrics, "convergence"))
+    policy = _record(_first(metrics, "energy_policy", "energyPolicy"))
+    reference = _record(_first(metrics, "reference_provenance", "referenceProvenance"))
+
+    reported_valid = _boolean(
+        _first(
+            energy,
+            "reported_energy_is_valid",
+            "reportedEnergyIsValid",
+            default=_first(result_record, "reported_energy_is_valid", "reportedEnergyIsValid"),
+        )
+    )
+    diagnostic = _boolean(
+        _first(
+            energy,
+            "projected_solve_is_diagnostic",
+            "projectedSolveIsDiagnostic",
+            default=_first(
+                convergence,
+                "projected_solve_is_diagnostic",
+                "projectedSolveIsDiagnostic",
+            ),
+        )
+    )
+    scientific = _boolean(
+        _first(
+            energy,
+            "scientific_converged",
+            "scientificConverged",
+            default=_first(
+                convergence,
+                "scientific_converged",
+                "scientificConverged",
+                default=_first(result_record, "scientific_converged", "scientificConverged"),
+            ),
+        )
+    )
+    primary_source = _text(
+        _first(
+            energy,
+            "reported_energy_source",
+            "reportedEnergySource",
+            default=_first(
+                policy,
+                "primary_energy_source",
+                "primaryEnergySource",
+                default=_first(result_record, "reported_energy_source", "reportedEnergySource"),
+            ),
+        )
+    )
+    failure_reason = _text(
+        _first(
+            convergence,
+            "convergence_failure_reason",
+            "convergenceFailureReason",
+            default=_first(energy, "reported_energy_invalid_reason", "reportedEnergyInvalidReason"),
+        )
+    )
+    reference_method = _text(_first(reference, "method", "reference_method", "referenceMethod"))
+    reference_status = _text(_first(reference, "validity_status", "validityStatus"))
+
+    reason: str | None = None
+    if status != "completed":
+        reason = f"status_{status}"
+    elif final_energy is None or reference_energy is None:
+        reason = "missing_energy_or_reference"
+    elif reported_valid is False:
+        reason = "reported_energy_invalid"
+    elif diagnostic is True:
+        reason = "projected_solve_diagnostic"
+    elif scientific is False or converged is False:
+        reason = "scientific_convergence_not_established"
+    elif reference_status is not None and reference_status != "valid":
+        reason = "reference_provenance_invalid"
+    elif reference_method is not None and reference_method.upper() != "CASCI":
+        reason = "reference_method_unsupported"
+
+    return {
+        "reference_method": reference_method,
+        "reference_solver_path": _text(_first(reference, "solver_path", "solverPath")),
+        "reference_basis": _text(_first(reference, "basis")),
+        "reference_active_space": _first(reference, "active_space", "activeSpace"),
+        "reference_backend_target": _text(
+            _first(reference, "backend_target", "backendTarget")
+        ),
+        "reference_validity_status": reference_status,
+        "reference_hamiltonian_sha256": _text(
+            _first(reference, "hamiltonian_sha256", "hamiltonianSha256")
+        ),
+        "reported_energy_is_valid": reported_valid,
+        "projected_solve_is_diagnostic": diagnostic,
+        "scientific_converged": scientific,
+        "primary_energy_source": primary_source,
+        "convergence_failure_reason": failure_reason,
+        "benchmark_eligible": reason is None,
+        "benchmark_exclusion_reason": reason,
+    }
+
+
 def _runtime_seconds(
     run: Mapping[str, Any],
     result: Mapping[str, Any],
@@ -394,6 +546,15 @@ def normalize_api_row(
     status = _normalize_status(_first(run, "status") or _first(entry, "status"))
     if run_export is None:
         status = _normalize_status(_first(entry, "status", default="missing"))
+    converged = _boolean(_first(result, "converged"))
+    quality_fields = _benchmark_quality_fields(
+        result=result,
+        status=status,
+        final_energy=final_energy,
+        reference_energy=reference_energy,
+        converged=converged,
+    )
+    seed_fields = _config_seeds(config, algorithm)
 
     row = {
         "benchmark_id": benchmark_id,
@@ -411,9 +572,13 @@ def normalize_api_row(
         "backend_target": _text(_first(run, "backend_target", "backendTarget")),
         "backend_name": _backend_name(config),
         **execution_fields,
+        **quality_fields,
         "seed": seed,
         "seed_roles": seed_roles,
+        **seed_fields,
         "status": status,
+        "execution_generation": _integer(_first(run, "execution_generation")),
+        "restarted_from_run_id": _text(_first(run, "restarted_from_run_id")),
         "created_at": _safe_iso(_first(run, "created_at", "createdAt")),
         "result_created_at": _safe_iso(_first(result, "created_at", "createdAt")),
         "runtime_seconds": runtime_seconds,
@@ -422,7 +587,7 @@ def normalize_api_row(
         "signed_error": signed_error,
         "absolute_error": absolute_error,
         "iterations": _integer(_first(result, "iterations")),
-        "converged": _boolean(_first(result, "converged")),
+        "converged": converged,
         "error_message": _text(
             _first(entry, "errorMessage", "error_message")
             or _first(_record(_first(run, "metadata", "run_metadata")), "error_message", "errorMessage")
@@ -472,6 +637,19 @@ def normalize_folder_row(
     status = _normalize_status(_first(source, "status"))
     if status == "missing" and _first(source, "error"):
         status = "failed"
+    converged = _boolean(_first(source, "converged"))
+    quality_fields = _benchmark_quality_fields(
+        result=source,
+        status=status,
+        final_energy=final_energy,
+        reference_energy=reference_energy,
+        converged=converged,
+    )
+    seed_fields = _config_seeds(source, algorithm)
+    for field_name in seed_fields:
+        explicit_seed = _number(_first(source, field_name))
+        if explicit_seed is not None:
+            seed_fields[field_name] = _integer(explicit_seed)
 
     execution_fields = _benchmark_execution_fields(result=source, config=source)
     for field in (
@@ -505,9 +683,13 @@ def normalize_folder_row(
         "backend_target": _text(_first(source, "backend_target", "backendTarget")),
         "backend_name": _text(_first(source, "backend_name", "backendName")),
         **execution_fields,
+        **quality_fields,
         "seed": _integer(_first(source, "seed")),
         "seed_roles": _parse_seed_roles(_first(source, "seed_roles", "seedRoles")),
+        **seed_fields,
         "status": status,
+        "execution_generation": _integer(_first(source, "execution_generation")),
+        "restarted_from_run_id": _text(_first(source, "restarted_from_run_id")),
         "created_at": _safe_iso(_first(source, "created_at", "createdAt")),
         "result_created_at": _safe_iso(_first(source, "result_created_at", "resultCreatedAt")),
         "runtime_seconds": runtime,
@@ -516,7 +698,7 @@ def normalize_folder_row(
         "signed_error": signed_error,
         "absolute_error": absolute_error,
         "iterations": _integer(_first(source, "iterations")),
-        "converged": _boolean(_first(source, "converged")),
+        "converged": converged,
         "error_message": _text(_first(source, "error_message", "errorMessage", "error")),
     }
     return canonical | {
@@ -853,9 +1035,25 @@ def _successful_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any
     return [
         row
         for row in rows
-        if str(row.get("status") or "").lower() in SUCCESS_STATUSES
+        if _benchmark_row_is_eligible(row)
         and _number(row.get("absolute_error")) is not None
     ]
+
+
+def _benchmark_row_is_eligible(row: Mapping[str, Any]) -> bool:
+    """Return whether a row may contribute to benchmark comparisons."""
+    explicit = row.get("benchmark_eligible")
+    if isinstance(explicit, bool):
+        return explicit
+    if str(row.get("status") or "").lower() not in SUCCESS_STATUSES:
+        return False
+    if row.get("reported_energy_is_valid") is False:
+        return False
+    if row.get("projected_solve_is_diagnostic") is True:
+        return False
+    if row.get("scientific_converged") is False or row.get("converged") is False:
+        return False
+    return True
 
 
 def _group_summary(rows: list[Mapping[str, Any]], key: str) -> list[dict[str, Any]]:
@@ -898,6 +1096,13 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     successful = _successful_rows(rows)
     by_algorithm = _group_summary(rows, "algorithm")
     by_molecule = _group_summary(rows, "molecule")
+    by_algorithm_path = _group_summary(
+        [
+            dict(row, algorithm_path=_algorithm_path_label(row))
+            for row in rows
+        ],
+        "algorithm_path",
+    )
     best: list[dict[str, Any]] = []
     for molecule, molecule_rows in sorted(
         itertools_group(rows, "molecule"), key=lambda item: item[0]
@@ -935,9 +1140,16 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "successful_result_count": len(successful),
         "status_counts": dict(sorted(status_counts.items())),
         "by_algorithm": by_algorithm,
+        "by_algorithm_path": by_algorithm_path,
         "by_molecule": by_molecule,
         "best_algorithm_by_molecule": best,
     }
+
+
+def _algorithm_path_label(row: Mapping[str, Any]) -> str:
+    algorithm = str(row.get("algorithm") or "UNKNOWN")
+    path = str(row.get("actual_path_class") or "unknown_path")
+    return f"{algorithm} · {path}"
 
 
 def itertools_group(
@@ -1018,6 +1230,7 @@ def write_summary_files(summary: Mapping[str, Any], output_dir: Path) -> None:
         json.dumps(dict(summary), indent=2) + "\n", encoding="utf-8"
     )
     write_records_csv(summary["by_algorithm"], summaries_dir / "by_algorithm.csv")
+    write_records_csv(summary["by_algorithm_path"], summaries_dir / "by_algorithm_path.csv")
     write_records_csv(summary["by_molecule"], summaries_dir / "by_molecule.csv")
     write_records_csv(
         summary["best_algorithm_by_molecule"],
