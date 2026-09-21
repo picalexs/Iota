@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchMolecules, createMolecule, getMolecule, updateMolecule } from "@/api/molecules";
 import { createRun } from "@/api/runs";
 import type { MoleculePreset } from "@/lib/benchmark-presets";
+import type { RunExecutionMetadata } from "@/lib/results/execution-metadata";
 import type { BackendCapability, RunResponse } from "@/types/run";
 import {
   acquireMoleculeId,
@@ -77,6 +78,31 @@ function makeEntry(overrides: Partial<BenchmarkEntry>): BenchmarkEntry {
     classicalRefs: { hf: -1.116, fci: -1.137 },
     elapsedSeconds: null,
     latestEventSequence: 0,
+    ...overrides,
+  };
+}
+
+function makeExecutionMetadata(overrides: Partial<RunExecutionMetadata> = {}): RunExecutionMetadata {
+  return {
+    backendName: null,
+    selectionPolicy: null,
+    shots: null,
+    optimizationLevel: null,
+    aerMethod: null,
+    simulatorMethod: null,
+    primitiveFamily: null,
+    qubits: null,
+    depth: null,
+    twoQubitDepth: null,
+    seedSimulator: null,
+    seedTranspiler: null,
+    ibmJobId: null,
+    ibmStatus: null,
+    ibmQueuePosition: null,
+    ibmPubCount: null,
+    ibmTiming: null,
+    transpilationLayout: [],
+    usedPhysicalQubits: [],
     ...overrides,
   };
 }
@@ -343,11 +369,11 @@ describe("benchmark molecule utilities", () => {
   it("does not score projected diagnostics as benchmark results", () => {
     const entry = makeEntry({
       algorithm: "kqd",
-      executionMetadata: {
+      executionMetadata: makeExecutionMetadata({
         reportedEnergyIsValid: true,
         projectedSolveIsDiagnostic: true,
         scientificConverged: false,
-      },
+      }),
     });
 
     expect(getBenchmarkEligibility(entry)).toEqual({
@@ -359,11 +385,11 @@ describe("benchmark molecule utilities", () => {
 
   it("does not score scientifically unconverged results", () => {
     const entry = makeEntry({
-      executionMetadata: {
+      executionMetadata: makeExecutionMetadata({
         reportedEnergyIsValid: true,
         projectedSolveIsDiagnostic: false,
         scientificConverged: false,
-      },
+      }),
     });
 
     expect(getBenchmarkEligibility(entry)).toEqual({
