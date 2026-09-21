@@ -390,6 +390,7 @@ export type RunConfigValue =
   | EasyOptions
   | AdvancedConfig
   | BackendOptions
+  | ChemistryOptions
   | NoiseProfile
   | undefined;
 
