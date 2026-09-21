@@ -15,7 +15,11 @@ import { formatDuration } from "@/lib/format-duration";
 import { isTimedOutFailureMessage } from "@/lib/run-failure";
 import { cn } from "@/lib/utils";
 import type { BenchmarkEntry } from "./benchmark-utils";
-import { assessBenchmarkEntry } from "./benchmark-utils";
+import {
+  assessBenchmarkEntry,
+  benchmarkEligibilityMessage,
+  getBenchmarkEligibility,
+} from "./benchmark-utils";
 import { BenchmarkMoleculeActions } from "./benchmark-molecule-actions";
 import {
   BenchmarkResultRowActions,
@@ -211,6 +215,8 @@ function ChemicalAccuracyCell({
   }
   const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
   if (!assessment.isScorable) {
+    const eligibility = getBenchmarkEligibility(entry);
+    const message = benchmarkEligibilityMessage(eligibility.reason);
     return (
       <div className="flex items-center gap-3">
         <StatusIndicator
@@ -218,7 +224,7 @@ function ChemicalAccuracyCell({
           label=""
           showLabel={false}
           iconClassName="text-muted-foreground"
-          ariaLabel="Chemical accuracy unknown"
+          ariaLabel={`Chemical accuracy unavailable: ${message}`}
         />
         <span className="text-xs text-muted-foreground">-</span>
       </div>

@@ -67,6 +67,11 @@ export interface BenchmarkSubmitResult {
 
 export type BenchmarkAccuracyFilter = "all" | AccuracyVerdict;
 export type BenchmarkAccuracySort = "default" | "lowest_error" | "highest_error";
+export type BenchmarkEligibilityReason =
+  | "not_completed"
+  | "reported_energy_invalid"
+  | "projected_solve_diagnostic"
+  | "scientific_convergence_not_established";
 export const TERMINAL: Set<EntryStatus> = new Set(["completed", "failed", "cancelled"]);
 export const NON_EXECUTING: Set<EntryStatus> = new Set(["planned", "excluded"]);
 export const RUNNING_POLL_INTERVAL_MS = 3000;
@@ -480,6 +485,43 @@ export function effectiveRefs(entry: BenchmarkEntry): {
   return { hf: entry.preset.references.hf, fci: entry.preset.references.fci, computed: false };
 }
 
+export function getBenchmarkEligibility(entry: BenchmarkEntry): {
+  eligible: boolean;
+  reason: BenchmarkEligibilityReason | null;
+} {
+  if (entry.status !== "completed") {
+    return { eligible: false, reason: "not_completed" };
+  }
+
+  const metadata = entry.executionMetadata;
+  if (metadata?.reportedEnergyIsValid === false) {
+    return { eligible: false, reason: "reported_energy_invalid" };
+  }
+  if (metadata?.projectedSolveIsDiagnostic === true) {
+    return { eligible: false, reason: "projected_solve_diagnostic" };
+  }
+  if (metadata?.scientificConverged === false || entry.converged === false) {
+    return { eligible: false, reason: "scientific_convergence_not_established" };
+  }
+
+  return { eligible: true, reason: null };
+}
+
+export function benchmarkEligibilityMessage(reason: BenchmarkEligibilityReason | null): string {
+  switch (reason) {
+    case "not_completed":
+      return "row is not completed";
+    case "reported_energy_invalid":
+      return "reported energy is invalid";
+    case "projected_solve_diagnostic":
+      return "projected solve is diagnostic only";
+    case "scientific_convergence_not_established":
+      return "scientific convergence was not established";
+    default:
+      return "reference or energy data is unavailable";
+  }
+}
+
 export function extractRunErrorMessage(run: RunResponse): string | null {
   const metadata = run.metadata;
   if (!metadata || typeof metadata !== "object") return null;
@@ -506,7 +548,7 @@ export function getBenchmarkStats(entries: BenchmarkEntry[], chemicalAccuracyHa:
   for (const entry of entries) {
     if (entry.status !== "completed" || entry.energy === null) continue;
     const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
-    if (entry.converged === false) {
+    if (getBenchmarkEligibility(entry).reason === "scientific_convergence_not_established") {
       notConverged += 1;
     }
     if (!assessment.isScorable) {
@@ -539,13 +581,27 @@ export function assessBenchmarkEntry(
   energy = entry.energy,
 ): AccuracyAssessment {
   const refs = effectiveRefs(entry);
-  return assessChemicalAccuracy({
+  const assessment = assessChemicalAccuracy({
     energy,
     hf: refs.hf,
     fci: refs.fci,
     thresholdHa: chemicalAccuracyHa,
     converged: entry.converged,
   });
+  if (!getBenchmarkEligibility(entry).eligible) {
+    return {
+      ...assessment,
+      verdict: "unscored",
+      errorHa: null,
+      errorMha: null,
+      absErrorHa: null,
+      absErrorMha: null,
+      withinThreshold: false,
+      correlationRecoveredPct: null,
+      isScorable: false,
+    };
+  }
+  return assessment;
 }
 
 export function sortBenchmarkRows(

@@ -10,9 +10,11 @@ import {
   filterBenchmarkRows,
   getBenchmarkBackendOptions,
   getBenchmarkAlgorithmBlockers,
+  getBenchmarkEligibility,
   getBenchmarkIbmBackends,
   getBenchmarkMoleculeBlocker,
   getBenchmarkStats,
+  assessBenchmarkEntry,
   normalizeStoredEntry,
   QUEUED_POLL_INTERVAL_MS,
   RUNNING_POLL_INTERVAL_MS,
@@ -330,11 +332,44 @@ describe("benchmark molecule utilities", () => {
     ];
 
     expect(getBenchmarkStats(entries, 0.0016)).toMatchObject({
-      accurate: 2,
+      accurate: 1,
       notAccurate: 1,
-      unscored: 1,
+      unscored: 2,
       notConverged: 1,
     });
+  });
+
+  it("does not score projected diagnostics as benchmark results", () => {
+    const entry = makeEntry({
+      algorithm: "kqd",
+      executionMetadata: {
+        reportedEnergyIsValid: true,
+        projectedSolveIsDiagnostic: true,
+        scientificConverged: false,
+      },
+    });
+
+    expect(getBenchmarkEligibility(entry)).toEqual({
+      eligible: false,
+      reason: "projected_solve_diagnostic",
+    });
+    expect(assessBenchmarkEntry(entry, 0.0016).isScorable).toBe(false);
+  });
+
+  it("does not score scientifically unconverged results", () => {
+    const entry = makeEntry({
+      executionMetadata: {
+        reportedEnergyIsValid: true,
+        projectedSolveIsDiagnostic: false,
+        scientificConverged: false,
+      },
+    });
+
+    expect(getBenchmarkEligibility(entry)).toEqual({
+      eligible: false,
+      reason: "scientific_convergence_not_established",
+    });
+    expect(assessBenchmarkEntry(entry, 0.0016).verdict).toBe("unscored");
   });
 
   it("filters and sorts benchmark rows by verdict and absolute error", () => {
