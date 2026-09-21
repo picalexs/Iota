@@ -275,7 +275,7 @@ def render_plots(
         }
 
     return {
-        "plot_schema_version": "qss-benchmark-plots.v1",
+        "plot_schema_version": "qss-benchmark-plots.v2",
         "error_view": error_view,
         "output_format": output_format,
         "source_row_count": len(rows),

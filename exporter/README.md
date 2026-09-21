@@ -118,6 +118,16 @@ The exporter keeps only the fields needed for comparison and audit:
 - requested and effective shot counts;
 - requested and effective estimator precision, measurement mode, Aer method,
   noise provenance, and actual execution path.
+- reference method, solver path, basis, active space, validity status, and
+  Hamiltonian hash;
+- scientific convergence, diagnostic status, reported energy source, exclusion
+  reason, execution generation, and restart parent.
+
+The exporter keeps diagnostic rows for audit. It marks them with
+`benchmark_eligible: false`. Summaries and plots use only eligible rows.
+Eligible rows must have a completed status, a finite energy and reference,
+valid reported energy, no projected-solve diagnostic flag, and established
+scientific convergence. A finite diagnostic energy is not a benchmark result.
 
 For noisy Aer Estimator runs, `requested_shots` is the nominal shot-equivalent
 budget used to derive precision. Aer Estimator precision is not a literal
@@ -157,16 +167,22 @@ Create the same plots directly from a saved QSS benchmark:
 The command writes four plots and `plot_manifest.json`:
 
 - `error_by_algorithm`: absolute or signed error distributions;
-- `convergence_by_algorithm`: completed-row convergence rates;
-- `runtime_by_algorithm`: completed-row runtime distributions;
+- `convergence_by_algorithm`: scientific convergence rates;
+- `runtime_by_algorithm`: eligible-row runtime distributions;
 - `error_vs_runtime`: positive runtime and error points on log axes.
+
+Error and runtime plots group rows by algorithm and actual execution path.
+This prevents Aer sampler, Aer estimator, local classical, and diagnostic
+paths from appearing as one method.
 
 Use `--error-view signed` for signed error plots. Use `--format svg` for
 editable vector output or `--format both` for PNG and SVG. The plot writer
 reserves legend space and saves with a tight bounding box to keep text visible.
 
-Rows without the required values are excluded from the relevant plot and are
-reported in `plot_manifest.json`.
+Rows without the required values, rows with diagnostic energies, and rows that
+did not establish scientific convergence are excluded from the relevant plot.
+The counts are reported in `plot_manifest.json`. Signed runtime plots use a
+symlog error axis so negative errors remain visible.
 
 ## Tests
 
@@ -185,7 +201,7 @@ The tests use fake API clients and local rows. They do not submit QSS runs.
 - `export_benchmark.py`: compact export from a folder or QSS API;
 - `plot_benchmark.py`: plot generation from a folder or QSS API;
 - `benchmark_io.py`: shared row normalization, API access, summaries, and
-  manifest helpers;
+  manifest helpers. It defines the export eligibility contract;
 - `benchmark_plots.py`: layout-safe Matplotlib plot builders;
 - `tests/`: focused exporter tests;
 - `quantum_diag/`: older local benchmark and diagnostic tools.
