@@ -9,6 +9,7 @@ export function InfoHubPage() {
       <InfoCollectionHero
         eyebrow="Reference"
         title="Reference"
+        description="Browse the algorithms, components, backends, and noise models used by the application."
         actions={
           <Button asChild variant="outline" size="sm">
             <Link to="/help/parameters">Parameter glossary</Link>
