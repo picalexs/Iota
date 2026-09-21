@@ -143,6 +143,19 @@ describe("BenchmarkResultsTable", () => {
     expect(screen.getByLabelText("Execution path: Local matrix-free")).toBeInTheDocument();
   });
 
+  it("shows the statevector execution path", async () => {
+    renderBenchmarkResultsTable({
+      grouped: buildGroupedRows({
+        executionMetadata: {
+          actualExecutionTarget: "statevector",
+          actualPathClass: "statevector_exact",
+        } as NonNullable<BenchmarkEntry["executionMetadata"]>,
+      }),
+    });
+
+    expect(await screen.findByLabelText("Execution path: Statevector exact")).toBeInTheDocument();
+  });
+
   it("marks cancelled rows as unscored for chemical accuracy", async () => {
     renderBenchmarkResultsTable({ grouped: buildGroupedRows({ status: "cancelled" }) });
 

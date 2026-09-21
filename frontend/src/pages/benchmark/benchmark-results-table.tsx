@@ -150,6 +150,7 @@ function executionPathLabel(entry: BenchmarkEntry): string {
     aer_statevector_evolution: "Aer statevector evolution",
     dense_classical: "Local dense classical",
     sector_matrix_free: "Local matrix-free",
+    statevector_exact: "Statevector exact",
   };
   const pathLabel = metadata?.actualPathClass
     ? pathLabels[metadata.actualPathClass]
@@ -164,6 +165,8 @@ function executionPathLabel(entry: BenchmarkEntry): string {
       return "IBM Runtime";
     case "local_classical":
       return "Local classical";
+    case "statevector":
+      return "Statevector exact";
     default:
       return "Unknown";
   }
