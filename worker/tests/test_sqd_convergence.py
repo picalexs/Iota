@@ -74,6 +74,16 @@ def test_iteration_values_are_finite_accepts_valid_inputs() -> None:
     )
 
 
+def test_iteration_values_are_finite_accepts_first_iteration_delta_sentinels() -> None:
+    assert iteration_values_are_finite(
+        energy_value=-1.0,
+        delta_energy=float("inf"),
+        occupancy_delta=float("inf"),
+        occupancy_vector=np.asarray([1.0, 0.0]),
+        deltas_available=False,
+    )
+
+
 @pytest.mark.parametrize(
     ("iteration", "energy_delta", "occupancy_delta", "selected_count", "expected"),
     [

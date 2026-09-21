@@ -31,12 +31,17 @@ def iteration_values_are_finite(
     delta_energy: float,
     occupancy_delta: float,
     occupancy_vector: np.ndarray,
+    deltas_available: bool = True,
 ) -> bool:
     """Return whether one SQD iteration has finite convergence inputs."""
+    delta_values_are_valid = (
+        bool(np.isfinite(delta_energy) and np.isfinite(occupancy_delta))
+        if deltas_available
+        else bool(not np.isnan(delta_energy) and not np.isnan(occupancy_delta))
+    )
     return bool(
         np.isfinite(energy_value)
-        and np.isfinite(delta_energy)
-        and np.isfinite(occupancy_delta)
+        and delta_values_are_valid
         and np.all(np.isfinite(np.asarray(occupancy_vector, dtype=float)))
     )
 

@@ -62,6 +62,7 @@ def run_sqd_recovery_loop(
             delta_energy=outcome.delta_energy,
             occupancy_delta=outcome.occupancy_delta,
             occupancy_vector=outcome.occupancy_vector,
+            deltas_available=iteration > 1,
         )
         converged = False
         if not numerically_valid:
