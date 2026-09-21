@@ -20,6 +20,7 @@ from worker.chemistry.matrix_element_circuits import (
     apply_layout_to_observable,
     transpile_aer_circuit,
 )
+from worker.chemistry.aer_runtime import aer_runtime_metadata, validate_aer_runtime
 
 _DEFAULT_CONTEXT = BackendExecutionContext(backend_target="aer_simulator")
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ class AerAdapter(BackendAdapter):
         from qiskit_aer.primitives import EstimatorV2
 
         resolved = context or _DEFAULT_CONTEXT
+        validate_aer_runtime(resolved)
         self._job_ids = []
         self._last_metadata = {}
         primitive_options, metadata = self._build_primitive_options(
@@ -80,6 +82,7 @@ class AerAdapter(BackendAdapter):
         from qiskit_aer.primitives import SamplerV2
 
         resolved = context or _DEFAULT_CONTEXT
+        validate_aer_runtime(resolved)
         self._job_ids = []
         self._last_metadata = {}
         primitive_options, metadata = self._build_primitive_options(resolved)
@@ -194,9 +197,9 @@ class AerAdapter(BackendAdapter):
                 "selection_policy": resolved.selection_policy,
                 "backend_primitives_used": True,
                 "primitive_family": "qiskit_aer",
-                "shots": None,
+                "shots": resolved.shots,
                 "requested_shots": _requested_shots(resolved),
-                "effective_shots": None,
+                "effective_shots": resolved.shots,
                 "requested_estimator_precision": _requested_estimator_precision(resolved),
                 "effective_estimator_precision": resolved.estimator_precision,
                 "measurement_mode": _measurement_mode(resolved.estimator_precision),
@@ -211,6 +214,7 @@ class AerAdapter(BackendAdapter):
                     "simulator_options": aer_simulator_options(resolved),
                 },
             }
+            metadata.update(aer_runtime_metadata(resolved))
             self._last_metadata = dict(metadata)
         if self._job_ids:
             metadata["job_ids"] = list(self._job_ids)
@@ -276,9 +280,9 @@ class AerAdapter(BackendAdapter):
             "selection_policy": context.selection_policy,
             "backend_primitives_used": True,
             "primitive_family": "qiskit_aer",
-            "shots": None if include_estimator_precision else context.shots,
+            "shots": context.shots,
             "requested_shots": _requested_shots(context),
-            "effective_shots": None if include_estimator_precision else context.shots,
+            "effective_shots": context.shots,
             "requested_estimator_precision": _requested_estimator_precision(context),
             "effective_estimator_precision": context.estimator_precision,
             "measurement_mode": _measurement_mode(context.estimator_precision),
@@ -293,6 +297,7 @@ class AerAdapter(BackendAdapter):
                 "simulator_options": aer_simulator_options(context),
             },
         }
+        metadata.update(aer_runtime_metadata(context))
         return primitive_options, metadata
 
     def _transpile_cached(

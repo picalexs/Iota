@@ -247,7 +247,7 @@ def test_aer_estimator_records_and_applies_precision_without_sampler_option_leak
     assert metadata["uncertainty_policy"] == "aer_estimator_default_precision"
 
 
-def test_aer_exact_estimator_metadata_does_not_claim_configured_shots() -> None:
+def test_aer_exact_estimator_metadata_records_configured_shots() -> None:
     adapter = AerAdapter()
     context = BackendExecutionContext(
         backend_target="aer_simulator",
@@ -260,8 +260,8 @@ def test_aer_exact_estimator_metadata_does_not_claim_configured_shots() -> None:
 
     assert metadata["measurement_mode"] == "exact"
     assert metadata["requested_shots"] == 256
-    assert metadata["shots"] is None
-    assert metadata["effective_shots"] is None
+    assert metadata["shots"] == 256
+    assert metadata["effective_shots"] == 256
 
 
 @pytest.mark.parametrize(
@@ -857,8 +857,8 @@ def test_ibm_precision_estimator_metadata_does_not_claim_configured_shots() -> N
     assert metadata["measurement_mode"] == "precision_sampled"
     assert metadata["requested_shots"] == 512
     assert metadata["effective_estimator_precision"] == 0.25
-    assert metadata["shots"] is None
-    assert metadata["effective_shots"] is None
+    assert metadata["shots"] == 512
+    assert metadata["effective_shots"] == 512
 
 
 def test_ibm_adapter_uses_least_error_selection_policy_for_resolution() -> None:

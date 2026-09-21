@@ -231,7 +231,7 @@ def test_kqd_exact_evolution_on_aer_target_reports_local_provenance() -> None:
     assert metadata["aer_simulator_used"] is False
     assert metadata["backend_primitives_used"] is False
     assert metadata["primitive_family"] is None
-    assert metadata["effective_shots"] is None
+    assert metadata["effective_shots"] == 4096
     assert metadata["actual_noise_applied"] is False
     assert "transpilation_summary" not in metadata
 

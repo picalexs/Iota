@@ -11,6 +11,7 @@ from worker.adapters.base import (
     PrimitiveRunGuard,
 )
 from worker.chemistry.backend_selector import build_backend_execution_context
+from worker.chemistry.aer_runtime import validate_aer_runtime
 
 from .execution_config import _noise_profile_from_config, _selection_policy_from_config
 
@@ -58,6 +59,8 @@ def build_backend_context_for_run(
 
     if backend_context.backend_target != "aer_simulator":
         return backend_context
+
+    validate_aer_runtime(backend_context)
 
     return BackendExecutionContext(
         backend_target=backend_context.backend_target,

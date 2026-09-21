@@ -10,6 +10,7 @@ from worker.adapters.aer_noise import normalize_noise_profile
 from worker.adapters.base import AdapterCapabilities, BackendAdapter, BackendExecutionContext
 from worker.adapters.ibm_adapter import IBMAdapter
 from worker.adapters.statevector_adapter import StatevectorAdapter
+from worker.chemistry.aer_runtime import validate_aer_method_for_device
 from worker.exceptions import BackendError
 
 _AER_METHODS = {
@@ -94,6 +95,7 @@ def build_backend_execution_context(
         not isinstance(device, str) or device.upper() not in {"CPU", "GPU"}
     ):
         raise BackendError("Aer device must be 'CPU' or 'GPU'")
+    validate_aer_method_for_device(device=device, method=simulator_method)
     selection_policy = str(options.pop("selection_policy", selection_policy) or selection_policy)
     for key in ("seed_simulator", "seed_transpiler"):
         seed_value = options.get(key)
