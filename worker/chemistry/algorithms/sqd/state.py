@@ -10,6 +10,7 @@ import numpy as np
 
 from worker.chemistry.algorithms.sqd.config import SQDOptions
 from worker.chemistry.algorithms.sqd.recovery import SQDDependencies
+from worker.chemistry.algorithms.sqd.selected_ci_backend import resolve_selected_ci_solver
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ class SQDRunState:
     )
 
 
-def import_sqd_dependencies() -> SQDDependencies:
+def import_sqd_dependencies(selected_ci_device: str | None = None) -> SQDDependencies:
     """Import qiskit-addon-sqd entrypoints used by SQD execution."""
     try:
         from qiskit_addon_sqd.configuration_recovery import recover_configurations
@@ -87,11 +88,16 @@ def import_sqd_dependencies() -> SQDDependencies:
     except ImportError as exc:  # pragma: no cover - dependency is pinned in worker requirements
         raise RuntimeError("qiskit-addon-sqd must be installed to run SQD") from exc
 
+    selected_ci = resolve_selected_ci_solver(solve_fermion, selected_ci_device)
     return SQDDependencies(
         recover_configurations=recover_configurations,
         postselect_by_hamming_right_and_left=postselect_by_hamming_right_and_left,
-        solve_fermion=solve_fermion,
+        solve_fermion=selected_ci.solve_fermion,
         subsample=subsample,
+        selected_ci_requested_device=selected_ci.requested_device,
+        selected_ci_actual_device=selected_ci.actual_device,
+        selected_ci_provider=selected_ci.provider,
+        selected_ci_fallback_reason=selected_ci.fallback_reason,
     )
 
 

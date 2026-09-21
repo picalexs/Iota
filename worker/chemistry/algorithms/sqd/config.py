@@ -46,6 +46,10 @@ class SQDOptions:
     selected_ci_limit_summary: dict[str, Any]
     sci_solver_options: dict[str, Any]
     open_shell: bool
+    selected_ci_requested_device: str = "CPU"
+    selected_ci_actual_device: str = "CPU"
+    selected_ci_provider: str = "qiskit_addon_sqd"
+    selected_ci_fallback_reason: str | None = None
 
 
 def resolve_sqd_hamiltonian_inputs(

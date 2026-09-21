@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
@@ -233,9 +234,21 @@ def run_sqd(
     sampling_provider: dict[str, Any] | None = None,
 ) -> SQDResult:
     """Run an SQD loop using HamiltonianBundle tensors and addon-sqd APIs."""
-    deps = _import_sqd_dependencies()
     sample_budget = getattr(backend_context, "shots", None)
     options = _resolve_sqd_options(config, hamiltonian, sample_budget=sample_budget)
+    chemistry_options = getattr(backend_context, "chemistry_options", {}) or {}
+    selected_ci_device = chemistry_options.get("selected_ci_device")
+    if selected_ci_device in {None, "", "CPU"}:
+        deps = _import_sqd_dependencies()
+    else:
+        deps = _import_sqd_dependencies(selected_ci_device=selected_ci_device)
+    options = replace(
+        options,
+        selected_ci_requested_device=deps.selected_ci_requested_device,
+        selected_ci_actual_device=deps.selected_ci_actual_device,
+        selected_ci_provider=deps.selected_ci_provider,
+        selected_ci_fallback_reason=deps.selected_ci_fallback_reason,
+    )
     _log_sqd_setup(options)
 
     sqd_wall_start = time.monotonic()

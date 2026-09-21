@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -183,6 +184,22 @@ def test_run_skqd_defaults_to_sample_union_selected_ci(
     assert result.converged is True
 
 
+def test_run_skqd_sample_union_rejects_explicit_gpu_selected_ci(
+    mock_hamiltonian_bundle: object,
+) -> None:
+    with pytest.raises(RuntimeError, match="arbitrary sampled determinant union"):
+        run_skqd(
+            hamiltonian=mock_hamiltonian_bundle,
+            backend=object(),
+            backend_context=SimpleNamespace(
+                chemistry_options={"selected_ci_device": "GPU"},
+            ),
+            config={
+                "algorithm": "skqd",
+                "krylov_extension_dim": 2,
+                "samples_per_state": 4,
+            },
+        )
 @pytest.mark.parametrize(
     "backend_context",
     [

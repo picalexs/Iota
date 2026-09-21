@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from worker.chemistry.accelerators import normalize_chemistry_device
 from worker.chemistry.algorithms.skqd.config import SKQDConfig, resolve_skqd_config
 from worker.chemistry.algorithms.skqd.convergence import (
     evaluate_sample_union_convergence,
@@ -347,6 +348,7 @@ def _run_skqd_sample_union(
     progress_callback: ProgressCallback | None,
     backend_context: Any | None,
     started_at: float,
+    selected_ci_execution: dict[str, Any],
 ) -> SKQDResult:
     """Run the direct sample-union path and persist its explicit status."""
     use_sampler_circuits = (
@@ -408,6 +410,7 @@ def _run_skqd_sample_union(
         **workflow_metadata,
         "requested_sampling_mode": skqd_config.sampling_mode,
         "execution_path": execution_path,
+        "selected_ci_execution": dict(selected_ci_execution),
         "execution_provenance": {
             "requested_sampling_mode": skqd_config.sampling_mode,
             "actual_sampling_mode": workflow_metadata["sampling_mode"],
@@ -501,6 +504,24 @@ def run_skqd(
         plan.execution_mode,
     )
     if skqd_config.sampling_mode == "sample_union_exact":
+        selected_ci_device = normalize_chemistry_device(
+            (getattr(backend_context, "chemistry_options", {}) or {}).get("selected_ci_device")
+        )
+        if selected_ci_device == "GPU":
+            raise RuntimeError(
+                "GPU selected-CI is not available for SKQD sample_union_exact because that "
+                "path must diagonalize the arbitrary sampled determinant union on CPU"
+            )
+        selected_ci_execution = {
+            "requested_device": selected_ci_device,
+            "actual_device": "CPU",
+            "provider": "skqd.sample_union_exact",
+            "fallback_reason": (
+                "SKQD sample_union_exact uses the exact arbitrary-union CPU solver"
+                if selected_ci_device == "AUTO"
+                else None
+            ),
+        }
         return _run_skqd_sample_union(
             hamiltonian=hamiltonian,
             backend=backend,
@@ -509,6 +530,7 @@ def run_skqd(
             progress_callback=progress_callback,
             backend_context=backend_context,
             started_at=t_start,
+            selected_ci_execution=selected_ci_execution,
         )
     sqd_result = run_sqd(
         hamiltonian=hamiltonian,

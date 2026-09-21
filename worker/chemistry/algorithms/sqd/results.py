@@ -147,6 +147,12 @@ def _build_subsampling_summary(
         "seed": options.seed,
         "symmetrize_spin": options.symmetrize_spin,
         "carryover_threshold": round(options.carryover_threshold, 8),
+        "selected_ci_execution": {
+            "requested_device": options.selected_ci_requested_device,
+            "actual_device": options.selected_ci_actual_device,
+            "provider": options.selected_ci_provider,
+            "fallback_reason": options.selected_ci_fallback_reason,
+        },
     }
     if state.selected_ci_dimensions:
         summary["selected_ci"] = {
@@ -225,6 +231,12 @@ def _build_sci_result_package(
         "carryover_threshold": round(options.carryover_threshold, 8),
         "best_carryover": state.best_carryover_summary or state.last_carryover_summary,
         "work_ledger": dict(state.work_ledger),
+        "selected_ci_execution": {
+            "requested_device": options.selected_ci_requested_device,
+            "actual_device": options.selected_ci_actual_device,
+            "provider": options.selected_ci_provider,
+            "fallback_reason": options.selected_ci_fallback_reason,
+        },
     }
     if state.last_sampled_circuit is not None:
         package["circuit_preview"] = serialize_sqd_circuit_preview(state.last_sampled_circuit)

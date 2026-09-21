@@ -25,6 +25,10 @@ class SQDDependencies:
     postselect_by_hamming_right_and_left: Any
     solve_fermion: Any
     subsample: Any
+    selected_ci_requested_device: str = "CPU"
+    selected_ci_actual_device: str = "CPU"
+    selected_ci_provider: str = "qiskit_addon_sqd"
+    selected_ci_fallback_reason: str | None = None
 
 
 @dataclass
