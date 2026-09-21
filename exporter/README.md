@@ -80,6 +80,14 @@ The default workflow targets `statevector` or `aer_simulator`. IBM Runtime
 submission is blocked unless the caller passes `--allow-ibm`. Do not pass that
 flag for local tests or this workflow.
 
+### Noisy Aer budget
+
+For noisy Aer, omit `estimator_precision` from `backend.options` to use the
+automatic policy. The exporter keeps the configured `shots` value and the
+worker derives the estimator precision as `1/sqrt(shots)`. The default `4096`
+budget gives `0.015625`. Use `1024` (`0.03125`) for a faster development pilot.
+Set `estimator_precision` to `0.0` only for an explicit exact diagnostic.
+
 ## 2. Export benchmark results
 
 Export a saved QSS benchmark through the API:
@@ -107,6 +115,14 @@ The exporter keeps only the fields needed for comparison and audit:
 - run status and error message;
 - final energy, reference energy, signed error, absolute error, iterations,
   convergence, and runtime.
+- requested and effective shot counts;
+- requested and effective estimator precision, measurement mode, Aer method,
+  noise provenance, and actual execution path.
+
+For noisy Aer Estimator runs, `requested_shots` is the nominal shot-equivalent
+budget used to derive precision. Aer Estimator precision is not a literal
+sampler-shot count. Sampler algorithms report their own shot ledger when it is
+available.
 
 The default output contains:
 

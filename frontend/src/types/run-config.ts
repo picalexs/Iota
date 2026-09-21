@@ -146,6 +146,7 @@ export interface BackendOptions {
   selection_policy: BackendSelectionPolicy;
   backend_name: string | null;
   shots: number;
+  estimator_precision?: number | null;
   optimization_level: 0 | 1 | 2 | 3;
   seed_simulator: number | null;
   seed_transpiler: number | null;

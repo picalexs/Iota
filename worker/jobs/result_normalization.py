@@ -471,6 +471,8 @@ def _build_benchmark_provenance(
             "effective_shots": execution.get("effective_shots"),
             "requested_estimator_precision": execution.get("requested_estimator_precision"),
             "effective_estimator_precision": execution.get("effective_estimator_precision"),
+            "measurement_mode": execution.get("measurement_mode"),
+            "simulator_method": execution.get("simulator_method"),
             "noise_source": noise_summary.get("source"),
             "noise_fingerprint": noise_summary.get("model_fingerprint_sha256"),
         },

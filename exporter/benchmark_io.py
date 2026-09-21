@@ -29,6 +29,17 @@ CANONICAL_FIELDS = (
     "basis_set",
     "backend_target",
     "backend_name",
+    "requested_shots",
+    "effective_shots",
+    "requested_estimator_precision",
+    "effective_estimator_precision",
+    "measurement_mode",
+    "simulator_method",
+    "noise_source",
+    "noise_fingerprint",
+    "actual_execution_target",
+    "actual_path_class",
+    "sampler_requested_shots_total",
     "seed",
     "seed_roles",
     "status",
@@ -139,6 +150,91 @@ def _parse_list(value: Any) -> list[Any]:
         if isinstance(parsed, list):
             return parsed
     return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _benchmark_execution_fields(
+    *,
+    result: Mapping[str, Any] | None,
+    config: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Extract execution-budget provenance from a run export or checkpoint."""
+    result_record = _record(result)
+    config_record = _record(config)
+    options = _record(_first(config_record, "backend_options", "backendOptions"))
+    metrics = _record(_first(result_record, "algorithm_metrics", "algorithmMetrics"))
+    provenance = _record(
+        _first(metrics, "benchmark_provenance", "benchmarkProvenance")
+    )
+    execution = _record(_first(provenance, "execution"))
+    if not execution:
+        execution = _record(_first(metrics, "backend_execution", "backendExecution"))
+
+    requested_shots = _first(execution, "requested_shots", "requestedShots")
+    if requested_shots is None:
+        requested_shots = _first(options, "shots")
+    effective_shots = _first(execution, "effective_shots", "effectiveShots")
+
+    requested_precision = _first(
+        execution,
+        "requested_estimator_precision",
+        "requestedEstimatorPrecision",
+    )
+    if requested_precision is None and "estimator_precision" in options:
+        requested_precision = options.get("estimator_precision")
+    effective_precision = _first(
+        execution,
+        "effective_estimator_precision",
+        "effectiveEstimatorPrecision",
+    )
+    noise_profile = _record(_first(config_record, "noise_profile", "noiseProfile"))
+    backend_target = _text(_first(config_record, "backend_target", "backendTarget"))
+    if (
+        requested_precision is None
+        and backend_target == "aer_simulator"
+        and noise_profile
+        and _number(requested_shots) is not None
+    ):
+        requested_precision = 1.0 / math.sqrt(float(_number(requested_shots)))
+
+    if effective_precision is None:
+        effective_precision = requested_precision
+    measurement_mode = _text(_first(execution, "measurement_mode", "measurementMode"))
+    if measurement_mode is None and _number(effective_precision) is not None:
+        measurement_mode = "exact" if float(effective_precision) == 0.0 else "precision_sampled"
+
+    noise_source = _text(_first(execution, "noise_source", "noiseSource"))
+    if noise_source is None:
+        noise_source = _text(_first(noise_profile, "source"))
+    noise_fingerprint = _text(
+        _first(execution, "noise_fingerprint", "noiseFingerprint")
+    )
+    simulator_method = _text(_first(execution, "simulator_method", "simulatorMethod"))
+    if simulator_method is None:
+        simulator_method = _text(_first(options, "aer_method", "method"))
+
+    ledger = _record(_first(provenance, "work_ledger", "workLedger"))
+    if not ledger:
+        ledger = _record(_first(metrics, "work_ledger", "workLedger"))
+
+    return {
+        "requested_shots": _integer(requested_shots),
+        "effective_shots": _integer(effective_shots),
+        "requested_estimator_precision": _number(requested_precision),
+        "effective_estimator_precision": _number(effective_precision),
+        "measurement_mode": measurement_mode,
+        "simulator_method": simulator_method,
+        "noise_source": noise_source,
+        "noise_fingerprint": noise_fingerprint,
+        "actual_execution_target": _text(
+            _first(execution, "actual_execution_target", "actualExecutionTarget")
+        ),
+        "actual_path_class": _text(
+            _first(execution, "actual_path_class", "actualPathClass")
+        ),
+        "sampler_requested_shots_total": _integer(
+            _first(ledger, "sampler_requested_shots_total", "samplerRequestedShotsTotal")
+        ),
+    }
 
 
 def _iso_datetime(value: Any) -> datetime | None:
@@ -278,6 +374,7 @@ def normalize_api_row(
     algorithm = _text(_first(entry, "algorithm")) or _text(_first(run, "algorithm"))
     algorithm = algorithm.lower() if algorithm is not None else None
     config = _record(_first(run, "config_json", "configJson", "config"))
+    execution_fields = _benchmark_execution_fields(result=result, config=config)
     entry_seed = _first(entry, "seed")
     seed, inferred_roles = _config_seed(config, algorithm)
     if _number(entry_seed) is not None:
@@ -313,6 +410,7 @@ def normalize_api_row(
         or _text(_first(benchmark, "selectedBasis", "selected_basis")),
         "backend_target": _text(_first(run, "backend_target", "backendTarget")),
         "backend_name": _backend_name(config),
+        **execution_fields,
         "seed": seed,
         "seed_roles": seed_roles,
         "status": status,
@@ -375,6 +473,23 @@ def normalize_folder_row(
     if status == "missing" and _first(source, "error"):
         status = "failed"
 
+    execution_fields = _benchmark_execution_fields(result=source, config=source)
+    for field in (
+        "requested_shots",
+        "effective_shots",
+        "requested_estimator_precision",
+        "effective_estimator_precision",
+        "measurement_mode",
+        "simulator_method",
+        "noise_source",
+        "noise_fingerprint",
+        "actual_execution_target",
+        "actual_path_class",
+        "sampler_requested_shots_total",
+    ):
+        if field in source:
+            execution_fields[field] = source.get(field)
+
     canonical = {
         "benchmark_id": _text(_first(source, "benchmark_id", "benchmarkId"))
         or _text(_first(benchmark, "id")),
@@ -389,6 +504,7 @@ def normalize_folder_row(
         or _text(_first(benchmark, "selectedBasis", "selected_basis")),
         "backend_target": _text(_first(source, "backend_target", "backendTarget")),
         "backend_name": _text(_first(source, "backend_name", "backendName")),
+        **execution_fields,
         "seed": _integer(_first(source, "seed")),
         "seed_roles": _parse_seed_roles(_first(source, "seed_roles", "seedRoles")),
         "status": status,
@@ -459,6 +575,7 @@ def _submission_rows(path: Path, benchmark: Mapping[str, Any]) -> list[dict[str,
                 or _text(_first(benchmark, "selectedBasis", "selected_basis")),
                 "backend_target": _text(_first(config, "backend_target", "backendTarget")),
                 "backend_name": _text(_first(options, "backend_name", "backendName")),
+                **_benchmark_execution_fields(result=None, config=config),
                 "seed": item.get("seed", _first(snapshot, "seed")),
                 "seed_roles": item.get("seed_roles", _first(snapshot, "seedRoles", "seed_roles")),
                 "status": item.get("status") or _first(snapshot, "status"),

@@ -83,6 +83,32 @@ def test_campaign_expands_seeds_into_idempotent_runs_and_checkpoint(tmp_path: Pa
     assert (tmp_path / "benchmark.json").is_file()
 
 
+def test_campaign_uses_automatic_noisy_aer_precision_by_default(tmp_path: Path) -> None:
+    manifest = _manifest()
+    manifest["backend"] = {
+        "target": "aer_simulator",
+        "name": "ibm_kyiv",
+        "options": {"shots": 1024},
+    }
+    manifest["noise_profile"] = {
+        "source": "backend_derived",
+        "reference_backend": "ibm_kyiv",
+    }
+
+    api = FakeWriteApi()
+    create_campaign(
+        manifest,
+        base_url="http://unused",
+        output_dir=tmp_path,
+        client=api,  # type: ignore[arg-type]
+    )
+
+    payload = next(payload for path, payload in api.posts if path == "/api/runs")
+    options = payload["backend_options"]
+    assert options["shots"] == 1024
+    assert "estimator_precision" not in options
+
+
 def test_campaign_resume_does_not_submit_runs_again(tmp_path: Path) -> None:
     first_api = FakeWriteApi()
     create_campaign(_manifest(), base_url="http://unused", output_dir=tmp_path, client=first_api)  # type: ignore[arg-type]

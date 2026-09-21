@@ -88,6 +88,8 @@ def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
             "effective_shots": None,
             "requested_estimator_precision": 0.015625,
             "effective_estimator_precision": 0.0,
+            "measurement_mode": None,
+            "simulator_method": None,
             "noise_source": None,
             "noise_fingerprint": None,
         },

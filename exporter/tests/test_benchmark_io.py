@@ -59,6 +59,22 @@ def _run_export() -> dict:
             "iterations": 7,
             "converged": True,
             "created_at": "2026-09-20T10:00:03Z",
+            "algorithm_metrics": {
+                "benchmark_provenance": {
+                    "execution": {
+                        "requested_shots": 4096,
+                        "effective_shots": None,
+                        "requested_estimator_precision": 0.015625,
+                        "effective_estimator_precision": 0.015625,
+                        "measurement_mode": "precision_sampled",
+                        "simulator_method": "automatic",
+                        "noise_source": "backend_derived",
+                        "noise_fingerprint": "abc123",
+                        "actual_execution_target": "aer_simulator",
+                        "actual_path_class": "aer_branch_estimator",
+                    }
+                }
+            },
         },
         "execution_segments": [{"duration_seconds": 2.5}],
     }
@@ -77,6 +93,12 @@ def test_api_normalization_selects_compact_result_and_seed_roles() -> None:
     assert row["seed_roles"] == ["algorithm", "transpiler"]
     assert row["absolute_error"] == 0.1
     assert row["runtime_seconds"] == 2.5
+    assert row["requested_shots"] == 4096
+    assert row["effective_shots"] is None
+    assert row["effective_estimator_precision"] == 0.015625
+    assert row["measurement_mode"] == "precision_sampled"
+    assert row["noise_source"] == "backend_derived"
+    assert row["actual_path_class"] == "aer_branch_estimator"
     assert set(row) >= set(CANONICAL_FIELDS)
     assert "raw_result" not in row
     assert "execution_segments" not in row

@@ -68,7 +68,10 @@ def build_backend_execution_context(
     if (
         backend_target == "aer_simulator"
         and noise_profile is not None
-        and "estimator_precision" not in (backend_options or {})
+        and (
+            "estimator_precision" not in (backend_options or {})
+            or (backend_options or {}).get("estimator_precision") is None
+        )
     ):
         # A noisy Aer estimator with precision=0 uses exact expectation values.
         # Derive a sampled precision from the run shot budget unless the caller

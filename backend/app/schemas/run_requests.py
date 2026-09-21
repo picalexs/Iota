@@ -24,7 +24,6 @@ class RunCreate(BaseModel):
                 "backend_options": {
                     "selection_policy": "manual",
                     "shots": 4096,
-                    "estimator_precision": 0.0,
                     "optimization_level": 1,
                     "aer_method": "automatic",
                 },
@@ -60,11 +59,17 @@ class RunCreate(BaseModel):
         return molecule_basis_set
 
     def snapshot_config(self) -> dict[str, Any]:
+        backend_options = self.backend_options.model_dump(mode="json")
+        # Preserve the distinction between automatic precision and an explicit
+        # exact request in the worker-facing snapshot. Other nullable options
+        # retain their existing compatibility shape.
+        if backend_options.get("estimator_precision") is None:
+            backend_options.pop("estimator_precision", None)
         return {
             "algorithm": self.algorithm.value,
             "mode": self.mode.value,
             "backend_target": self.backend_target.value,
-            "backend_options": self.backend_options.model_dump(mode="json"),
+            "backend_options": backend_options,
             "basis_set_override": self.basis_set_override,
             "easy_options": self.easy_options.model_dump() if self.easy_options else None,
             "advanced_config": self.advanced_config.model_dump() if self.advanced_config else None,

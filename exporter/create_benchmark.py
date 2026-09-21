@@ -227,7 +227,6 @@ def _build_seeded_config(
         "selection_policy": "manual",
         "backend_name": backend.get("name"),
         "shots": 4096,
-        "estimator_precision": 0.0,
         "optimization_level": 1,
         "seed_simulator": None,
         "seed_transpiler": None,

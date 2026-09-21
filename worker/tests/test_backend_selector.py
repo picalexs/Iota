@@ -46,6 +46,21 @@ def test_noisy_aer_derives_sampled_precision_from_shots() -> None:
     assert context.estimator_precision == 0.0625
 
 
+def test_noisy_aer_treats_null_precision_as_automatic() -> None:
+    context = build_backend_execution_context(
+        backend_target="aer_simulator",
+        backend_options={"shots": 1024, "estimator_precision": None},
+        noise_profile={
+            "source": "custom_preset",
+            "preset": "depolarizing_cx",
+            "strength": 0.01,
+        },
+    )
+
+    assert context.requested_estimator_precision == 0.03125
+    assert context.estimator_precision == 0.03125
+
+
 def test_explicit_noisy_aer_precision_is_preserved() -> None:
     context = build_backend_execution_context(
         backend_target="aer_simulator",

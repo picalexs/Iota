@@ -29,12 +29,13 @@ class BackendOptions(BaseModel):
     selection_policy: BackendSelectionPolicy = BackendSelectionPolicy.MANUAL
     backend_name: str | None = Field(None, min_length=1, max_length=255)
     shots: int = Field(4096, ge=1, le=1_000_000)
-    estimator_precision: float = Field(
-        0.0,
+    estimator_precision: float | None = Field(
+        None,
         ge=0.0,
         allow_inf_nan=False,
         description=(
-            "Estimator standard-error budget. Zero requests exact ideal-estimator values."
+            "Estimator standard-error budget. Omit or set null to derive 1/sqrt(shots) "
+            "for noisy Aer. Zero requests exact estimator values."
         ),
     )
     optimization_level: int = Field(1, ge=0, le=3)
