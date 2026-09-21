@@ -20,6 +20,10 @@ function buildBackendOptions(
   backendTarget: AlgorithmAwareRunCreate["backend_target"],
 ): BackendOptions {
   const isAer = backendTarget === "aer_simulator";
+  const useGpuShotBatching =
+    isAer &&
+    execution.mode === "aer_simulator_backend_noise" &&
+    execution.device === "GPU";
   return {
     selection_policy: "manual",
     backend_name: execution.backendName,
@@ -29,6 +33,7 @@ function buildBackendOptions(
     seed_transpiler: null,
     aer_method: isAer ? (execution.aerMethod ?? "automatic") : "automatic",
     device: isAer ? (execution.device ?? null) : null,
+    batched_shots_gpu: useGpuShotBatching ? true : null,
   };
 }
 

@@ -239,7 +239,8 @@ function BenchmarkAerExecutionControl({
         </Select>
       </div>
       <p className="text-[11px] text-muted-foreground sm:col-span-2">
-        GPU mode uses one dedicated worker and requires an explicit GPU-compatible method.
+        GPU mode uses one dedicated worker and requires an explicit GPU-compatible method. Backend-
+        derived noise enables Aer GPU shot batching automatically.
       </p>
     </div>
   );

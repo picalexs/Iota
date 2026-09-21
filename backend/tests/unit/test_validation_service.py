@@ -104,6 +104,81 @@ def test_validate_run_request_rejects_gpu_aer_automatic_method() -> None:
     assert any(error.field == "backend_options.aer_method" for error in response.errors)
 
 
+def test_validate_run_request_rejects_gpu_shot_batching_without_gpu() -> None:
+    run = _make_kqd_run_create(
+        backend_target=BackendTarget.AER_SIMULATOR,
+        backend_options={
+            "aer_method": "statevector",
+            "batched_shots_gpu": True,
+        },
+    )
+
+    response = validate_run_request(run)
+
+    assert response.valid is False
+    assert any(error.field == "backend_options.batched_shots_gpu" for error in response.errors)
+
+
+def test_validate_run_request_rejects_incompatible_aer_parallel_options() -> None:
+    run = _make_kqd_run_create(
+        backend_target=BackendTarget.AER_SIMULATOR,
+        backend_options={
+            "aer_method": "statevector",
+            "max_parallel_experiments": 2,
+            "max_parallel_shots": 2,
+        },
+    )
+
+    response = validate_run_request(run)
+
+    assert response.valid is False
+    assert any(error.field == "backend_options.max_parallel_shots" for error in response.errors)
+
+
+def test_validate_run_request_rejects_gpu_batching_with_custatevec() -> None:
+    run = _make_kqd_run_create(
+        backend_target=BackendTarget.AER_SIMULATOR,
+        backend_options={
+            "device": "GPU",
+            "aer_method": "statevector",
+            "batched_shots_gpu": True,
+            "cuStateVec_enable": True,
+        },
+    )
+
+    response = validate_run_request(run)
+
+    assert response.valid is False
+    assert any(error.field == "backend_options.cuStateVec_enable" for error in response.errors)
+
+
+def test_validate_run_request_rejects_shot_branching_with_automatic_method() -> None:
+    run = _make_kqd_run_create(
+        backend_target=BackendTarget.AER_SIMULATOR,
+        backend_options={"shot_branching_enable": True},
+    )
+
+    response = validate_run_request(run)
+
+    assert response.valid is False
+    assert any(error.field == "backend_options.shot_branching_enable" for error in response.errors)
+
+
+def test_validate_run_request_rejects_blocking_with_mps_method() -> None:
+    run = _make_kqd_run_create(
+        backend_target=BackendTarget.AER_SIMULATOR,
+        backend_options={
+            "aer_method": "matrix_product_state",
+            "blocking_enable": True,
+        },
+    )
+
+    response = validate_run_request(run)
+
+    assert response.valid is False
+    assert any(error.field == "backend_options.blocking_enable" for error in response.errors)
+
+
 def test_validate_run_request_rejects_aer_device_options_for_ibm_target() -> None:
     run = _make_kqd_run_create(
         backend_target=BackendTarget.IBM_RUNTIME,

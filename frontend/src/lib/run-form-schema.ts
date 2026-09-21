@@ -15,6 +15,7 @@ import type { SimulationRunFormData } from "@/types/run";
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const AER_STATEVECTOR_METHODS = new Set(["automatic", "statevector", "matrix_product_state"]);
 const GPU_AER_METHODS = new Set(["statevector", "density_matrix", "unitary"]);
+const SHOT_BRANCHING_AER_METHODS = new Set(["statevector", "density_matrix"]);
 const HARDWARE_MATRIX_DIM_LIMIT = 8;
 const KQD_EASY_DIMS = { fastest: 2, balanced: 8, best_accuracy: 8 } as const;
 const QFD_EASY_DIMS = { fastest: 2, balanced: 8, best_accuracy: 8 } as const;
@@ -59,6 +60,9 @@ const optionalNullableInteger = (fieldLabel: string) =>
     .number({ error: `${fieldLabel} must be an integer` })
     .int(`${fieldLabel} must be an integer`)
     .nullable();
+
+const optionalAerBoolean = z.boolean().nullable().optional();
+const optionalAerParallelism = z.number().int().min(1).max(1024).nullable().optional();
 
 const thermalNoiseProfileSchema = z
   .object({
@@ -215,16 +219,71 @@ function validateManualIbmBackendSelection(data: RunFormData, ctx: z.RefinementC
 }
 
 function validateAerDeviceRules(data: RunFormData, ctx: z.RefinementCtx) {
-  if (data.backend_target !== "aer_simulator" || data.backend_options.device !== "GPU") {
+  if (data.backend_target !== "aer_simulator") {
     return;
   }
 
-  const aerMethod = data.backend_options.aer_method ?? "automatic";
-  if (!GPU_AER_METHODS.has(aerMethod)) {
+  const options = data.backend_options;
+  const aerMethod = options.aer_method ?? "automatic";
+  if (options.device === "GPU" && !GPU_AER_METHODS.has(aerMethod)) {
     addCustomIssue(
       ctx,
       ["backend_options", "aer_method"],
       "GPU Aer execution requires Statevector, Density matrix, or Unitary.",
+    );
+  }
+
+  if (options.batched_shots_gpu === true && options.device !== "GPU") {
+    addCustomIssue(
+      ctx,
+      ["backend_options", "batched_shots_gpu"],
+      "GPU shot batching requires the GPU device.",
+    );
+  }
+
+  if (options.cuStateVec_enable === true && options.device !== "GPU") {
+    addCustomIssue(
+      ctx,
+      ["backend_options", "cuStateVec_enable"],
+      "cuStateVec acceleration requires the GPU device.",
+    );
+  }
+
+  if (options.batched_shots_gpu === true && options.cuStateVec_enable === true) {
+    addCustomIssue(
+      ctx,
+      ["backend_options", "cuStateVec_enable"],
+      "Disable cuStateVec when GPU shot batching is enabled.",
+    );
+  }
+
+  if (
+    (options.max_parallel_experiments ?? 0) > 1 &&
+    (options.max_parallel_shots ?? 0) > 1
+  ) {
+    addCustomIssue(
+      ctx,
+      ["backend_options", "max_parallel_shots"],
+      "Choose max parallel experiments or max parallel shots, not both.",
+    );
+  }
+
+  if (
+    options.shot_branching_enable === true &&
+    !SHOT_BRANCHING_AER_METHODS.has(aerMethod)
+  ) {
+    addCustomIssue(
+      ctx,
+      ["backend_options", "shot_branching_enable"],
+      "Shot branching requires Statevector or Density matrix.",
+    );
+  }
+
+  if (options.blocking_enable === true && !GPU_AER_METHODS.has(aerMethod)) {
+    addCustomIssue(
+      ctx,
+      ["backend_options", "blocking_enable"],
+      "Blocking requires Statevector, Density matrix, or Unitary.",
     );
   }
 }
@@ -830,6 +889,15 @@ export const runFormSchema = z
         ])
         .nullable(),
       device: z.enum(["CPU", "GPU"]).nullable().optional(),
+      batched_shots_gpu: optionalAerBoolean,
+      runtime_parameter_bind_enable: optionalAerBoolean,
+      shot_branching_enable: optionalAerBoolean,
+      blocking_enable: optionalAerBoolean,
+      cuStateVec_enable: optionalAerBoolean,
+      max_parallel_threads: optionalAerParallelism,
+      max_parallel_experiments: optionalAerParallelism,
+      max_parallel_shots: optionalAerParallelism,
+      aer_pub_chunk_size: z.number().int().min(1).max(32).nullable().optional(),
     }),
     noise_profile: z
       .union([

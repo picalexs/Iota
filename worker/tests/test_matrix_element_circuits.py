@@ -72,6 +72,7 @@ def test_aer_simulator_options_forwards_acceleration_and_thread_controls() -> No
             "batched_shots_gpu": True,
             "runtime_parameter_bind_enable": True,
             "max_parallel_threads": 9999,
+            "max_parallel_shots": 8,
             "unrelated": "ignored",
         },
     )
@@ -82,6 +83,7 @@ def test_aer_simulator_options_forwards_acceleration_and_thread_controls() -> No
         "batched_shots_gpu": True,
         "runtime_parameter_bind_enable": True,
         "max_parallel_threads": 1024,
+        "max_parallel_shots": 8,
     }
 
 

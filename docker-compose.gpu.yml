@@ -1,6 +1,9 @@
 services:
   worker-gpu:
-    image: ${QSS_GPU_WORKER_IMAGE:?Set QSS_GPU_WORKER_IMAGE to a verified CUDA/Aer worker image}
+    build:
+      context: .
+      dockerfile: worker/Dockerfile.gpu
+    image: ${QSS_GPU_WORKER_IMAGE:-qss-worker-gpu:local}
     profiles: [gpu]
     command: python -m worker.main
     volumes:

@@ -27,6 +27,7 @@ _IBM_RUNTIME_ALGORITHMS = frozenset(
 _DENSE_CLASSICAL_ALGORITHMS = frozenset({RunAlgorithm.KQD, RunAlgorithm.QFD})
 _AER_STATEVECTOR_METHODS = frozenset({"automatic", "statevector", "matrix_product_state"})
 _GPU_AER_METHODS = frozenset({"statevector", "density_matrix", "unitary"})
+_SHOT_BRANCHING_AER_METHODS = frozenset({"statevector", "density_matrix"})
 _AER_GPU_OPTION_FIELDS = (
     "device",
     "batched_shots_gpu",
@@ -37,6 +38,7 @@ _AER_GPU_OPTION_FIELDS = (
     "max_parallel_threads",
     "max_parallel_experiments",
     "max_parallel_shots",
+    "aer_pub_chunk_size",
 )
 _MAX_HARDWARE_MATRIX_DIM = 8
 _MAX_NOISY_AER_PROJECTED_MATRIX_ORBITALS = 6
@@ -93,6 +95,81 @@ def _append_aer_device_validation_messages(
                 code=ValidationErrorCode.UNSUPPORTED_OPTION,
                 message=f"GPU Aer execution requires an explicit supported method: {methods}.",
                 suggestion="Choose statevector or density_matrix for GPU execution.",
+            )
+        )
+
+    if options.batched_shots_gpu is True and options.device != "GPU":
+        errors.append(
+            RunValidationErrorDetail(
+                field="backend_options.batched_shots_gpu",
+                code=ValidationErrorCode.UNSUPPORTED_OPTION,
+                message="GPU shot batching requires backend_options.device='GPU'.",
+                suggestion="Select GPU or disable batched_shots_gpu.",
+            )
+        )
+
+    if options.cuStateVec_enable is True and options.device != "GPU":
+        errors.append(
+            RunValidationErrorDetail(
+                field="backend_options.cuStateVec_enable",
+                code=ValidationErrorCode.UNSUPPORTED_OPTION,
+                message="cuStateVec acceleration requires backend_options.device='GPU'.",
+                suggestion="Select GPU or disable cuStateVec_enable.",
+            )
+        )
+
+    if options.batched_shots_gpu is True and options.cuStateVec_enable is True:
+        errors.append(
+            RunValidationErrorDetail(
+                field="backend_options.cuStateVec_enable",
+                code=ValidationErrorCode.UNSUPPORTED_OPTION,
+                message="cuStateVec_enable cannot be combined with batched_shots_gpu.",
+                suggestion="Disable cuStateVec_enable when GPU shot batching is enabled.",
+            )
+        )
+
+    if (
+        options.max_parallel_experiments is not None
+        and options.max_parallel_experiments > 1
+        and options.max_parallel_shots is not None
+        and options.max_parallel_shots > 1
+    ):
+        errors.append(
+            RunValidationErrorDetail(
+                field="backend_options.max_parallel_shots",
+                code=ValidationErrorCode.UNSUPPORTED_OPTION,
+                message=(
+                    "Aer cannot enable max_parallel_experiments and "
+                    "max_parallel_shots at the same time."
+                ),
+                suggestion="Set only one Aer parallelization mode above 1.",
+            )
+        )
+
+    if (
+        options.shot_branching_enable is True
+        and options.aer_method not in _SHOT_BRANCHING_AER_METHODS
+    ):
+        errors.append(
+            RunValidationErrorDetail(
+                field="backend_options.shot_branching_enable",
+                code=ValidationErrorCode.UNSUPPORTED_OPTION,
+                message=(
+                    "shot_branching_enable requires the statevector or density_matrix "
+                    "Aer method."
+                ),
+                suggestion="Choose statevector or density_matrix, or disable shot branching.",
+            )
+        )
+
+    if options.blocking_enable is True and options.aer_method not in _GPU_AER_METHODS:
+        methods = ", ".join(sorted(_GPU_AER_METHODS))
+        errors.append(
+            RunValidationErrorDetail(
+                field="backend_options.blocking_enable",
+                code=ValidationErrorCode.UNSUPPORTED_OPTION,
+                message=f"blocking_enable requires one of these Aer methods: {methods}.",
+                suggestion="Choose statevector, density_matrix, or unitary, or disable blocking.",
             )
         )
 

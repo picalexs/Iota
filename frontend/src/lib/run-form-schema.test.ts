@@ -141,6 +141,7 @@ describe("runFormSchema", () => {
           ...validFormData.backend_options,
           device: "GPU",
           aer_method: "statevector",
+          batched_shots_gpu: true,
         },
       }).success,
     ).toBe(true);
@@ -159,6 +160,28 @@ describe("runFormSchema", () => {
     expect(invalid.error?.issues.map((issue) => issue.path.join("."))).toContain(
       "backend_options.aer_method",
     );
+  });
+
+  it("rejects incompatible Aer throughput settings in the form", () => {
+    const result = runFormSchema.safeParse({
+      ...validFormData,
+      backend_target: "aer_simulator",
+      backend_options: {
+        ...validFormData.backend_options,
+        device: "GPU",
+        aer_method: "statevector",
+        batched_shots_gpu: true,
+        cuStateVec_enable: true,
+        max_parallel_experiments: 2,
+        max_parallel_shots: 2,
+      },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path.join(".")).sort()).toEqual([
+      "backend_options.cuStateVec_enable",
+      "backend_options.max_parallel_shots",
+    ]);
   });
 
   it("rejects simulator names as backend-derived noise references", () => {

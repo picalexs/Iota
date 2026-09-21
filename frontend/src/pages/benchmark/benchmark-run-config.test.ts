@@ -74,6 +74,7 @@ describe("benchmark-run-config", () => {
     expect(config.backend_options?.shots).toBe(256);
     expect(config.backend_options?.aer_method).toBe("automatic");
     expect(config.backend_options?.device).toBeNull();
+    expect(config.backend_options?.batched_shots_gpu).toBeNull();
   });
 
   it("keeps explicit low-shot GPU settings on Aer benchmark rows", () => {
@@ -94,6 +95,23 @@ describe("benchmark-run-config", () => {
       shots: 256,
       aer_method: "statevector",
       device: "GPU",
+      batched_shots_gpu: true,
     });
+  });
+
+  it("does not enable noisy-shot batching for ideal GPU rows", () => {
+    const config = buildSimpleBenchmarkRunConfig(
+      "vqe",
+      "sto-3g",
+      {
+        mode: "aer_simulator",
+        backendName: null,
+        aerMethod: "statevector",
+        device: "GPU",
+      },
+      "fastest",
+    );
+
+    expect(config.backend_options?.batched_shots_gpu).toBeNull();
   });
 });
