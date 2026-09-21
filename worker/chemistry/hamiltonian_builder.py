@@ -9,6 +9,7 @@ import struct
 import time
 from typing import Any
 
+from worker.chemistry.accelerators import resolve_gpu4pyscf
 from worker.chemistry.problem_manifest import build_problem_manifest
 from worker.chemistry.types import HamiltonianBundle, PreparedMolecule
 
@@ -172,7 +173,11 @@ def _resolve_build_active_space(
     return n_electrons, n_orbitals, True, total_electrons, total_orbitals
 
 
-def build_qubit_hamiltonian(molecule: PreparedMolecule) -> HamiltonianBundle:
+def build_qubit_hamiltonian(
+    molecule: PreparedMolecule,
+    *,
+    chemistry_options: dict[str, Any] | None = None,
+) -> HamiltonianBundle:
     """Build a qubit Hamiltonian bundle via PySCF -> ffsim for a molecule."""
     try:
         import ffsim
@@ -205,8 +210,15 @@ def build_qubit_hamiltonian(molecule: PreparedMolecule) -> HamiltonianBundle:
         else None
     )
 
+    requested_reference_device = (chemistry_options or {}).get("reference_device")
+    reference_resolution, gpu_rhf = resolve_gpu4pyscf(requested_reference_device)
     t_scf = time.monotonic()
-    mf = scf.RHF(mol)
+    mf = gpu_rhf(mol) if gpu_rhf is not None else scf.RHF(mol)
+    if reference_resolution.actual_device == "GPU":
+        density_fit = getattr(mf, "density_fit", None)
+        if not callable(density_fit):
+            raise RuntimeError("GPU4PySCF RHF does not provide density fitting")
+        mf = density_fit()
     mf.verbose = 0
     mf.kernel()
     scf_elapsed = time.monotonic() - t_scf
@@ -223,6 +235,14 @@ def build_qubit_hamiltonian(molecule: PreparedMolecule) -> HamiltonianBundle:
         float(mf.e_tot),
         scf_elapsed,
     )
+
+    if reference_resolution.actual_device == "GPU":
+        to_cpu = getattr(mf, "to_cpu", None)
+        if not callable(to_cpu):
+            raise RuntimeError(
+                "GPU4PySCF RHF does not provide to_cpu(); cannot safely continue to CPU CASCI"
+            )
+        mf = to_cpu()
 
     mo_coeff = getattr(mf, "mo_coeff", None)
     if mo_coeff is None:
@@ -323,7 +343,11 @@ def build_qubit_hamiltonian(molecule: PreparedMolecule) -> HamiltonianBundle:
     )
 
     metadata: dict[str, Any] = {
-        "pipeline": "pyscf+ffsim",
+        "pipeline": (
+            "gpu4pyscf+pyscf+ffsim"
+            if reference_resolution.actual_device == "GPU"
+            else "pyscf+ffsim"
+        ),
         "nuclear_repulsion": float(mol.energy_nuc()),
         "hf_energy": float(mf.e_tot),
         "casci_energy": float(mc.e_tot),
@@ -340,7 +364,18 @@ def build_qubit_hamiltonian(molecule: PreparedMolecule) -> HamiltonianBundle:
         },
         "reference_method": "CASCI",
         "reference_backend_target": "local_classical",
-        "reference_solver_path": "pyscf+ffsim",
+        "reference_solver_path": (
+            "gpu4pyscf-scf+pyscf-casci+ffsim"
+            if reference_resolution.actual_device == "GPU"
+            else "pyscf+ffsim"
+        ),
+        "reference_device_requested": reference_resolution.requested_device,
+        "reference_device_actual": reference_resolution.actual_device,
+        "reference_provider": reference_resolution.provider,
+        "reference_density_fitting": reference_resolution.actual_device == "GPU",
+        "reference_gpu_fallback_reason": reference_resolution.fallback_reason,
+        "scf_device": reference_resolution.actual_device,
+        "casci_device": "CPU",
         "reference_basis": molecule.basis,
         "reference_active_space": [n_electrons, n_orbitals],
         "reference_precision": None,

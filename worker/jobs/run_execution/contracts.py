@@ -33,7 +33,6 @@ class StartedRunContext(NamedTuple):
     config_snapshot: dict[str, Any]
     algorithm_config: dict[str, Any]
     backend_options_runtime: dict[str, Any]
-    chemistry_options_runtime: dict[str, Any]
     chemistry_input: ChemistryInputContract
     eta_seed_seconds_per_iteration: float | None
     eta_seed_confidence: float | None

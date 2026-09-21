@@ -347,20 +347,27 @@ def _build_local_primitive_job_observer(
 def _build_hamiltonian_bundle(
     *,
     chemistry_input: ChemistryInput,
+    chemistry_options: dict[str, Any] | None = None,
 ) -> HamiltonianBundle:
     """Compatibility wrapper for the extracted Hamiltonian cache seam."""
     if (
         build_molecule is _ORIGINAL_BUILD_MOLECULE
         and build_qubit_hamiltonian is _ORIGINAL_BUILD_QUBIT_HAMILTONIAN
     ):
-        return _hamiltonian_cache._build_hamiltonian_bundle(chemistry_input=chemistry_input)
+        return _hamiltonian_cache._build_hamiltonian_bundle(
+            chemistry_input=chemistry_input,
+            chemistry_options=chemistry_options,
+        )
 
     original_build_molecule = _hamiltonian_cache.build_molecule
     original_build_qubit_hamiltonian = _hamiltonian_cache.build_qubit_hamiltonian
     _hamiltonian_cache.build_molecule = build_molecule
     _hamiltonian_cache.build_qubit_hamiltonian = build_qubit_hamiltonian
     try:
-        return _hamiltonian_cache._build_hamiltonian_bundle(chemistry_input=chemistry_input)
+        return _hamiltonian_cache._build_hamiltonian_bundle(
+            chemistry_input=chemistry_input,
+            chemistry_options=chemistry_options,
+        )
     finally:
         _hamiltonian_cache.build_molecule = original_build_molecule
         _hamiltonian_cache.build_qubit_hamiltonian = original_build_qubit_hamiltonian

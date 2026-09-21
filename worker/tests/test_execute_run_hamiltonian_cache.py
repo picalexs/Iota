@@ -99,3 +99,30 @@ def test_build_hamiltonian_bundle_cache_key_tracks_basis_override(monkeypatch) -
     assert seen_bases == ["sto-3g", "6-31g"]
     assert sto.metadata["tag"] == "sto-3g"
     assert g631.metadata["tag"] == "6-31g"
+
+
+def test_build_hamiltonian_bundle_cache_key_tracks_chemistry_device(monkeypatch) -> None:
+    execute_run_module.clear_hamiltonian_bundle_cache()
+
+    monkeypatch.setattr(execute_run_module, "build_molecule", lambda _: _prepared_molecule())
+    seen_devices: list[str] = []
+
+    def _build_bundle(prepared: PreparedMolecule, *, chemistry_options=None) -> HamiltonianBundle:
+        del prepared
+        seen_devices.append(str((chemistry_options or {}).get("reference_device", "CPU")))
+        return _bundle(seen_devices[-1])
+
+    monkeypatch.setattr(execute_run_module, "build_qubit_hamiltonian", _build_bundle)
+
+    cpu = execute_run_module._build_hamiltonian_bundle(
+        chemistry_input=_chemistry_input(),
+        chemistry_options={"reference_device": "CPU"},
+    )
+    gpu = execute_run_module._build_hamiltonian_bundle(
+        chemistry_input=_chemistry_input(),
+        chemistry_options={"reference_device": "GPU"},
+    )
+
+    assert seen_devices == ["CPU", "GPU"]
+    assert cpu.metadata["tag"] == "CPU"
+    assert gpu.metadata["tag"] == "GPU"

@@ -11,7 +11,10 @@ from copy import deepcopy
 from worker.chemistry.types import HamiltonianBundle, PreparedMolecule
 
 
-def chemistry_cache_key(molecule: PreparedMolecule) -> str:
+def chemistry_cache_key(
+    molecule: PreparedMolecule,
+    chemistry_options: dict[str, object] | None = None,
+) -> str:
     """Build a deterministic cache key from normalized molecule input."""
     payload = {
         "atom_spec": [
@@ -25,6 +28,7 @@ def chemistry_cache_key(molecule: PreparedMolecule) -> str:
         "charge": molecule.charge,
         "multiplicity": molecule.multiplicity,
         "active_space": list(molecule.active_space) if molecule.active_space is not None else None,
+        "chemistry_options": dict(chemistry_options or {}),
     }
     canonical_payload = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
