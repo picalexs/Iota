@@ -1215,6 +1215,23 @@ def write_records_csv(records: list[Mapping[str, Any]], path: Path) -> None:
 
 def compact_manifest(bundle: SourceBundle, *, files: list[str]) -> dict[str, Any]:
     summary = summarize_rows(bundle.rows)
+    selected_backend = _text(
+        _first(bundle.benchmark, "selectedBackendName", "selected_backend_name")
+    )
+    actual_backends = sorted(
+        {
+            str(row["backend_name"])
+            for row in bundle.rows
+            if _text(row.get("backend_name")) is not None
+        }
+    )
+    provenance_warnings: list[str] = []
+    if selected_backend is not None and actual_backends and selected_backend not in actual_backends:
+        provenance_warnings.append(
+            "saved benchmark backend does not match any actual run backend"
+        )
+    if len(actual_backends) > 1:
+        provenance_warnings.append("benchmark uses multiple actual run backends")
     source_metadata = {
         "source_type": bundle.source_type,
         "source_id": bundle.source_id,
@@ -1233,6 +1250,9 @@ def compact_manifest(bundle: SourceBundle, *, files: list[str]) -> dict[str, Any
         "successful_result_count": summary["successful_result_count"],
         "status_counts": summary["status_counts"],
         "runtime_sources": dict(bundle.runtime_sources),
+        "selected_backend_name": selected_backend,
+        "actual_backend_names": actual_backends,
+        "provenance_warnings": provenance_warnings,
         "source_signature": source_signature(bundle.rows),
         "files": sorted(files),
     }

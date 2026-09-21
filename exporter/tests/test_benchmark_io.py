@@ -5,6 +5,8 @@ from pathlib import Path
 
 from exporter.benchmark_io import (
     CANONICAL_FIELDS,
+    SourceBundle,
+    compact_manifest,
     load_api_source,
     load_folder_source,
     normalize_api_row,
@@ -303,3 +305,20 @@ def test_summary_excludes_completed_diagnostic_rows_from_successes() -> None:
 
     assert summary["successful_result_count"] == 1
     assert summary["best_algorithm_by_molecule"][0]["algorithm"] == "vqe"
+
+
+def test_manifest_warns_when_saved_backend_differs_from_actual_runs() -> None:
+    manifest = compact_manifest(
+        SourceBundle(
+            benchmark={"id": "benchmark-1", "selectedBackendName": "ibm_pittsburgh"},
+            rows=[{"backend_name": "ibm_boston", "status": "cancelled"}],
+            source_type="folder",
+            source_id="benchmark-1",
+        ),
+        files=[],
+    )
+
+    assert manifest["actual_backend_names"] == ["ibm_boston"]
+    assert manifest["provenance_warnings"] == [
+        "saved benchmark backend does not match any actual run backend"
+    ]
