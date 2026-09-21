@@ -730,6 +730,14 @@ export function RunForm({ initialMoleculeId = null }: RunFormProps) {
                     shouldValidate: true,
                   })
                 }
+                chemistryOptions={values.chemistry_options}
+                onChemistryOptionsChange={(next) =>
+                  form.setValue("chemistry_options", next, {
+                    shouldDirty: true,
+                    shouldTouch: true,
+                    shouldValidate: true,
+                  })
+                }
                 noiseProfile={values.noise_profile}
                 onNoiseProfileChange={(next) =>
                   form.setValue("noise_profile", next, {

@@ -56,6 +56,7 @@ def build_backend_execution_context(
     backend_options: dict[str, Any] | None = None,
     noise_profile: dict[str, Any] | None = None,
     selection_policy: str = "requested",
+    chemistry_options: dict[str, Any] | None = None,
 ) -> BackendExecutionContext:
     """Resolve run-level backend options into a stable execution context."""
     options = dict(backend_options or {})
@@ -120,6 +121,7 @@ def build_backend_execution_context(
         requested_estimator_precision=requested_estimator_precision,
         optimization_level=optimization_level,
         simulator_method=simulator_method,
+        chemistry_options=dict(chemistry_options or {}),
     )
 
 

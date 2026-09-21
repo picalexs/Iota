@@ -899,6 +899,13 @@ export const runFormSchema = z
       max_parallel_shots: optionalAerParallelism,
       aer_pub_chunk_size: z.number().int().min(1).max(32).nullable().optional(),
     }),
+    chemistry_options: z
+      .object({
+        reference_device: z.enum(["CPU", "GPU", "AUTO"]).nullable().optional(),
+        selected_ci_device: z.enum(["CPU", "GPU", "AUTO"]).nullable().optional(),
+      })
+      .nullable()
+      .optional(),
     noise_profile: z
       .union([
         z.object({

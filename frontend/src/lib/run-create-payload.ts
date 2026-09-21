@@ -286,6 +286,7 @@ export function buildAlgorithmAwareRunCreate(
     mode: values.mode,
     backend_target: values.backend_target,
     chemical_accuracy_target_ha: values.chemical_accuracy_target_ha,
+    chemistry_options: values.chemistry_options ?? null,
     backend_options: {
       ...backendOptions,
       backend_name:

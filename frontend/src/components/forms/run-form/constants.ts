@@ -21,6 +21,10 @@ export const initialValues: SimulationRunFormData = {
     aer_method: "automatic",
     device: null,
   },
+  chemistry_options: {
+    reference_device: null,
+    selected_ci_device: null,
+  },
   noise_profile: null,
   basis_set_override: "",
   easy_options: {

@@ -94,7 +94,10 @@ def prepare_backend_and_hamiltonian(
             "multiplicity": started.chemistry_input.multiplicity,
         },
     )
-    hamiltonian_bundle = build_hamiltonian_bundle(chemistry_input=started.chemistry_input)
+    hamiltonian_bundle = build_hamiltonian_bundle(
+        chemistry_input=started.chemistry_input,
+        chemistry_options=started.chemistry_options_runtime or {},
+    )
     logger.info(
         "Run %s: hamiltonian built num_qubits=%d num_spatial_orbitals=%d "
         "active_space=%s pipeline=%s elapsed=%.3fs",

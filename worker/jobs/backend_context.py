@@ -13,7 +13,11 @@ from worker.adapters.base import (
 from worker.chemistry.backend_selector import build_backend_execution_context
 from worker.chemistry.aer_runtime import validate_aer_runtime
 
-from .execution_config import _noise_profile_from_config, _selection_policy_from_config
+from .execution_config import (
+    _chemistry_options_from_config,
+    _noise_profile_from_config,
+    _selection_policy_from_config,
+)
 
 IBMJobObserverFactory = Callable[..., PrimitiveJobObserver]
 LocalJobObserverFactory = Callable[..., PrimitiveJobObserver]
@@ -37,6 +41,7 @@ def build_backend_context_for_run(
         backend_options=backend_options_runtime,
         noise_profile=_noise_profile_from_config(config_snapshot),
         selection_policy=_selection_policy_from_config(config_snapshot),
+        chemistry_options=_chemistry_options_from_config(config_snapshot),
     )
     if backend_context.backend_target == "ibm_runtime":
         return BackendExecutionContext(
@@ -50,6 +55,7 @@ def build_backend_context_for_run(
             requested_estimator_precision=backend_context.requested_estimator_precision,
             optimization_level=backend_context.optimization_level,
             simulator_method=backend_context.simulator_method,
+            chemistry_options=backend_context.chemistry_options,
             primitive_run_guard=run_guard_factory(run_id),
             primitive_job_observer=ibm_job_observer_factory(
                 run_id=run_id,
@@ -73,6 +79,7 @@ def build_backend_context_for_run(
         requested_estimator_precision=backend_context.requested_estimator_precision,
         optimization_level=backend_context.optimization_level,
         simulator_method=backend_context.simulator_method,
+        chemistry_options=backend_context.chemistry_options,
         primitive_run_guard=run_guard_factory(run_id),
         primitive_job_observer=local_job_observer_factory(run_id=run_id),
     )

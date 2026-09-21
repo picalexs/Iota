@@ -4,6 +4,7 @@ from app.schemas import run as compatibility
 from app.schemas.run_config import (
     BackendDerivedNoiseProfile,
     BackendOptions,
+    ChemistryOptions,
     CustomPresetNoiseProfile,
 )
 from app.schemas.run_requests import RunCreate
@@ -82,6 +83,15 @@ def test_backend_options_keep_aer_tuning_fields_optional_and_bounded() -> None:
             pass
         else:
             raise AssertionError(f"expected invalid {field} to fail: {value!r}")
+
+
+def test_chemistry_options_keep_accelerators_optional_and_typed() -> None:
+    assert ChemistryOptions().model_dump() == {}
+    options = ChemistryOptions(reference_device="GPU", selected_ci_device="AUTO")
+    assert options.model_dump() == {
+        "reference_device": "GPU",
+        "selected_ci_device": "AUTO",
+    }
 
 
 def test_noise_profiles_require_explicit_parameters_and_real_references() -> None:

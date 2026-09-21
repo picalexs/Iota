@@ -68,6 +68,7 @@ from .control_state import (
 from .dispatcher import dispatch_algorithm
 from .execution_config import (
     _backend_options_from_config,
+    _chemistry_options_from_config,
     _estimate_seed_from_snapshot,
     _extract_run_context,
     _runtime_algorithm_config,
@@ -560,6 +561,7 @@ def _start_run_context(
                 run_row_snapshot.get("credential_profile_id") if run_row_snapshot else None
             ),
         )
+        chemistry_options_runtime = _chemistry_options_from_config(run_context.config_snapshot)
         if backend_options_runtime.get("credential_profile_id"):
             backend_options_runtime = inject_profile_credentials(session, backend_options_runtime)
 
@@ -586,6 +588,7 @@ def _start_run_context(
             config_snapshot=run_context.config_snapshot,
             algorithm_config=algorithm_config,
             backend_options_runtime=backend_options_runtime,
+            chemistry_options_runtime=chemistry_options_runtime,
             chemistry_input=chemistry_input,
             eta_seed_seconds_per_iteration=eta_seed_seconds_per_iteration,
             eta_seed_confidence=eta_seed_confidence,

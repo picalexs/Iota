@@ -3,9 +3,18 @@ import type {
   BackendCapability,
   BackendOptions,
   BackendTarget,
+  ChemistryOptions,
   NoiseProfile,
   RunMode,
 } from "@/types/run";
+import { FormField } from "@/components/forms/form-field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   backendDefaultsForTarget,
   getNoiseReferenceDevice,
@@ -24,6 +33,8 @@ interface BackendSectionProps {
   onChange: (v: BackendTarget) => void;
   backendOptions: BackendOptions;
   onBackendOptionsChange: (next: BackendOptions) => void;
+  chemistryOptions?: ChemistryOptions | null;
+  onChemistryOptionsChange?: (next: ChemistryOptions) => void;
   noiseProfile: NoiseProfile | null;
   onNoiseProfileChange: (next: NoiseProfile | null) => void;
   capabilities: BackendCapability[];
@@ -42,6 +53,8 @@ export function BackendSection({
   onChange,
   backendOptions,
   onBackendOptionsChange,
+  chemistryOptions,
+  onChemistryOptionsChange,
   noiseProfile,
   onNoiseProfileChange,
   capabilities,
@@ -168,6 +181,68 @@ export function BackendSection({
         error={error}
         onSelect={handleBackendTargetChange}
       />
+
+      {mode === "advanced" && value != null && onChemistryOptionsChange ? (
+        <div className="grid gap-4 rounded-lg border border-border/70 bg-card p-4 md:grid-cols-2">
+          <FormField
+            label="Reference chemistry device"
+            htmlFor="chemistry-reference-device"
+            help={{
+              short:
+                "Use GPU4PySCF for the SCF reference stage when the GPU chemistry provider is installed.",
+              anchor: "chemistry_options.reference_device",
+            }}
+          >
+            <Select
+              value={chemistryOptions?.reference_device ?? "CPU"}
+              onValueChange={(next) =>
+                onChemistryOptionsChange({
+                  ...(chemistryOptions ?? {}),
+                  reference_device: next as ChemistryOptions["reference_device"],
+                })
+              }
+            >
+              <SelectTrigger id="chemistry-reference-device" disabled={disabled}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CPU">CPU (default)</SelectItem>
+                <SelectItem value="GPU">GPU (GPU4PySCF required)</SelectItem>
+                <SelectItem value="AUTO">Auto (GPU when available)</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormField>
+
+          <FormField
+            label="Selected-CI device"
+            htmlFor="selected-ci-device"
+            help={{
+              short:
+                "Use SBD for SQD selected-CI batches. SKQD sample-union mode keeps its exact CPU solver.",
+              anchor: "chemistry_options.selected_ci_device",
+            }}
+          >
+            <Select
+              value={chemistryOptions?.selected_ci_device ?? "CPU"}
+              onValueChange={(next) =>
+                onChemistryOptionsChange({
+                  ...(chemistryOptions ?? {}),
+                  selected_ci_device: next as ChemistryOptions["selected_ci_device"],
+                })
+              }
+            >
+              <SelectTrigger id="selected-ci-device" disabled={disabled}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CPU">CPU (default)</SelectItem>
+                <SelectItem value="GPU">GPU (SBD required)</SelectItem>
+                <SelectItem value="AUTO">Auto (SBD when available)</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormField>
+        </div>
+      ) : null}
 
       {isExpandedBackend ? (
         <BackendSectionExpanded

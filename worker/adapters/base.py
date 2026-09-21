@@ -43,6 +43,7 @@ class BackendExecutionContext:
     requested_estimator_precision: float | None = None
     optimization_level: int = 1
     simulator_method: str = "automatic"
+    chemistry_options: dict[str, Any] = field(default_factory=dict)
     primitive_job_observer: PrimitiveJobObserver | None = field(
         default=None,
         compare=False,

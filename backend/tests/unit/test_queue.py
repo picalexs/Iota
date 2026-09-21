@@ -140,6 +140,15 @@ def test_queue_name_for_run_keeps_cpu_default_queue():
     assert queue_name_for_run(run, settings=settings) == "quantum"
 
 
+def test_queue_name_for_run_routes_gpu_chemistry_requests():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(
+        config_json={"chemistry_options": {"reference_device": "GPU"}}
+    )
+
+    assert queue_name_for_run(run, settings=settings) == "quantum-gpu"
+
+
 def test_enqueue_run_uses_configured_queue_name():
     mock_queue = MagicMock()
     mock_queue.enqueue.return_value = MagicMock(id="job-1")

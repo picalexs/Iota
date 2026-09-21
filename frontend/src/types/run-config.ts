@@ -132,6 +132,13 @@ export type NoiseProfile = BackendDerivedNoiseProfile | CustomPresetNoiseProfile
 
 export type BackendSelectionPolicy = "manual" | "least_busy" | "least_error";
 
+export type ChemistryDevice = "CPU" | "GPU" | "AUTO";
+
+export interface ChemistryOptions {
+  reference_device?: ChemistryDevice | null;
+  selected_ci_device?: ChemistryDevice | null;
+}
+
 export type AerMethod =
   | "automatic"
   | "statevector"
@@ -397,6 +404,7 @@ export interface RunConfigJson {
   easy_options?: EasyOptions | null;
   advanced_config?: AdvancedConfig | null;
   backend_options?: BackendOptions | null;
+  chemistry_options?: ChemistryOptions | null;
   noise_profile?: NoiseProfile | null;
   client_request_id?: UUID | null;
   versions?: Record<string, string> | null;
@@ -415,6 +423,7 @@ export interface AlgorithmAwareRunCreate {
   easy_options?: EasyOptions;
   advanced_config?: AdvancedConfig;
   backend_options?: BackendOptions;
+  chemistry_options?: ChemistryOptions | null;
   basis_set_override?: string;
   noise_profile?: NoiseProfile | null;
   ibm_runtime_confirmed?: boolean;
@@ -437,6 +446,7 @@ export interface SimulationRunFormData {
   backend_target: BackendTarget | null;
   chemical_accuracy_target_ha: number | null;
   backend_options: BackendOptions;
+  chemistry_options?: ChemistryOptions | null;
   noise_profile: NoiseProfile | null;
   basis_set_override: string;
   easy_options: EasyOptions;

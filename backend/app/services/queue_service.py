@@ -76,12 +76,18 @@ def _log_queue_failure(
 
 
 def queue_name_for_run(run: object, *, settings: Any | None = None) -> str:
-    """Route explicit GPU requests to the GPU-only worker queue."""
+    """Route GPU-backed Aer or chemistry requests to the GPU worker queue."""
     resolved_settings = settings or get_settings()
     config_snapshot = getattr(run, "config_json", None)
     if isinstance(config_snapshot, dict):
         backend_options = config_snapshot.get("backend_options")
         if isinstance(backend_options, dict) and backend_options.get("device") == "GPU":
+            return str(resolved_settings.gpu_queue_name)
+        chemistry_options = config_snapshot.get("chemistry_options")
+        if isinstance(chemistry_options, dict) and any(
+            chemistry_options.get(field) in {"GPU", "AUTO"}
+            for field in ("reference_device", "selected_ci_device")
+        ):
             return str(resolved_settings.gpu_queue_name)
     return str(resolved_settings.queue_name)
 

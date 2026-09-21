@@ -253,6 +253,12 @@ def _backend_options_from_config(
     return resolved_backend_options
 
 
+def _chemistry_options_from_config(config_snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Resolve optional chemistry accelerator settings from a run snapshot."""
+    chemistry_options = config_snapshot.get("chemistry_options")
+    return dict(chemistry_options) if isinstance(chemistry_options, dict) else {}
+
+
 def _noise_profile_from_config(config_snapshot: dict[str, Any]) -> dict[str, Any] | None:
     noise_profile = config_snapshot.get("noise_profile")
     return dict(noise_profile) if isinstance(noise_profile, dict) else None

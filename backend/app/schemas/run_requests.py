@@ -8,7 +8,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import BackendTarget, RunAlgorithm, RunMode, RunStatus
-from app.schemas.run_config import AdvancedConfig, BackendOptions, EasyOptions, NoiseProfile
+from app.schemas.run_config import (
+    AdvancedConfig,
+    BackendOptions,
+    ChemistryOptions,
+    EasyOptions,
+    NoiseProfile,
+)
 
 
 class RunCreate(BaseModel):
@@ -43,6 +49,7 @@ class RunCreate(BaseModel):
     backend_options: BackendOptions = Field(
         default_factory=lambda: BackendOptions.model_validate({})
     )
+    chemistry_options: ChemistryOptions | None = None
     easy_options: EasyOptions | None = None
     advanced_config: AdvancedConfig | None = None
     basis_set_override: str | None = Field(None, min_length=1, max_length=255)
@@ -70,6 +77,11 @@ class RunCreate(BaseModel):
             "mode": self.mode.value,
             "backend_target": self.backend_target.value,
             "backend_options": backend_options,
+            "chemistry_options": (
+                self.chemistry_options.model_dump(mode="json")
+                if self.chemistry_options
+                else None
+            ),
             "basis_set_override": self.basis_set_override,
             "easy_options": self.easy_options.model_dump() if self.easy_options else None,
             "advanced_config": self.advanced_config.model_dump() if self.advanced_config else None,

@@ -115,6 +115,29 @@ class BackendOptions(BaseModel):
     )
 
 
+class ChemistryOptions(BaseModel):
+    """Optional classical chemistry accelerator choices."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reference_device: Literal["CPU", "GPU", "AUTO"] | None = Field(
+        None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Device for the PySCF reference SCF stage. GPU uses optional GPU4PySCF; "
+            "AUTO uses it when installed and otherwise keeps the CPU path."
+        ),
+    )
+    selected_ci_device: Literal["CPU", "GPU", "AUTO"] | None = Field(
+        None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Device for SQD selected-CI stages. GPU uses optional SBD; AUTO falls back "
+            "to the CPU selected-CI solver when SBD is unavailable."
+        ),
+    )
+
+
 class NoiseModelSource(StrEnum):
     """Source type for optional noise profile."""
 
