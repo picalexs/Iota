@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from worker.adapters.base import BackendExecutionContext
 from worker.exceptions import BackendError
+
+if TYPE_CHECKING:
+    from worker.adapters.base import BackendExecutionContext
 
 GPU_AER_METHODS = frozenset({"statevector", "density_matrix", "unitary"})
 
