@@ -120,10 +120,18 @@ def aer_pauli_time_evolution_state(
     time_step: float,
     trotter_steps: int = 1,
     context: Any | None = None,
-) -> np.ndarray:
-    """Evolve a state by simulating a PauliEvolutionGate with AerSimulator."""
+    result_metadata: dict[str, Any] | None = None,
+    return_metadata: bool = False,
+) -> np.ndarray | tuple[np.ndarray, dict[str, Any]]:
+    """Evolve a state with Aer while optionally retaining result metadata.
+
+    The default return value remains the statevector. Callers that need Aer
+    timing or device evidence can pass ``result_metadata`` and/or set
+    ``return_metadata`` to receive the captured metadata explicitly.
+    """
     if is_zero_time(time_step):
-        return _normalized_state(state)
+        evolved = _normalized_state(state)
+        return (evolved, {}) if return_metadata else evolved
     if trotter_steps < 1:
         raise ValueError("trotter_steps must be positive")
     if context is not None and getattr(context, "noise_profile", None):
@@ -137,6 +145,11 @@ def aer_pauli_time_evolution_state(
     from qiskit.quantum_info import SparsePauliOp
     from qiskit.synthesis import LieTrotter
 
+    from worker.chemistry.aer_runtime import (
+        extract_aer_result_metadata,
+        validate_aer_method_for_device,
+        validate_aer_runtime,
+    )
     from worker.chemistry.matrix_element_circuits import build_aer_simulator
 
     pauli_hamiltonian = getattr(hamiltonian, "pauli_hamiltonian", None)
@@ -151,6 +164,11 @@ def aer_pauli_time_evolution_state(
             "KQD/QFD Aer time evolution requires aer_method='automatic', "
             "'statevector', or 'matrix_product_state'."
         )
+
+    device = _backend_option_str(context, "device")
+    validate_aer_method_for_device(device=device, method=simulator_method)
+    if device == "GPU" and isinstance(getattr(context, "backend_options", None), dict):
+        validate_aer_runtime(context)
 
     simulator = build_aer_simulator(context)
 
@@ -183,9 +201,13 @@ def aer_pauli_time_evolution_state(
         run_options["seed_simulator"] = seed_simulator
 
     result = simulator.run(transpiled, **run_options).result()
+    captured_metadata = extract_aer_result_metadata(result)
+    if result_metadata is not None:
+        result_metadata.update(captured_metadata)
     data = result.data(0)
     evolved = np.asarray(data["statevector"], dtype=complex)
-    return _normalized_state(evolved)
+    normalized = _normalized_state(evolved)
+    return (normalized, captured_metadata) if return_metadata else normalized
 
 
 def _normalized_state(state: np.ndarray) -> np.ndarray:
@@ -229,3 +251,13 @@ def _backend_option_int(context: Any | None, key: str) -> int | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return int(value)
+
+
+def _backend_option_str(context: Any | None, key: str) -> str | None:
+    if context is None:
+        return None
+    options = getattr(context, "backend_options", None)
+    if not isinstance(options, dict):
+        return None
+    value = options.get(key)
+    return value.strip().upper() if isinstance(value, str) else None

@@ -97,13 +97,20 @@ def evolve_dense_qfd_state(
     if is_zero_time(time_point):
         return evolution_context.reference_state
     if evolution_context.use_aer:
-        return aer_time_evolution_fn(
-            evolution_context.hamiltonian,
-            evolution_context.reference_state,
-            time_step=time_point,
-            trotter_steps=evolution_context.trotter_steps,
-            context=evolution_context.backend_context,
-        )
+        aer_kwargs: dict[str, Any] = {
+            "hamiltonian": evolution_context.hamiltonian,
+            "state": evolution_context.reference_state,
+            "time_step": time_point,
+            "trotter_steps": evolution_context.trotter_steps,
+            "context": evolution_context.backend_context,
+        }
+        if aer_time_evolution_fn is aer_pauli_time_evolution_state:
+            resource_metadata = getattr(evolution_context.backend_context, "resource_metadata", None)
+            if isinstance(resource_metadata, dict):
+                aer_kwargs["result_metadata"] = resource_metadata.setdefault(
+                    "aer_state_evolution", {}
+                )
+        return aer_time_evolution_fn(**aer_kwargs)
     if evolution_context.eigenvalues is None or evolution_context.eigenvectors is None:
         raise RuntimeError("QFD exact evolution spectrum was not prepared")
     return exact_time_evolution_fn(

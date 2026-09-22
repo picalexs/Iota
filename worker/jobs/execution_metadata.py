@@ -332,6 +332,12 @@ def merge_backend_metadata(
         ),
         **adapter_metadata,
     }
+    aer_state_evolution = backend_context.resource_metadata.get("aer_state_evolution")
+    if isinstance(aer_state_evolution, dict):
+        metadata["aer_state_evolution"] = dict(aer_state_evolution)
+        if aer_state_evolution.get("actual_device") in {"CPU", "GPU"}:
+            metadata["actual_device"] = aer_state_evolution["actual_device"]
+            metadata["device_verified"] = aer_state_evolution.get("device_verified") is True
     if provisional and algorithm in {"kqd", "qfd", "qse"}:
         metadata.update(pending_conditional_execution_metadata(algorithm))
     elif algorithm in {"kqd", "qfd"}:

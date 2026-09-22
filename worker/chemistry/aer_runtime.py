@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -26,10 +27,15 @@ class AerRuntimeInfo:
 
     def metadata(self, *, requested_device: str | None) -> dict[str, Any]:
         normalized_requested = _normalize_device(requested_device)
+        # Device discovery proves that a requested GPU is available. It does
+        # not prove that a later simulator job used that GPU. Keep that fact
+        # separate until Aer returns experiment metadata.
+        preflight_actual = "CPU" if normalized_requested == "CPU" else None
         return {
             "requested_device": normalized_requested,
             "device_source": "explicit" if requested_device is not None else "default",
-            "actual_device": normalized_requested,
+            "actual_device": preflight_actual,
+            "device_verified": preflight_actual is not None,
             "available_devices": list(self.available_devices),
             "gpu_available": self.gpu_available,
             "aer_version": self.aer_version,
@@ -96,6 +102,46 @@ def validate_aer_method_for_device(*, device: str | None, method: str) -> None:
         )
 
 
+def extract_aer_result_metadata(result: Any, *, experiment_index: int = 0) -> dict[str, Any]:
+    """Extract result and experiment metadata without inferring device use.
+
+    Aer exposes aggregate timing/runtime facts on ``Result.metadata`` and
+    simulator details, including the actual device, on the selected result
+    entry. Missing metadata is valid for test doubles and older result shapes.
+    """
+    captured: dict[str, Any] = {}
+    result_metadata = _metadata_mapping(getattr(result, "metadata", None))
+    if result_metadata:
+        captured["aer_result_metadata"] = result_metadata
+
+    experiment_metadata: dict[str, Any] = {}
+    results = getattr(result, "results", None)
+    if isinstance(results, (list, tuple)) and 0 <= experiment_index < len(results):
+        experiment_metadata = _metadata_mapping(
+            getattr(results[experiment_index], "metadata", None)
+        )
+    if experiment_metadata:
+        captured["aer_experiment_metadata"] = experiment_metadata
+        actual_device = _observed_device(experiment_metadata.get("device"))
+        if actual_device is not None:
+            captured["actual_device"] = actual_device
+            captured["device_verified"] = True
+    return captured
+
+
+def _metadata_mapping(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {}
+    return dict(value)
+
+
+def _observed_device(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().upper()
+    return normalized if normalized in {"CPU", "GPU"} else None
+
+
 def aer_runtime_metadata(context: BackendExecutionContext) -> dict[str, Any]:
     """Return capability and requested/actual device metadata for a run."""
     info = validate_aer_runtime(context)
@@ -106,6 +152,7 @@ __all__ = [
     "GPU_AER_METHODS",
     "AerRuntimeInfo",
     "aer_runtime_metadata",
+    "extract_aer_result_metadata",
     "probe_aer_runtime",
     "validate_aer_method_for_device",
     "validate_aer_runtime",

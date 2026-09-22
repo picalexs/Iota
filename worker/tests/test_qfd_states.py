@@ -168,6 +168,93 @@ def test_qfd_aer_evolution_preserves_analytic_complex_phase() -> None:
     assert negative == pytest.approx(expected_negative)
 
 
+def test_qfd_dense_aer_evolution_persists_result_metadata_on_context() -> None:
+    reference = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2.0)
+    hamiltonian = SimpleNamespace(
+        num_qubits=1,
+        pauli_hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+    )
+    context = SimpleNamespace(
+        backend_target="aer_simulator",
+        backend_options={"device": "CPU"},
+        simulator_method="statevector",
+        optimization_level=1,
+        resource_metadata={},
+        noise_profile=None,
+    )
+    evolution_context = SimpleNamespace(
+        hamiltonian=hamiltonian,
+        reference_state=reference,
+        use_aer=True,
+        trotter_steps=1,
+        backend_context=context,
+    )
+
+    evolve_dense_qfd_state(evolution_context=evolution_context, time_point=0.25)
+
+    metadata = context.resource_metadata["aer_state_evolution"]
+    assert metadata["actual_device"] == "CPU"
+    assert metadata["device_verified"] is True
+    assert metadata["aer_experiment_metadata"]["method"] == "statevector"
+
+
+def test_qfd_aer_evolution_can_return_result_metadata(monkeypatch) -> None:
+    from worker.chemistry import matrix_element_circuits
+
+    reference = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2.0)
+    hamiltonian = SimpleNamespace(
+        num_qubits=1,
+        pauli_hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+    )
+    context = BackendExecutionContext(
+        backend_target="aer_simulator",
+        backend_options={"device": "CPU", "max_parallel_threads": 2},
+        simulator_method="statevector",
+    )
+    metadata_sink: dict[str, object] = {}
+    captured_options: dict[str, object] = {}
+    real_build_aer_simulator = matrix_element_circuits.build_aer_simulator
+
+    def capture_aer_options(context, *, extra_options=None):
+        captured_options.update(
+            matrix_element_circuits.aer_simulator_options(
+                context,
+                extra_options=extra_options,
+            )
+        )
+        return real_build_aer_simulator(context, extra_options=extra_options)
+
+    monkeypatch.setattr(
+        matrix_element_circuits,
+        "build_aer_simulator",
+        capture_aer_options,
+    )
+
+    evolved, metadata = aer_pauli_time_evolution_state(
+        hamiltonian,
+        reference,
+        time_step=np.pi / 4.0,
+        context=context,
+        result_metadata=metadata_sink,
+        return_metadata=True,
+    )
+
+    assert evolved == pytest.approx(
+        np.array([np.exp(-1j * np.pi / 4.0), np.exp(1j * np.pi / 4.0)]) / np.sqrt(2.0)
+    )
+    assert metadata == metadata_sink
+    assert metadata["aer_result_metadata"]
+    assert metadata["aer_experiment_metadata"]["method"] == "statevector"
+    assert metadata["aer_experiment_metadata"]["device"] == "CPU"
+    assert metadata["actual_device"] == "CPU"
+    assert metadata["device_verified"] is True
+    assert captured_options == {
+        "method": "statevector",
+        "device": "CPU",
+        "max_parallel_threads": 2,
+    }
+
+
 def test_small_symmetric_grid_times_are_evolved_in_dense_and_sector_paths() -> None:
     hamiltonian = np.diag([1e10, -1e10]).astype(complex)
     reference = np.array([1.0, 1.0], dtype=complex) / np.sqrt(2.0)

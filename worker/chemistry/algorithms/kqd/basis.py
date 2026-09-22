@@ -77,12 +77,21 @@ def evolve_dense_krylov_state(
             state_projection=reference_projection,
         )
     if use_aer:
+        aer_kwargs: dict[str, Any] = {
+            "hamiltonian": hamiltonian,
+            "state": reference,
+            "time_step": time_point,
+            "trotter_steps": trotter_steps,
+            "context": backend_context,
+        }
+        if aer_time_evolution_fn is aer_pauli_time_evolution_state:
+            resource_metadata = getattr(backend_context, "resource_metadata", None)
+            if isinstance(resource_metadata, dict):
+                aer_kwargs["result_metadata"] = resource_metadata.setdefault(
+                    "aer_state_evolution", {}
+                )
         return aer_time_evolution_fn(
-            hamiltonian,
-            reference,
-            time_step=time_point,
-            trotter_steps=trotter_steps,
-            context=backend_context,
+            **aer_kwargs,
         )
     return trotterized_time_evolution_fn(
         operator_matrix,

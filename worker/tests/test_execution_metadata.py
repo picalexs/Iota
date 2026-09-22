@@ -49,6 +49,41 @@ def test_setup_payload_combines_chemistry_and_backend_metadata() -> None:
     assert payload["shots"] == 123
     assert payload["resolved_backend_name"] == "statevector"
     assert payload["hf_energy"] == -1.0
+    assert payload["execution_plan"]["execution_lane"] == "local_exact"
+    assert payload["execution_plan"]["plan_is_runtime_proof"] is False
+
+
+def test_result_metadata_keeps_gpu_capability_separate_from_execution_proof() -> None:
+    result = {"raw_result": {}, "algorithm_metrics": {}}
+    context = BackendExecutionContext(
+        backend_target="aer_simulator",
+        backend_options={"device": "GPU"},
+    )
+
+    apply_result_metadata(
+        result,
+        algorithm="vqe",
+        mode="advanced",
+        backend_target="aer_simulator",
+        chemistry_input=ChemistryInput(atoms=[], basis="6-31g"),
+        backend_adapter=_adapter(
+            {
+                "available_devices": ["CPU", "GPU"],
+                "actual_device": None,
+                "device_verified": False,
+            }
+        ),
+        backend_context=context,
+    )
+
+    state_stage = next(
+        stage
+        for stage in result["backend_execution"]["execution_plan"]["stage_paths"]
+        if stage["stage_name"] == "state_generation_or_sampling"
+    )
+    assert state_stage["planned_device"] == "GPU"
+    assert state_stage["actual_device"] is None
+    assert state_stage["device_verified"] is False
 
 
 def test_setup_payload_preserves_problem_manifest() -> None:
