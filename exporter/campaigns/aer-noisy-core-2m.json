@@ -1,0 +1,21 @@
+{
+  "name": "Paper custom noisy Aer H2 and LiH",
+  "campaign_id": "paper-aer-noisy-core-2m",
+  "molecules": [
+    {"id": "ce9bda97-c4fd-4949-9783-8f0d8b3c3983", "name": "Hydrogen", "key": "h2"},
+    {"id": "ce815871-d15c-463a-a101-40b3e4fcc2d1", "name": "Lithium Hydride", "key": "lih"}
+  ],
+  "algorithms": [
+    {"id": "vqe-noisy-balanced", "label": "VQE noisy balanced", "algorithm": "vqe", "mode": "advanced", "advanced_config": {"algorithm": "vqe", "ansatz_name": "NumberPreserving", "optimizer_name": "COBYLA", "max_iterations": 128, "max_function_evaluations": 128, "reps": 1, "initial_point_strategy": "zero_plus_seeded_random", "initial_point_candidates": 1, "seed": null}},
+    {"id": "qse-noisy-balanced", "label": "QSE noisy balanced", "algorithm": "qse", "mode": "advanced", "advanced_config": {"algorithm": "qse", "reference_method": "hf", "excitation_level": "singles", "max_subspace_dim": 4, "regularization": 1e-6, "overlap_threshold": 1e-4, "residual_tolerance": 1e-6}},
+    {"id": "kqd-noisy-balanced", "label": "KQD noisy balanced", "algorithm": "kqd", "mode": "advanced", "advanced_config": {"algorithm": "kqd", "krylov_dim": 4, "time_step": 0.25, "evolution_method": "trotter", "trotter_steps": 2, "residual_tolerance": 1e-5}},
+    {"id": "qfd-noisy-balanced", "label": "QFD noisy balanced", "algorithm": "qfd", "mode": "advanced", "advanced_config": {"algorithm": "qfd", "num_time_points": 4, "max_time": 0.5, "time_grid_type": "linear", "qfd_variant": "qfd_chemistry_forward", "kappa": 1.0, "trotter_steps": 2, "residual_tolerance": 1e-5}},
+    {"id": "sqd-noisy-balanced", "label": "SQD noisy balanced", "algorithm": "sqd", "mode": "advanced", "seed_roles": ["algorithm", "sampling"], "advanced_config": {"algorithm": "sqd", "samples_per_batch": 256, "num_batches": 4, "max_iterations": 4, "sampling_state_source": "vqe", "sampling_vqe_ansatz_name": "NumberPreserving", "sampling_vqe_optimizer_name": "COBYLA", "sampling_vqe_max_iterations": 128, "sampling_vqe_reps": 1, "sampling_vqe_seed": null, "energy_tol": 1e-4, "occupancies_tol": 1e-4, "min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 16}},
+    {"id": "skqd-noisy-balanced", "label": "SKQD noisy balanced", "algorithm": "skqd", "mode": "advanced", "advanced_config": {"algorithm": "skqd", "samples_per_state": 512, "base_sampling_options": {"min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 16}, "krylov_extension_dim": 1, "sampling_mode": "sample_union_exact", "time_step": 0.2, "trotter_steps": 1, "residual_tolerance": 1e-5}}
+  ],
+  "seeds": [11, 17, 23, 29, 41],
+  "basis_set": "sto-3g",
+  "backend": {"target": "aer_simulator", "options": {"shots": 4096, "aer_method": "automatic", "optimization_level": 1}},
+  "noise_profile": {"source": "custom_preset", "preset": "depolarizing_cx", "strength": 0.01},
+  "metadata": {"paper_section": "local_noise_sensitivity", "noise": "custom_depolarizing_cx_0.01"}
+}

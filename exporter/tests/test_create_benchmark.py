@@ -83,6 +83,56 @@ def test_campaign_expands_seeds_into_idempotent_runs_and_checkpoint(tmp_path: Pa
     assert (tmp_path / "benchmark.json").is_file()
 
 
+def test_campaign_keeps_repeated_algorithm_variants_distinct(tmp_path: Path) -> None:
+    manifest = _manifest()
+    manifest["algorithms"] = [
+        {
+            "id": "fastest",
+            "label": "Fastest",
+            "algorithm": "vqe",
+            "mode": "advanced",
+            "advanced_config": {
+                "algorithm": "vqe",
+                "ansatz_name": "NumberPreserving",
+                "optimizer_name": "COBYLA",
+                "max_iterations": 3,
+            },
+        },
+        {
+            "id": "best-accuracy",
+            "label": "Best accuracy",
+            "algorithm": "vqe",
+            "mode": "advanced",
+            "advanced_config": {
+                "algorithm": "vqe",
+                "ansatz_name": "NumberPreserving",
+                "optimizer_name": "COBYLA",
+                "max_iterations": 6,
+            },
+        },
+    ]
+
+    api = FakeWriteApi()
+    create_campaign(
+        manifest,
+        base_url="http://unused",
+        output_dir=tmp_path,
+        client=api,  # type: ignore[arg-type]
+    )
+
+    run_posts = [payload for path, payload in api.posts if path == "/api/runs"]
+    assert len(run_posts) == 4
+    assert len({payload["client_request_id"] for payload in run_posts}) == 4
+    entry_ids = [entry["id"] for entry in api.patches[-1][1]["entries"]]
+    assert len(set(entry_ids)) == 4
+    assert {entry["variantId"] for entry in api.patches[-1][1]["entries"]} == {
+        "fastest:seed=11",
+        "fastest:seed=17",
+        "best-accuracy:seed=11",
+        "best-accuracy:seed=17",
+    }
+
+
 def test_campaign_uses_automatic_noisy_aer_precision_by_default(tmp_path: Path) -> None:
     manifest = _manifest()
     manifest["backend"] = {

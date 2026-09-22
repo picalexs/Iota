@@ -106,6 +106,19 @@ def _normalize_variants(value: Any) -> list[dict[str, Any]]:
     return result
 
 
+def _variant_key(variant: Mapping[str, Any]) -> str:
+    """Return the stable manifest key used to distinguish configuration variants."""
+
+    algorithm = _text(variant.get("algorithm")) or "algorithm"
+    explicit = _text(
+        variant.get("id", variant.get("variant_id", variant.get("variantId")))
+    )
+    if explicit is not None:
+        return _slug(explicit)
+    mode = _text(variant.get("mode")) or ("advanced" if variant.get("advanced_config") else "easy")
+    return _slug(f"{algorithm}-{mode}")
+
+
 def validate_campaign(manifest: Mapping[str, Any]) -> dict[str, Any]:
     """Validate and normalize the user-facing campaign manifest."""
 
@@ -141,6 +154,14 @@ def validate_campaign(manifest: Mapping[str, Any]) -> dict[str, Any]:
         if "noise_profile" not in variant and noise_profile is not None:
             variant["noise_profile"] = dict(noise_profile)
         _seed_roles(algorithm, variant, target)
+
+    variant_keys = [_variant_key(variant) for variant in variants]
+    duplicates = sorted({key for key in variant_keys if variant_keys.count(key) > 1})
+    if duplicates:
+        raise ExporterError(
+            "Algorithm variants need unique id values when repeated: "
+            + ", ".join(duplicates)
+        )
 
     return {
         "name": name,
@@ -318,8 +339,10 @@ def _build_seeded_config(
     return config, roles
 
 
-def _entry_id(molecule: Mapping[str, Any], algorithm: str, seed: int) -> str:
-    return f"{_slug(_molecule_key(molecule))}:{algorithm}:seed={seed}"
+def _entry_id(
+    molecule: Mapping[str, Any], variant: Mapping[str, Any], seed: int
+) -> str:
+    return f"{_slug(_molecule_key(molecule))}:{_variant_key(variant)}:seed={seed}"
 
 
 def _entry_snapshot(
@@ -333,6 +356,8 @@ def _entry_snapshot(
     run_id: str | None = None,
     error_message: str | None = None,
 ) -> dict[str, Any]:
+    variant_key = _variant_key(variant)
+    variant_label = _text(variant.get("label")) or variant_key
     return {
         "id": entry_id,
         "preset": {
@@ -341,8 +366,8 @@ def _entry_snapshot(
             "formula": _text(molecule.get("formula")),
         },
         "algorithm": variant["algorithm"],
-        "variantId": f"{variant['algorithm']}:seed={seed}",
-        "variantLabel": f"{variant['algorithm'].upper()} seed={seed}",
+        "variantId": f"{variant_key}:seed={seed}",
+        "variantLabel": f"{variant_label} seed={seed}",
         "mode": variant.get("mode", "easy"),
         "status": status,
         "moleculeId": molecule.get("id"),
@@ -364,7 +389,7 @@ def _campaign_entries(campaign: Mapping[str, Any], molecules: list[dict[str, Any
             for seed in campaign["seeds"]:
                 algorithm = str(variant["algorithm"])
                 roles = _seed_roles(algorithm, variant, campaign["backend"]["target"])
-                entry_id = _entry_id(molecule, algorithm, seed)
+                entry_id = _entry_id(molecule, variant, seed)
                 entries.append(
                     {
                         "entry_id": entry_id,

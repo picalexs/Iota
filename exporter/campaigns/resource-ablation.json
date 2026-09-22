@@ -1,0 +1,21 @@
+{
+  "name": "Paper SQD and SKQD resource ablation",
+  "campaign_id": "paper-resource-ablation",
+  "molecules": [
+    {"id": "ce9bda97-c4fd-4949-9783-8f0d8b3c3983", "name": "Hydrogen", "key": "h2"},
+    {"id": "ce815871-d15c-463a-a101-40b3e4fcc2d1", "name": "Lithium Hydride", "key": "lih"},
+    {"id": "66338bed-c3c3-470d-bb3c-914586b158d2", "name": "Beryllium Hydride", "key": "beh2"}
+  ],
+  "algorithms": [
+    {"id": "sqd-1k", "label": "SQD 1k samples", "algorithm": "sqd", "mode": "advanced", "seed_roles": ["algorithm", "sampling"], "advanced_config": {"algorithm": "sqd", "samples_per_batch": 256, "num_batches": 4, "max_iterations": 4, "sampling_state_source": "vqe", "sampling_vqe_ansatz_name": "NumberPreserving", "sampling_vqe_optimizer_name": "COBYLA", "sampling_vqe_max_iterations": 128, "sampling_vqe_reps": 1, "sampling_vqe_seed": null, "energy_tol": 1e-4, "occupancies_tol": 1e-4, "min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 16}},
+    {"id": "sqd-4k", "label": "SQD 4k samples", "algorithm": "sqd", "mode": "advanced", "seed_roles": ["algorithm", "sampling"], "advanced_config": {"algorithm": "sqd", "samples_per_batch": 512, "num_batches": 8, "max_iterations": 8, "sampling_state_source": "vqe", "sampling_vqe_ansatz_name": "NumberPreserving", "sampling_vqe_optimizer_name": "COBYLA", "sampling_vqe_max_iterations": 448, "sampling_vqe_reps": 2, "sampling_vqe_seed": null, "energy_tol": 7.5e-5, "occupancies_tol": 7.5e-5, "min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 32}},
+    {"id": "sqd-16k", "label": "SQD 16k samples", "algorithm": "sqd", "mode": "advanced", "seed_roles": ["algorithm", "sampling"], "advanced_config": {"algorithm": "sqd", "samples_per_batch": 1024, "num_batches": 16, "max_iterations": 12, "sampling_state_source": "vqe", "sampling_vqe_ansatz_name": "NumberPreserving", "sampling_vqe_optimizer_name": "COBYLA", "sampling_vqe_max_iterations": 512, "sampling_vqe_reps": 2, "sampling_vqe_seed": null, "energy_tol": 5e-5, "occupancies_tol": 5e-5, "min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 64}},
+    {"id": "skqd-512", "label": "SKQD 512 samples per state", "algorithm": "skqd", "mode": "advanced", "seed_roles": ["algorithm"], "advanced_config": {"algorithm": "skqd", "samples_per_state": 512, "base_sampling_options": {"min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 16}, "krylov_extension_dim": 1, "sampling_mode": "sample_union_exact", "time_step": 0.2, "trotter_steps": 1, "residual_tolerance": 1e-6}},
+    {"id": "skqd-1024", "label": "SKQD 1024 samples per state", "algorithm": "skqd", "mode": "advanced", "seed_roles": ["algorithm"], "advanced_config": {"algorithm": "skqd", "samples_per_state": 1024, "base_sampling_options": {"min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 32}, "krylov_extension_dim": 4, "sampling_mode": "sample_union_exact", "time_step": 0.22, "trotter_steps": 1, "residual_tolerance": 1e-6}},
+    {"id": "skqd-2048", "label": "SKQD 2048 samples per state", "algorithm": "skqd", "mode": "advanced", "seed_roles": ["algorithm"], "advanced_config": {"algorithm": "skqd", "samples_per_state": 2048, "base_sampling_options": {"min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 64}, "krylov_extension_dim": 6, "sampling_mode": "sample_union_exact", "time_step": 0.26, "trotter_steps": 1, "residual_tolerance": 1e-6}}
+  ],
+  "seeds": [11, 17, 23, 29, 41],
+  "basis_set": "sto-3g",
+  "backend": {"target": "statevector", "options": {"aer_method": "statevector", "optimization_level": 1}},
+  "metadata": {"paper_section": "sampling_resource_ablation", "budgets": [1024, 4096, 16384]}
+}
