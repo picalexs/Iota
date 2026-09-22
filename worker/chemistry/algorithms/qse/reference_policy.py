@@ -31,6 +31,7 @@ def _reference_vqe_cost(
     ansatz_name: str,
     optimizer_name: str,
     reference_reps: int,
+    reference_seed: int | None,
     execution_mode: str,
 ) -> dict[str, Any]:
     """Capture the measured cost of the VQE reference-state optimization."""
@@ -70,6 +71,7 @@ def _reference_vqe_cost(
         "ansatz_name": ansatz_name,
         "optimizer_name": optimizer_name,
         "reps": reference_reps,
+        "seed": reference_seed,
         "objective_evaluations": objective_evaluations,
         "optimizer_iterations": optimizer_iterations,
         "max_function_evaluations": diagnostics.get("max_function_evaluations"),
@@ -227,6 +229,9 @@ def build_vqe_reference_state(
         low=1,
         high=1000,
     )
+    reference_seed = resolved_config.get("vqe_reference_seed")
+    if not isinstance(reference_seed, int) or isinstance(reference_seed, bool):
+        reference_seed = None
 
     reference_progress = _reference_progress_callback(
         progress_callback=progress_callback,
@@ -248,6 +253,7 @@ def build_vqe_reference_state(
             "reps": reference_reps,
             "initial_point_strategy": "zero_plus_seeded_random",
             "initial_point_candidates": 2,
+            "seed": reference_seed,
         },
         progress_callback=reference_progress,
     )
@@ -256,6 +262,7 @@ def build_vqe_reference_state(
         ansatz_name=ansatz_name,
         optimizer_name=optimizer_name,
         reference_reps=reference_reps,
+        reference_seed=reference_seed,
         execution_mode=execution_mode,
     )
 
