@@ -6,6 +6,12 @@ from typing import Any
 
 from worker.adapters.base import BackendExecutionContext
 from worker.chemistry.circuit_artifacts import enrich_circuit_artifacts
+from worker.jobs.execution_plan import (
+    DeviceRequest,
+    ExecutionPlan,
+    ResourceClass,
+    StageRequest,
+)
 from worker.contracts import (
     BackendAdapterContract,
     ChemistryInputContract,
@@ -102,6 +108,191 @@ def pending_conditional_execution_metadata(algorithm: str) -> dict[str, Any]:
     }
 
 
+def _requested_device(value: Any) -> DeviceRequest:
+    if isinstance(value, str):
+        return DeviceRequest(value.strip().upper())
+    return DeviceRequest.CPU
+
+
+def _stage_plan_metadata(
+    *,
+    algorithm: str,
+    backend_context: BackendExecutionContext,
+    adapter_metadata: dict[str, Any],
+    result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build planned stage provenance without claiming runtime proof."""
+    backend_options = backend_context.backend_options
+    resources = backend_context.resource_metadata
+    available_devices = adapter_metadata.get("available_devices")
+    aer_gpu_available = isinstance(available_devices, list) and "GPU" in available_devices
+    aer_request = _requested_device(backend_options.get("device"))
+    chemistry_options = backend_context.chemistry_options
+    reference_request = _requested_device(chemistry_options.get("reference_device"))
+    selected_ci_request = _requested_device(chemistry_options.get("selected_ci_device"))
+
+    reference_actual = resources.get("reference_device_actual")
+    reference_gpu_available = reference_actual == "GPU"
+    selected_ci_execution = {}
+    if isinstance(result, dict):
+        metrics = result.get("algorithm_metrics")
+        if isinstance(metrics, dict) and isinstance(metrics.get("selected_ci_execution"), dict):
+            selected_ci_execution = metrics["selected_ci_execution"]
+    selected_ci_actual = selected_ci_execution.get("actual_device")
+    selected_ci_gpu_available = selected_ci_actual == "GPU"
+    selected_ci_request = _requested_device(
+        selected_ci_execution.get("requested_device", selected_ci_request.value)
+    )
+
+    requests = [
+        StageRequest(
+            name="reference_scf",
+            resource_class=(
+                ResourceClass.CHEMISTRY_GPU
+                if reference_request is not DeviceRequest.CPU
+                else ResourceClass.CPU
+            ),
+            requested_device=reference_request,
+            gpu_available=reference_gpu_available,
+            provider=resources.get("reference_provider"),
+        ),
+        StageRequest(
+            name="hamiltonian_build",
+            resource_class=ResourceClass.CPU,
+            requested_device=DeviceRequest.CPU,
+            gpu_available=False,
+            provider="pyscf+ffsim",
+        ),
+        StageRequest(
+            name="state_generation_or_sampling",
+            resource_class=(
+                ResourceClass.AER_GPU
+                if aer_request is DeviceRequest.GPU
+                else ResourceClass.CPU
+            ),
+            requested_device=aer_request,
+            gpu_available=aer_gpu_available,
+            provider="qiskit_aer" if backend_context.backend_target == "aer_simulator" else None,
+        ),
+        StageRequest(
+            name="selected_ci",
+            resource_class=(
+                ResourceClass.SBD_GPU
+                if selected_ci_request is not DeviceRequest.CPU
+                else ResourceClass.CPU
+            ),
+            requested_device=selected_ci_request,
+            gpu_available=selected_ci_gpu_available,
+            provider=selected_ci_execution.get("provider") or "qiskit_addon_sqd",
+        ),
+        StageRequest(
+            name="projected_solve",
+            resource_class=ResourceClass.CPU,
+            requested_device=DeviceRequest.CPU,
+            gpu_available=False,
+            provider="numpy+scipy",
+        ),
+        StageRequest(
+            name="finalize",
+            resource_class=ResourceClass.CPU,
+            requested_device=DeviceRequest.CPU,
+            gpu_available=False,
+            provider="worker",
+        ),
+    ]
+    # Non-SQD algorithms do not have a selected-CI stage. Keep the stage in the
+    # plan only when it was requested or reported, so metadata remains honest.
+    if algorithm not in {"sqd", "skqd"} and selected_ci_request is DeviceRequest.CPU:
+        requests = [request for request in requests if request.name != "selected_ci"]
+
+    plan = ExecutionPlan.resolve(requests)
+    stage_paths = [
+        {
+            "stage_name": stage.name,
+            "resource_class": stage.resource_class.value,
+            "requested_device": stage.requested_device.value,
+            "planned_device": stage.actual_device.value,
+            "actual_device": _observed_stage_device(
+                stage,
+                adapter_metadata=adapter_metadata,
+                reference_gpu_available=reference_gpu_available,
+                selected_ci_gpu_available=selected_ci_gpu_available,
+            ),
+            "device_verified": _stage_device_verified(
+                stage,
+                adapter_metadata=adapter_metadata,
+                reference_gpu_available=reference_gpu_available,
+                selected_ci_gpu_available=selected_ci_gpu_available,
+            ),
+            "provider": stage.provider,
+            "fallback_reason": stage.fallback_reason,
+        }
+        for stage in plan.stages
+    ]
+    actual_gpu_classes = {
+        stage["resource_class"]
+        for stage in stage_paths
+        if stage["actual_device"] == DeviceRequest.GPU.value
+    }
+    if ResourceClass.AER_GPU.value in actual_gpu_classes:
+        lane = "aer_gpu"
+    elif actual_gpu_classes:
+        lane = "chemistry_gpu"
+    elif backend_context.backend_target == "ibm_runtime":
+        lane = "ibm_runtime"
+    elif backend_context.backend_target == "aer_simulator":
+        lane = "aer_circuit"
+    else:
+        lane = "local_exact"
+    return {
+        "execution_lane": lane,
+        "stage_paths": stage_paths,
+        "plan_is_runtime_proof": False,
+    }
+
+
+def _observed_stage_device(
+    stage: Any,
+    *,
+    adapter_metadata: dict[str, Any],
+    reference_gpu_available: bool,
+    selected_ci_gpu_available: bool,
+) -> str | None:
+    if stage.actual_device is DeviceRequest.CPU:
+        return "CPU"
+    if stage.resource_class is ResourceClass.AER_GPU:
+        return (
+            adapter_metadata.get("actual_device")
+            if adapter_metadata.get("device_verified") is True
+            else None
+        )
+    if stage.resource_class is ResourceClass.CHEMISTRY_GPU and reference_gpu_available:
+        return "GPU"
+    if stage.resource_class is ResourceClass.SBD_GPU and selected_ci_gpu_available:
+        return "GPU"
+    return None
+
+
+def _stage_device_verified(
+    stage: Any,
+    *,
+    adapter_metadata: dict[str, Any],
+    reference_gpu_available: bool,
+    selected_ci_gpu_available: bool,
+) -> bool:
+    if stage.actual_device is DeviceRequest.CPU:
+        return True
+    if stage.resource_class is ResourceClass.AER_GPU:
+        return (
+            adapter_metadata.get("device_verified") is True
+            and adapter_metadata.get("actual_device") == "GPU"
+        )
+    return (
+        (stage.resource_class is ResourceClass.CHEMISTRY_GPU and reference_gpu_available)
+        or (stage.resource_class is ResourceClass.SBD_GPU and selected_ci_gpu_available)
+    )
+
+
 def merge_backend_metadata(
     *,
     algorithm: str,
@@ -134,6 +325,11 @@ def merge_backend_metadata(
         "optimization_level": backend_context.optimization_level,
         "noise_summary": {"enabled": bool(backend_context.noise_profile)},
         "resource_metadata": dict(backend_context.resource_metadata),
+        "execution_plan": _stage_plan_metadata(
+            algorithm=algorithm,
+            backend_context=backend_context,
+            adapter_metadata=adapter_metadata,
+        ),
         **adapter_metadata,
     }
     if provisional and algorithm in {"kqd", "qfd", "qse"}:
@@ -390,6 +586,12 @@ def apply_result_metadata(
         algorithm=algorithm,
         result=result,
         backend_metadata=backend_metadata,
+    )
+    backend_metadata["execution_plan"] = _stage_plan_metadata(
+        algorithm=algorithm,
+        backend_context=backend_context,
+        adapter_metadata=backend_metadata,
+        result=result,
     )
     result["backend_execution"] = backend_metadata
     result["raw_result"]["backend_execution"] = backend_metadata

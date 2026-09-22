@@ -76,6 +76,7 @@ services:
       ALLOW_INSECURE_DEFAULTS: ${ALLOW_INSECURE_DEFAULTS:-true}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       APP_VERSION: ${APP_VERSION:-dev}
+      QSS_CPU_THREAD_LIMIT: ${QSS_CPU_THREAD_LIMIT:-8}
       SKIP_PUBCHEM_SYNC: "true"
     depends_on:
       db:

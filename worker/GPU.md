@@ -147,6 +147,22 @@ docker compose ps --all
 GPU runs use the `quantum-gpu` queue. CPU runs use the `quantum` queue.
 Compose reserves one GPU for the GPU worker.
 
+The GPU worker also has normal CPU access. A run stays in one RQ job, so CPU
+preparation, CASCI, selected-CI fallback, and projected solves can run on the
+GPU worker while an Aer stage uses the reserved GPU. The queue name identifies
+the worker capability; it does not prove that every stage used a GPU. The
+worker records requested and actual device information per provider.
+
+Set `QSS_CPU_THREAD_LIMIT` to keep OpenMP, OpenBLAS, MKL, and NumExpr within
+the Compose CPU limit. A run can override Aer numerical limits with
+`max_parallel_threads`, `max_parallel_experiments`, and `max_parallel_shots`.
+The worker records these controls in `backend_execution.resource_metadata`.
+
+The RQ child work-horse must pass the GPU check. A startup health check proves
+only that the parent worker can import Aer and discover a GPU. Run an actual
+local smoke job on the target host before making performance claims. Do not
+use an IBM Runtime job for this check.
+
 ## Aer noisy-run settings
 
 The benchmark UI uses 256 shots by default for backend-derived noise. You can

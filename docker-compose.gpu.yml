@@ -22,6 +22,7 @@ services:
       LOCAL_CREDENTIALS_KEY_FILE: ${LOCAL_CREDENTIALS_KEY_FILE:-/app/local-state/credential-fernet.key}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       APP_VERSION: ${APP_VERSION:-dev}
+      QSS_CPU_THREAD_LIMIT: ${QSS_CPU_THREAD_LIMIT:-8}
     depends_on:
       db:
         condition: service_healthy

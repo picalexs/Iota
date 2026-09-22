@@ -98,6 +98,15 @@ def prepare_backend_and_hamiltonian(
         chemistry_input=started.chemistry_input,
         chemistry_options=started.chemistry_options_runtime or {},
     )
+    for key in (
+        "reference_device_actual",
+        "reference_provider",
+        "reference_gpu_fallback_reason",
+        "scf_device",
+        "casci_device",
+    ):
+        if key in hamiltonian_bundle.metadata:
+            backend_context.resource_metadata[key] = hamiltonian_bundle.metadata[key]
     logger.info(
         "Run %s: hamiltonian built num_qubits=%d num_spatial_orbitals=%d "
         "active_space=%s pipeline=%s elapsed=%.3fs",

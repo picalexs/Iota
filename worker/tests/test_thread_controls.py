@@ -40,6 +40,16 @@ def test_configure_thread_limits_uses_requested_limit(monkeypatch: pytest.Monkey
     }
 
 
+def test_configure_thread_limits_reads_worker_default_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("QSS_CPU_THREAD_LIMIT", "5")
+
+    result = configure_thread_limits({}, default_limit=8)
+
+    assert result["cpu_thread_limit"] == 5
+
+
 @pytest.mark.parametrize("value", [0, -1, 1.5, True, "4"])
 def test_configure_thread_limits_rejects_invalid_requested_limit(value: object) -> None:
     with pytest.raises(ValueError, match="max_parallel_threads"):

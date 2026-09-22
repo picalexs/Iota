@@ -29,7 +29,16 @@ def configure_thread_limits(
     projected solves.
     """
     options = backend_options or {}
+    configured_default = os.getenv("QSS_CPU_THREAD_LIMIT")
+    if configured_default is not None:
+        try:
+            default_limit = int(configured_default)
+        except ValueError as exc:
+            raise ValueError("QSS_CPU_THREAD_LIMIT must be a positive integer") from exc
     requested = options.get("max_parallel_threads")
+    if isinstance(default_limit, bool) or not isinstance(default_limit, int) or default_limit < 1:
+        raise ValueError("default_limit must be a positive integer")
+
     if requested is None:
         limit = default_limit
         source = "worker_default"
@@ -40,9 +49,6 @@ def configure_thread_limits(
         if limit < 1 or float(requested) != float(limit):
             raise ValueError("max_parallel_threads must be a positive integer")
         source = "backend_options"
-
-    if isinstance(default_limit, bool) or not isinstance(default_limit, int) or default_limit < 1:
-        raise ValueError("default_limit must be a positive integer")
 
     for name in _THREAD_ENVIRONMENT_VARIABLES:
         os.environ[name] = str(limit)
