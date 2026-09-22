@@ -429,6 +429,29 @@ def _refine_qse_backend_metadata(
                 "matrix construction; the requested backend is not invoked on this path."
             ),
         }
+    if metrics.get("execution_mode") == "measured_matrix_elements":
+        backend_target = str(backend_metadata.get("backend_target") or "")
+        return {
+            **backend_metadata,
+            "execution_mode": "measured_matrix_elements",
+            "actual_path_class": "measured_matrix_elements",
+            "actual_execution_target": (
+                "aer_simulator" if backend_target == "aer_simulator" else backend_target
+            ),
+            "backend_primitives_used": True,
+            "execution_scope": "measured_projected_matrix_elements",
+            "projected_matrix_source": (
+                "aer_estimator"
+                if backend_target == "aer_simulator"
+                else "ibm_runtime_estimator"
+            ),
+            "measured_projected_matrix_elements": True,
+            "fallback_reason": None,
+            "backend_note": (
+                "QSE measured projected matrix elements with the selected estimator; "
+                "the generalized eigensolve remains local."
+            ),
+        }
     execution_mode = metrics.get("execution_mode") or "qse_projected_local"
     is_sector_emulation = execution_mode == "sector_matrix_free"
     return {
@@ -532,10 +555,98 @@ def refine_backend_metadata_from_result(
             ),
         }
 
+    if (
+        backend_target == "aer_simulator"
+        and isinstance(summary, dict)
+        and summary.get("implemented_evolution_method") == "aer_pauli_lie_trotter"
+    ):
+        return {
+            **backend_metadata,
+            "execution_mode": "aer_statevector_evolution",
+            "actual_path_class": "aer_statevector_evolution",
+            "actual_execution_target": "aer_simulator",
+            "aer_simulator_used": True,
+            "backend_primitives_used": False,
+            "primitive_family": "qiskit_aer.AerSimulator",
+            "execution_scope": "aer_statevector_evolution",
+            "projected_matrix_source": "local_projected_solver",
+            "measured_projected_matrix_elements": False,
+            "fallback_reason": None,
+            "backend_note": (
+                f"{algorithm.upper()} uses AerSimulator for direct state evolution; "
+                "projected matrices and the final solve remain local."
+            ),
+        }
+
     context = BackendExecutionContext(backend_target=backend_target)
     return {
         **backend_metadata,
         **dense_classical_execution_metadata(algorithm, context),
+    }
+
+
+def _aer_capability_metadata(
+    *,
+    algorithm: str,
+    backend_context: BackendExecutionContext,
+    backend_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    """Describe Aer support separately from the observed execution path."""
+    if backend_context.backend_target != "aer_simulator":
+        return {
+            "status": "not_applicable",
+            "reason": "backend_target_is_not_aer_simulator",
+        }
+    path = str(backend_metadata.get("actual_path_class") or "")
+    if path in {
+        "sector_matrix_free",
+        "dense_classical",
+        "exact_matrix_evolution",
+        "qse_dense_exact_emulation",
+        "qse_projected_local",
+    }:
+        return {
+            "status": "cpu_only",
+            "reason": f"{algorithm}_resolved_to_local_classical_path",
+        }
+    if path.endswith("_path_pending"):
+        return {
+            "status": "pending",
+            "reason": f"{algorithm}_execution_path_is_not_resolved",
+        }
+    if path in {
+        "aer_primitive",
+        "aer_branch_estimator",
+        "aer_statevector_evolution",
+        "measured_matrix_elements",
+    }:
+        requested_device = str(
+            backend_metadata.get("requested_device")
+            or backend_context.backend_options.get("device")
+            or "CPU"
+        ).upper()
+        actual_device = backend_metadata.get("actual_device")
+        device_verified = backend_metadata.get("device_verified") is True
+        if requested_device == "GPU" and not (
+            actual_device == "GPU" and device_verified
+        ):
+            return {
+                "status": "rejected",
+                "reason": f"{algorithm}_aer_gpu_execution_not_verified",
+                "requested_device": requested_device,
+                "actual_device": actual_device,
+                "device_verified": device_verified,
+            }
+        return {
+            "status": "supported",
+            "reason": f"{algorithm}_has_an_aer_execution_path",
+            "requested_device": requested_device,
+            "actual_device": actual_device,
+            "device_verified": device_verified,
+        }
+    return {
+        "status": "rejected",
+        "reason": f"{algorithm}_has_no_resolved_aer_execution_path",
     }
 
 
@@ -584,6 +695,11 @@ def build_setup_payload(
         adapter_metadata=backend_adapter.execution_metadata(backend_context),
         backend_context=backend_context,
         provisional=True,
+    )
+    setup_backend_metadata["aer_capability"] = _aer_capability_metadata(
+        algorithm=algorithm,
+        backend_context=backend_context,
+        backend_metadata=setup_backend_metadata,
     )
     setup_payload.update(setup_backend_metadata)
     if hamiltonian_bundle.metadata.get("active_space_auto_reduced"):
@@ -639,6 +755,11 @@ def apply_result_metadata(
         backend_context=backend_context,
         adapter_metadata=backend_metadata,
         result=result,
+    )
+    backend_metadata["aer_capability"] = _aer_capability_metadata(
+        algorithm=algorithm,
+        backend_context=backend_context,
+        backend_metadata=backend_metadata,
     )
     result["backend_execution"] = backend_metadata
     result["raw_result"]["backend_execution"] = backend_metadata

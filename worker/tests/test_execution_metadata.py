@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from worker.adapters.base import BackendExecutionContext
 from worker.chemistry.types import ChemistryInput
 from worker.jobs.execution_metadata import (
@@ -174,6 +176,117 @@ def test_result_metadata_enrichment_preserves_algorithm_payload() -> None:
     assert result["raw_result"]["basis_set"] == "6-31g"
     assert result["backend_execution"]["execution_mode"] == "aer_branch_estimator"
     assert result["algorithm_metrics"]["backend_execution"] == result["backend_execution"]
+
+
+def test_direct_aer_kqd_path_is_not_reclassified_as_local_classical() -> None:
+    result = {
+        "raw_result": {},
+        "algorithm_metrics": {
+            "matrix_element_summary": {
+                "matrix_element_strategy": "dense_classical",
+                "implemented_evolution_method": "aer_pauli_lie_trotter",
+            }
+        },
+    }
+    context = BackendExecutionContext(
+        backend_target="aer_simulator",
+        backend_options={"device": "CPU"},
+    )
+
+    apply_result_metadata(
+        result,
+        algorithm="kqd",
+        mode="advanced",
+        backend_target="aer_simulator",
+        chemistry_input=ChemistryInput(atoms=[], basis="6-31g"),
+        backend_adapter=_adapter(
+            {
+                "available_devices": ["CPU", "GPU"],
+                "actual_execution_target": "aer_simulator",
+                "actual_path_class": "aer_primitive",
+                "aer_simulator_used": True,
+                "backend_primitives_used": False,
+            }
+        ),
+        backend_context=context,
+    )
+
+    metadata = result["backend_execution"]
+    assert metadata["actual_path_class"] == "aer_statevector_evolution"
+    assert metadata["actual_execution_target"] == "aer_simulator"
+    assert metadata["aer_capability"]["status"] == "supported"
+
+
+def test_measured_qse_metadata_preserves_aer_estimator_path() -> None:
+    result = {
+        "raw_result": {},
+        "algorithm_metrics": {"execution_mode": "measured_matrix_elements"},
+    }
+    context = BackendExecutionContext(
+        backend_target="aer_simulator",
+        backend_options={"device": "GPU"},
+    )
+
+    apply_result_metadata(
+        result,
+        algorithm="qse",
+        mode="advanced",
+        backend_target="aer_simulator",
+        chemistry_input=ChemistryInput(atoms=[], basis="6-31g"),
+        backend_adapter=_adapter(
+            {
+                "available_devices": ["CPU", "GPU"],
+                "actual_execution_target": "aer_simulator",
+                "actual_path_class": "aer_primitive",
+                "actual_device": "GPU",
+                "device_verified": True,
+                "backend_primitives_used": True,
+                "primitive_family": "qiskit_aer.EstimatorV2",
+            }
+        ),
+        backend_context=context,
+    )
+
+    metadata = result["backend_execution"]
+    assert metadata["actual_path_class"] == "measured_matrix_elements"
+    assert metadata["measured_projected_matrix_elements"] is True
+    assert metadata["aer_capability"]["status"] == "supported"
+
+
+@pytest.mark.parametrize("algorithm", ("vqe", "sqd", "skqd", "kqd", "qfd", "qse"))
+def test_explicit_aer_gpu_requires_result_level_device_evidence(algorithm: str) -> None:
+    metrics: dict[str, object] = {}
+    if algorithm in {"kqd", "qfd"}:
+        metrics["matrix_element_summary"] = {
+            "matrix_element_strategy": "branch_estimator"
+        }
+    elif algorithm == "qse":
+        metrics["execution_mode"] = "measured_matrix_elements"
+
+    result = {"raw_result": {}, "algorithm_metrics": metrics}
+    apply_result_metadata(
+        result,
+        algorithm=algorithm,
+        mode="advanced",
+        backend_target="aer_simulator",
+        chemistry_input=ChemistryInput(atoms=[], basis="6-31g"),
+        backend_adapter=_adapter(
+            {
+                "available_devices": ["CPU", "GPU"],
+                "actual_execution_target": "aer_simulator",
+                "actual_path_class": "aer_primitive",
+                "backend_primitives_used": True,
+            }
+        ),
+        backend_context=BackendExecutionContext(
+            backend_target="aer_simulator",
+            backend_options={"device": "GPU"},
+        ),
+    )
+
+    capability = result["backend_execution"]["aer_capability"]
+    assert capability["status"] == "rejected"
+    assert capability["reason"] == f"{algorithm}_aer_gpu_execution_not_verified"
 
 
 def test_projected_result_metadata_marks_sector_path_local() -> None:

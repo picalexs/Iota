@@ -25,6 +25,7 @@ from worker.chemistry.hamiltonian_action import build_hamiltonian_action
 from worker.chemistry.overlap import build_overlap_matrix
 from worker.chemistry.projected_subspace import projected_matrix_converged
 from worker.chemistry.sector_basis import hartree_fock_sector_state
+from worker.exceptions import RunExcludedError
 from worker.jobs.dispatcher import dispatch_algorithm
 
 RESOLVE_OPERATOR_MATRIX_PATH = "worker.chemistry.algorithms.kqd.workflow.resolve_operator_matrix"
@@ -544,6 +545,30 @@ def test_kqd_exact_ideal_aer_rejects_branch_fallback_before_estimator_creation()
             hamiltonian,
             None,
             BackendExecutionContext(backend_target="aer_simulator"),
+        )
+
+
+def test_kqd_exact_explicit_aer_gpu_is_rejected_before_cpu_fallback() -> None:
+    class _Backend:
+        def create_estimator(self, _context: object) -> object:
+            raise AssertionError("CPU fallback must not create an Aer estimator")
+
+    with pytest.raises(RunExcludedError, match="circuit-compatible Trotter"):
+        run_kqd_algorithm(
+            _Backend(),
+            {
+                "algorithm": "kqd",
+                "advanced_config": {
+                    "algorithm": "kqd",
+                    "evolution_method": "exact",
+                },
+            },
+            _single_qubit_x_hamiltonian(),
+            None,
+            BackendExecutionContext(
+                backend_target="aer_simulator",
+                backend_options={"device": "GPU"},
+            ),
         )
 
 

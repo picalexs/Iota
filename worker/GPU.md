@@ -64,8 +64,10 @@ The available values are `CPU`, `GPU`, and `AUTO`.
 - `CPU` keeps the existing CPU path.
 - `GPU` requires the selected provider. The run fails when the provider is not
   installed or the GPU backend is not available.
-- `AUTO` uses the provider when it is available. It records a CPU fallback
-  reason when it is not available.
+- `AUTO` keeps the chemistry stage on the CPU. The API routes `AUTO` to the
+  CPU queue because the current scheduler cannot discover optional providers
+  across queues. It records the deferred provider intent and CPU resolution.
+  Select `GPU` only when the run must use a provider on the GPU worker.
 
 `reference_device` controls the PySCF reference stage. The GPU path uses
 GPU4PySCF for restricted Hartree-Fock with density fitting. The worker then
@@ -97,6 +99,12 @@ provide pre-built wheels. The SBD SQD integration requires
 CPU-compatible and does not install SBD automatically:
 <https://github.com/Qiskit/sbd-eigensolver-python>.
 
+Use separate provider-specific images. Do not add GPU4PySCF and SBD to the
+Aer image without a verified CUDA, compiler, MPI, and dependency matrix.
+The current queue also routes explicit chemistry GPU requests to the Aer GPU
+worker, so provider-aware queues are required before these optional providers
+can be selected in production.
+
 Verify optional providers before selecting `GPU`:
 
 ```sh
@@ -104,8 +112,9 @@ python -c 'from gpu4pyscf.scf import RHF; print(RHF)'
 python -c 'import sbd; print(sbd.available_backends())'
 ```
 
-The SBD output must contain `gpu` or `gpu-omp`. Use `AUTO` when the same image
-must run on hosts with and without the optional chemistry providers.
+The SBD output must contain `gpu` or `gpu-omp`. Do not use `AUTO` to request
+provider discovery. The current scheduler resolves chemistry `AUTO` on the CPU
+queue.
 
 ## Start the GPU profile
 

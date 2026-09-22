@@ -20,6 +20,7 @@ from worker.chemistry.projected_execution import (
     resolve_projected_execution_policy,
 )
 from worker.chemistry.solver_utils import resolve_algorithm_config
+from worker.exceptions import RunExcludedError
 
 
 def run_kqd_algorithm(
@@ -35,6 +36,17 @@ def run_kqd_algorithm(
     )
     resolved_config = resolve_algorithm_config(config, "kqd")
     kqd_config = resolve_kqd_config(resolved_config)
+    if (
+        getattr(backend_context, "backend_target", None) == "aer_simulator"
+        and isinstance(getattr(backend_context, "backend_options", None), dict)
+        and str(backend_context.backend_options.get("device", "")).upper() == "GPU"
+        and kqd_config.evolution_method == "exact"
+    ):
+        raise RunExcludedError(
+            "Explicit Aer GPU KQD requires circuit-compatible Trotter evolution; "
+            "exact matrix-spectrum evolution is CPU-only.",
+            reason="aer_gpu_kqd_exact_evolution_is_cpu_only",
+        )
     if execution_policy.requires_estimator and kqd_config.evolution_method != "trotter":
         raise ValueError(
             "KQD branch matrix-element execution supports evolution_method='trotter' only"
