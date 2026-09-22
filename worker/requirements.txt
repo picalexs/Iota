@@ -22,7 +22,7 @@ croniter==6.2.2
     # via rq
 cryptography==50.0.0
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   pyspnego
     #   requests-ntlm
 cycler==0.12.1
@@ -30,7 +30,7 @@ cycler==0.12.1
 dill==0.4.1
     # via qiskit
 ffsim==0.0.68
-    # via -r worker/requirements.in
+    # via -r requirements.in
 fonttools==4.63.0
     # via matplotlib
 greenlet==3.5.0
@@ -41,9 +41,11 @@ ibm-cloud-sdk-core==3.24.4
     # via ibm-platform-services
 ibm-platform-services==0.75.0
     # via qiskit-ibm-runtime
+ibm-quantum-schemas==0.12.20260921
+    # via qiskit-ibm-runtime
 idna==3.19
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   requests
 jax==0.7.1
     # via
@@ -56,17 +58,18 @@ jaxlib==0.7.1
 kiwisolver==1.5.0
     # via matplotlib
 matplotlib==3.10.9
-    # via -r worker/requirements.in
+    # via -r requirements.in
 ml-dtypes==0.5.4
     # via
     #   jax
     #   jaxlib
 numpy==1.26.4
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   contourpy
     #   ffsim
     #   h5py
+    #   ibm-quantum-schemas
     #   jax
     #   jaxlib
     #   matplotlib
@@ -77,6 +80,7 @@ numpy==1.26.4
     #   qiskit-aer
     #   qiskit-ibm-runtime
     #   rustworkx
+    #   samplomatic
     #   scipy
 openqasm3[parser]==1.0.1
     # via qiskit-qasm3-import
@@ -85,41 +89,47 @@ opt-einsum==3.4.0
     #   ffsim
     #   jax
 orjson==3.11.9
-    # via ffsim
-packaging==26.2
     # via
-    #   matplotlib
-    #   qiskit-ibm-runtime
+    #   ffsim
+    #   samplomatic
+packaging==26.2
+    # via matplotlib
 pillow==12.3.0
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   matplotlib
 psutil==7.2.2
     # via qiskit-aer
 psycopg2-binary==2.9.11
-    # via -r worker/requirements.in
+    # via -r requirements.in
+pybase64==1.5.0
+    # via
+    #   ibm-quantum-schemas
+    #   qiskit-ibm-runtime
+    #   samplomatic
 pycparser==3.0
     # via cffi
 pydantic==2.13.4
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
+    #   ibm-quantum-schemas
     #   pydantic-settings
     #   qiskit-ibm-runtime
 pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.15.0
-    # via -r worker/requirements.in
+    # via -r requirements.in
 pyjwt==2.14.0
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   ibm-cloud-sdk-core
 pylatexenc==2.10
-    # via -r worker/requirements.in
+    # via -r requirements.in
 pyparsing==3.3.2
     # via matplotlib
 pyscf==2.13.0
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   ffsim
     #   qiskit-addon-sqd
 pyspnego==0.12.1
@@ -133,27 +143,31 @@ python-dateutil==2.9.0.post0
     #   qiskit-ibm-runtime
 python-dotenv==1.2.2
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   pydantic-settings
 qiskit==2.3.0
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   ffsim
+    #   ibm-quantum-schemas
     #   qiskit-addon-sqd
     #   qiskit-aer
     #   qiskit-ibm-runtime
     #   qiskit-qasm3-import
+    #   samplomatic
 qiskit-addon-sqd==0.12.1
-    # via -r worker/requirements.in
+    # via -r requirements.in
 qiskit-aer==0.17.2
-    # via -r worker/requirements.in
-qiskit-ibm-runtime==0.45.1
-    # via -r worker/requirements.in
+    # via -r requirements.in
+qiskit-ibm-runtime==0.49.0
+    # via -r requirements.in
 qiskit-qasm3-import==0.6.0
-    # via -r worker/requirements.in
+    # via
+    #   -r requirements.in
+    #   ibm-quantum-schemas
 redis==7.4.0
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   rq
 requests==2.33.1
     # via
@@ -163,14 +177,19 @@ requests==2.33.1
 requests-ntlm==1.3.0
     # via qiskit-ibm-runtime
 rq==2.7.0
-    # via -r worker/requirements.in
+    # via -r requirements.in
 rustworkx==0.17.1
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   qiskit
+    #   samplomatic
+samplomatic==0.21.0
+    # via
+    #   ibm-quantum-schemas
+    #   qiskit-ibm-runtime
 scipy==1.17.1
     # via
-    #   -r worker/requirements.in
+    #   -r requirements.in
     #   ffsim
     #   jax
     #   jaxlib
@@ -178,10 +197,11 @@ scipy==1.17.1
     #   qiskit
     #   qiskit-addon-sqd
     #   qiskit-aer
+    #   qiskit-ibm-runtime
 six==1.17.0
     # via python-dateutil
 sqlalchemy==2.0.49
-    # via -r worker/requirements.in
+    # via -r requirements.in
 stevedore==5.7.0
     # via qiskit
 typing-extensions==4.15.0
