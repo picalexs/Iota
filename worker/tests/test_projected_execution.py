@@ -21,6 +21,7 @@ from worker.chemistry.projected_execution import (
     validate_branch_estimator_feasibility,
 )
 from worker.chemistry.types import ExecutionPlan
+from worker.exceptions import RunExcludedError
 
 
 def _context(target: str | None = None, *, noise: object | None = None) -> SimpleNamespace:
@@ -113,6 +114,26 @@ def test_projected_policy_contains_one_path_and_primitive_decision(
     assert policy.selection_reason
 
 
+def test_explicit_aer_gpu_rejects_sector_matrix_free_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "worker.chemistry.projected_execution.can_use_sector_action",
+        lambda *_: True,
+    )
+    context = SimpleNamespace(
+        backend_target="aer_simulator",
+        backend_options={"device": "GPU"},
+        noise_profile=None,
+    )
+
+    with pytest.raises(RunExcludedError, match="sector matrix-free"):
+        resolve_projected_execution_policy(
+            hamiltonian=SimpleNamespace(num_qubits=13),
+            backend_context=context,
+        )
+
+
 @pytest.mark.parametrize(
     ("target", "noise", "reference_method", "expected_path", "expected_primitive"),
     [
@@ -138,6 +159,21 @@ def test_qse_policy_owns_measurement_and_reference_primitive_decisions(
     assert policy.actual_path == expected_path
     assert policy.primitive == expected_primitive
     assert policy.requires_estimator is (expected_primitive is not None)
+
+
+def test_explicit_aer_gpu_qse_uses_measured_matrix_elements() -> None:
+    policy = resolve_qse_execution_policy(
+        backend_context=SimpleNamespace(
+            backend_target="aer_simulator",
+            backend_options={"device": "GPU"},
+            noise_profile=None,
+        ),
+        reference_method="hf",
+    )
+
+    assert policy.actual_path == "measured_matrix_elements"
+    assert policy.primitive == "EstimatorV2"
+    assert policy.selection_reason == "explicit_aer_gpu_requires_measured_qse"
 
 
 @pytest.mark.parametrize(

@@ -71,6 +71,16 @@ def resolve_projected_execution_policy(
 ) -> ProjectedExecutionPolicy:
     """Select one projected execution path and its primitive requirement."""
     backend_target = getattr(backend_context, "backend_target", None)
+    if (
+        backend_target == "aer_simulator"
+        and _requested_aer_gpu(backend_context)
+        and can_use_sector_action(hamiltonian, backend_context)
+    ):
+        raise RunExcludedError(
+            "Explicit Aer GPU projected runs cannot use sector matrix-free execution; "
+            "reduce the active space or use a CPU exact lane.",
+            reason="aer_gpu_requires_circuit_projected_path",
+        )
     if backend_target == "ibm_runtime":
         return ProjectedExecutionPolicy(
             requested_backend_target=backend_target,
@@ -125,12 +135,16 @@ def resolve_qse_execution_policy(
     measured = backend_target == "ibm_runtime" or (
         backend_target == "aer_simulator"
         and getattr(backend_context, "noise_profile", None) is not None
-    )
+    ) or (backend_target == "aer_simulator" and _requested_aer_gpu(backend_context))
     if measured:
         reason = (
             "requested_ibm_runtime_requires_measured_qse"
             if backend_target == "ibm_runtime"
-            else "noisy_aer_requires_measured_qse"
+            else (
+                "explicit_aer_gpu_requires_measured_qse"
+                if _requested_aer_gpu(backend_context)
+                else "noisy_aer_requires_measured_qse"
+            )
         )
         return QSEExecutionPolicy(
             requested_backend_target=backend_target,
@@ -287,6 +301,13 @@ def can_use_sector_action(hamiltonian: object, backend_context: Any | None) -> b
         and can_build_hamiltonian_action(hamiltonian)
         and not hasattr(hamiltonian, "dense_operator_matrix")
     )
+
+
+def _requested_aer_gpu(backend_context: Any | None) -> bool:
+    if getattr(backend_context, "backend_target", None) != "aer_simulator":
+        return False
+    options = getattr(backend_context, "backend_options", None)
+    return isinstance(options, dict) and str(options.get("device", "")).upper() == "GPU"
 
 
 def should_use_branch_matrix_elements(
