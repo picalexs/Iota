@@ -514,6 +514,12 @@ def test_ibm_adapter_uses_runtime_primitives_and_tracks_job_ids() -> None:
 
     assert estimator_calls[0]["mode"] is backend
     assert estimator_calls[0]["options"]["default_shots"] == 512
+    assert estimator_calls[0]["options"]["resilience_level"] == 0
+    assert estimator_calls[0]["options"]["dynamical_decoupling"] == {"enable": False}
+    assert estimator_calls[0]["options"]["twirling"] == {
+        "enable_gates": False,
+        "enable_measure": False,
+    }
     assert "default_precision" not in estimator_calls[0]["options"]
     assert metadata["effective_estimator_precision"] == pytest.approx(1 / math.sqrt(512))
     assert metadata["measurement_mode"] == "precision_sampled"
@@ -572,6 +578,20 @@ def test_ibm_adapter_runtime_contract_caps_and_failure_payloads() -> None:
     metadata = adapter.execution_metadata(context)
     assert metadata["job_ids"] == ["runtime-job-123"]
     assert metadata["ibm_job_id"] == "runtime-job-123"
+    assert metadata["runtime_accounting"] == {
+        "submitted_jobs": 1,
+        "failed_submissions": 2,
+        "provider_observed_jobs": 1,
+        "successful_submissions": 1,
+        "submitted_pubs": 1,
+        "requested_shots_total": 512,
+        "failed_pub_count": 130,
+    }
+    assert [record["status"] for record in metadata["runtime_submission_ledger"]] == [
+        "provider_observed",
+        "failed",
+        "failed",
+    ]
     assert metadata["runtime_failure_payloads"] == [
         {"stage": "submission", "error_type": "RuntimeError", "pub_count": 1, "shots": 512},
         {"stage": "submission", "error_type": "BackendError", "pub_count": 129, "shots": 512},
@@ -667,10 +687,136 @@ def test_ibm_adapter_uses_estimator_precision_only_for_estimator() -> None:
     sampler = adapter.create_sampler(context)
 
     assert estimator_calls == [
-        {"mode": backend, "options": {"default_precision": 0.125}}
+        {
+            "mode": backend,
+            "options": {
+                "resilience_level": 0,
+                "dynamical_decoupling": {"enable": False},
+                "twirling": {"enable_gates": False, "enable_measure": False},
+                "default_precision": 0.125,
+            },
+        }
     ]
-    assert sampler_calls == [{"mode": backend, "options": {"default_shots": 512}}]
+    assert sampler_calls == [
+        {
+            "mode": backend,
+            "options": {
+                "resilience_level": 0,
+                "dynamical_decoupling": {"enable": False},
+                "twirling": {"enable_gates": False, "enable_measure": False},
+                "default_shots": 512,
+            },
+        }
+    ]
     assert sampler.allow_sampler_submission_retries is False
+
+
+def test_ibm_adapter_records_each_pub_and_isa_gate_metrics(monkeypatch) -> None:
+    backend = SimpleNamespace(name="ibm_brisbane", simulator=False)
+    service = SimpleNamespace(backend=lambda _name: backend)
+    job = SimpleNamespace(job_id=lambda: "runtime-job-123")
+    primitive = SimpleNamespace(run=lambda *args, **kwargs: job)
+
+    class PassManager:
+        def run(self, circuit):
+            return circuit.copy()
+
+    monkeypatch.setattr(
+        "qiskit.transpiler.preset_passmanagers.generate_preset_pass_manager",
+        lambda **_kwargs: PassManager(),
+    )
+    circuit = QuantumCircuit(2)
+    circuit.h(0)
+    circuit.cx(0, 1)
+    second_circuit = QuantumCircuit(2)
+    second_circuit.cx(0, 1)
+
+    adapter = IBMAdapter(
+        service_factory=lambda **_: service,
+        estimator_factory=lambda **_: primitive,
+    )
+    context = BackendExecutionContext(
+        backend_target="ibm_runtime",
+        backend_options={
+            "backend_name": "ibm_brisbane",
+            "token": "fake-token",
+            "instance": "fake-instance",
+            "seed_transpiler": 17,
+        },
+        shots=512,
+        optimization_level=2,
+    )
+
+    adapter.create_estimator(context).run(
+        [(circuit, object()), (second_circuit, object())]
+    )
+    metadata = adapter.execution_metadata(context)
+
+    records = metadata["transpilation_records"]
+    assert len(records) == 2
+    assert [record["provenance_class"] for record in records] == [
+        "qss_submitted_isa",
+        "qss_submitted_isa",
+    ]
+    assert all(record["provider_final_compilation"] == "unknown" for record in records)
+    assert records[0]["metrics"]["optimization_level"] == 2
+    assert records[0]["metrics"]["transpiler_seed"] == 17
+    assert records[0]["metrics"]["one_qubit_gate_count"] == 1
+    assert records[0]["metrics"]["two_qubit_gate_count"] == 1
+    assert records[1]["metrics"]["two_qubit_gate_count"] == 1
+    assert metadata["runtime_submission_ledger"][0]["pub_records"] == records
+
+
+@pytest.mark.parametrize(
+    ("dynamical_decoupling", "twirling", "policy_name"),
+    [
+        (False, False, "raw"),
+        (True, False, "dynamical_decoupling"),
+        (False, True, "twirling"),
+        (True, True, "dynamical_decoupling+twirling"),
+    ],
+)
+def test_ibm_adapter_records_explicit_execution_policy(
+    dynamical_decoupling: bool,
+    twirling: bool,
+    policy_name: str,
+) -> None:
+    backend = SimpleNamespace(name="ibm_brisbane", simulator=False)
+    service = SimpleNamespace(backend=lambda _name: backend)
+    calls: list[dict[str, object]] = []
+
+    adapter = IBMAdapter(
+        service_factory=lambda **_: service,
+        estimator_factory=lambda **kwargs: calls.append(kwargs) or object(),
+    )
+    context = BackendExecutionContext(
+        backend_target="ibm_runtime",
+        backend_options={
+            "backend_name": "ibm_brisbane",
+            "token": "fake-token",
+            "instance": "fake-instance",
+            "dynamical_decoupling": dynamical_decoupling,
+            "twirling": twirling,
+        },
+        shots=512,
+    )
+
+    adapter.create_estimator(context)
+    options = calls[0]["options"]
+    assert options["resilience_level"] == 0
+    assert options["dynamical_decoupling"] == {"enable": dynamical_decoupling}
+    assert options["twirling"] == {
+        "enable_gates": twirling,
+        "enable_measure": twirling,
+    }
+    assert adapter.execution_metadata(context)["raw_runtime_policy"] == {
+        "name": policy_name,
+        "resilience_level": 0,
+        "dynamical_decoupling": {"enable": dynamical_decoupling},
+        "twirling": {"enable_gates": twirling, "enable_measure": twirling},
+        "provider_observed": "unknown",
+        "status": "configured_not_provider_observed",
+    }
 
 
 def test_ibm_adapter_records_named_backend_mismatch_as_fallback() -> None:
