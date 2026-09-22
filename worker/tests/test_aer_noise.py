@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from worker.adapters.aer_noise import (
+    _basis_gates,
     normalize_noise_profile,
     resolve_aer_noise_profile,
 )
@@ -10,7 +11,7 @@ from worker.exceptions import NoiseConfigurationError
 
 
 class _FakeNoiseModel:
-    basis_gates = ["rz", "sx", "x", "cx"]
+    basis_gates = ["rz", "sx", "x", "cx", "delay"]
 
     def to_dict(self):
         return {"basis_gates": list(self.basis_gates), "errors": []}
@@ -62,6 +63,12 @@ def test_backend_derived_noise_uses_live_reference_temperature_and_topology(monk
     assert resolved.summary["backend_version"] == "1.2"
     assert len(resolved.summary["model_fingerprint_sha256"]) == 64
     assert "secret" not in str(resolved.summary)
+
+
+def test_backend_derived_noise_drops_delay_from_aer_basis_gates() -> None:
+    noise_model = SimpleNamespace(basis_gates=["x", "delay", "cx"])
+
+    assert _basis_gates(noise_model) == ("x", "cx")
 
 
 def test_backend_derived_noise_rejects_simulator_reference() -> None:

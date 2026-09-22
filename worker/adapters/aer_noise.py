@@ -28,6 +28,7 @@ _CUSTOM_PARAMETER_KEYS = {
     "t2_us",
     "gate_time_us",
 }
+_AER_UNSUPPORTED_BASIS_GATES = frozenset({"delay"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -334,7 +335,11 @@ def _basis_gates(noise_model: Any) -> tuple[str, ...]:
     values = getattr(noise_model, "basis_gates", ())
     if not isinstance(values, (list, tuple, set)):
         return ()
-    return tuple(str(value) for value in values)
+    return tuple(
+        gate
+        for gate in (str(value) for value in values)
+        if gate not in _AER_UNSUPPORTED_BASIS_GATES
+    )
 
 
 def _coupling_map(backend: Any) -> tuple[tuple[int, int], ...]:
