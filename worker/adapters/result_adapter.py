@@ -177,6 +177,32 @@ def _skqd_solution_provenance(selected_solution: Any, diagnostics: dict[str, Any
     return "selected_skqd_solution_unknown"
 
 
+def _projected_matrix_accounting(
+    summary: dict[str, Any],
+    *,
+    projected_dimension: int | None,
+) -> dict[str, Any]:
+    """Label logical projected work without presenting it as provider work."""
+    normalized = dict(summary)
+    if "projected_dimension" not in normalized and projected_dimension is not None:
+        normalized["projected_dimension"] = projected_dimension
+    if "projected_matrix_element_count" not in normalized and projected_dimension is not None:
+        normalized["projected_matrix_element_count"] = 2 * projected_dimension**2
+        normalized["projected_matrix_element_count_source"] = (
+            "derived_from_projected_dimension"
+        )
+    else:
+        normalized.setdefault(
+            "projected_matrix_element_count_source",
+            "algorithm_reported",
+        )
+    normalized.setdefault(
+        "projected_matrix_element_count_scope",
+        "logical_hamiltonian_and_overlap_entries",
+    )
+    return normalized
+
+
 def _energy_provenance(result: AlgorithmResult) -> dict[str, Any]:
     """Return final/best/reported energy provenance for normalized payloads."""
     if isinstance(result, VQEResult):
@@ -499,6 +525,10 @@ def _sqd_algorithm_metrics(result: SQDResult) -> dict[str, Any]:
 
 
 def _kqd_algorithm_metrics(result: KQDResult) -> dict[str, Any]:
+    matrix_element_summary = _projected_matrix_accounting(
+        result.matrix_element_summary,
+        projected_dimension=result.krylov_rank,
+    )
     metrics = {
         "ritz_values": result.ritz_values,
         "raw_ritz_values": result.raw_ritz_values,
@@ -507,14 +537,21 @@ def _kqd_algorithm_metrics(result: KQDResult) -> dict[str, Any]:
         "stability_summary": result.stability_summary,
         "selected_level_index": 0 if result.ritz_values else None,
     }
-    if result.matrix_element_summary:
-        metrics["matrix_element_summary"] = result.matrix_element_summary
+    if matrix_element_summary:
+        metrics["matrix_element_summary"] = matrix_element_summary
     if result.circuit_artifacts:
         metrics["circuit_artifacts"] = result.circuit_artifacts
     return metrics
 
 
 def _qfd_algorithm_metrics(result: QFDResult) -> dict[str, Any]:
+    projected_dimension = result.matrix_element_summary.get("projected_dimension")
+    if not isinstance(projected_dimension, int) or projected_dimension < 1:
+        projected_dimension = result.primary_iterations
+    matrix_element_summary = _projected_matrix_accounting(
+        result.matrix_element_summary,
+        projected_dimension=projected_dimension,
+    )
     metrics = {
         "filter_eigenvalues": result.filter_eigenvalues,
         "raw_filter_eigenvalues": result.raw_filter_eigenvalues,
@@ -522,17 +559,16 @@ def _qfd_algorithm_metrics(result: QFDResult) -> dict[str, Any]:
         "stability_summary": result.stability_summary,
         "selected_level_index": 0 if result.filter_eigenvalues else None,
     }
-    if result.matrix_element_summary:
-        metrics["matrix_element_summary"] = result.matrix_element_summary
+    if matrix_element_summary:
+        metrics["matrix_element_summary"] = matrix_element_summary
     return metrics
 
 
 def _qse_algorithm_metrics(result: QSEResult) -> dict[str, Any]:
     conditioning_summary = dict(result.conditioning_summary)
-    matrix_element_summary = dict(result.matrix_element_summary)
-    matrix_element_summary.setdefault("projected_dimension", result.primary_iterations)
-    matrix_element_summary.setdefault(
-        "projected_matrix_element_count", 2 * result.primary_iterations**2
+    matrix_element_summary = _projected_matrix_accounting(
+        result.matrix_element_summary,
+        projected_dimension=result.primary_iterations,
     )
     matrix_element_summary.setdefault("basis_construction_rule", "fermionic_excitation_basis")
     metrics = {
@@ -738,11 +774,16 @@ def _energy_consistency(
 
 def _skqd_algorithm_metrics(result: SKQDResult) -> dict[str, Any]:
     diagnostics = result.krylov_extension_diagnostics
+    sqd_core = result.sqd_core if isinstance(result.sqd_core, dict) else {}
     metrics: dict[str, Any] = {
-        "sqd_core": result.sqd_core,
+        "sqd_core": sqd_core,
         "krylov_extension_diagnostics": diagnostics,
     }
     work_ledger = diagnostics.get("work_ledger")
+    if not isinstance(work_ledger, dict):
+        sqd_package = sqd_core.get("sci_result_package")
+        nested_ledger = sqd_package.get("work_ledger") if isinstance(sqd_package, dict) else None
+        work_ledger = nested_ledger if isinstance(nested_ledger, dict) else None
     if isinstance(work_ledger, dict):
         metrics["work_ledger"] = dict(work_ledger)
     if result.circuit_artifacts:
@@ -950,6 +991,12 @@ def _projected_convergence_metadata(
     diagnostics_key = "orthogonality_metrics" if isinstance(result, KQDResult) else "conditioning_summary"
     diagnostics = metrics.get(diagnostics_key)
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    stability_summary = metrics.get("stability_summary")
+    stability_summary = stability_summary if isinstance(stability_summary, dict) else {}
+    termination_reason = stability_summary.get("termination_reason") or diagnostics.get(
+        "termination_reason"
+    )
+    termination_reason = termination_reason if isinstance(termination_reason, str) else None
     residual = _finite_float(diagnostics.get("relative_ritz_residual"))
     threshold = _finite_float(diagnostics.get("residual_convergence_threshold"))
     metadata = {
@@ -959,7 +1006,7 @@ def _projected_convergence_metadata(
         "convergence_criterion": "projected_overlap_condition_and_generalized_residual",
         "convergence_value": residual,
         "convergence_threshold": threshold,
-        "termination_reason": None,
+        "termination_reason": termination_reason,
     }
     if residual is None:
         metadata.update(
@@ -1026,6 +1073,10 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
         stable = overlap_condition is not None and overlap_condition >= 0.0
     residual = _finite_float(metrics.get("relative_residual"))
     threshold = _finite_float(metrics.get("convergence_threshold"))
+    conditioning_summary = metrics.get("conditioning_summary")
+    conditioning_summary = conditioning_summary if isinstance(conditioning_summary, dict) else {}
+    termination_reason = conditioning_summary.get("termination_reason")
+    termination_reason = termination_reason if isinstance(termination_reason, str) else None
     metadata = {
         "numerical_stable": stable,
         "projected_solver_converged": None,
@@ -1033,7 +1084,7 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
         "convergence_criterion": "projected_ritz_residual",
         "convergence_value": residual,
         "convergence_threshold": threshold,
-        "termination_reason": None,
+        "termination_reason": termination_reason,
     }
     if residual is None:
         metadata.update(

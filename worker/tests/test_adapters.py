@@ -769,6 +769,56 @@ def test_ibm_adapter_records_each_pub_and_isa_gate_metrics(monkeypatch) -> None:
     ]
 
 
+def test_ibm_adapter_attributes_transpilation_records_to_each_submission(monkeypatch) -> None:
+    backend = SimpleNamespace(name="ibm_brisbane", simulator=False)
+    service = SimpleNamespace(backend=lambda _name: backend)
+    jobs = iter(
+        SimpleNamespace(job_id=lambda job_id=job_id: job_id)
+        for job_id in ("runtime-job-1", "runtime-job-2")
+    )
+
+    class PassManager:
+        def run(self, circuit):
+            return circuit.copy()
+
+    monkeypatch.setattr(
+        "qiskit.transpiler.preset_passmanagers.generate_preset_pass_manager",
+        lambda **_kwargs: PassManager(),
+    )
+    primitive = SimpleNamespace(run=lambda *args, **kwargs: next(jobs))
+    circuits = [QuantumCircuit(1), QuantumCircuit(1), QuantumCircuit(1)]
+    circuits[0].x(0)
+    circuits[1].h(0)
+    circuits[2].z(0)
+
+    adapter = IBMAdapter(
+        service_factory=lambda **_: service,
+        estimator_factory=lambda **_: primitive,
+    )
+    context = BackendExecutionContext(
+        backend_target="ibm_runtime",
+        backend_options={
+            "backend_name": "ibm_brisbane",
+            "token": "fake-token",
+            "instance": "fake-instance",
+        },
+        shots=256,
+    )
+
+    estimator = adapter.create_estimator(context)
+    estimator.run([(circuits[0], object())])
+    estimator.run([(circuits[1], object()), (circuits[2], object())])
+    metadata = adapter.execution_metadata(context)
+
+    ledger = metadata["runtime_submission_ledger"]
+    assert [entry["submission_index"] for entry in ledger] == [1, 2]
+    assert [entry["pub_count"] for entry in ledger] == [1, 2]
+    assert [record["submission_index"] for record in ledger[0]["pub_records"]] == [1]
+    assert [record["submission_index"] for record in ledger[1]["pub_records"]] == [2, 2]
+    assert [record["pub_index"] for record in ledger[1]["pub_records"]] == [0, 1]
+    assert metadata["runtime_accounting"]["submitted_pubs"] == 3
+
+
 @pytest.mark.parametrize(
     ("dynamical_decoupling", "twirling", "policy_name"),
     [
@@ -1294,6 +1344,12 @@ def test_normalize_result_for_kqd_dataclass() -> None:
     assert normalized["algorithm_metrics"]["krylov_rank"] == 4
     assert normalized["algorithm_metrics"]["ritz_values"] == [-1.0, -0.97, -0.94, -0.92]
     assert normalized["algorithm_metrics"]["raw_ritz_values"] == []
+    assert normalized["algorithm_metrics"]["matrix_element_summary"] == {
+        "projected_dimension": 4,
+        "projected_matrix_element_count": 32,
+        "projected_matrix_element_count_scope": "logical_hamiltonian_and_overlap_entries",
+        "projected_matrix_element_count_source": "derived_from_projected_dimension",
+    }
 
 
 def test_normalize_result_for_qfd_dataclass() -> None:
@@ -1319,6 +1375,12 @@ def test_normalize_result_for_qfd_dataclass() -> None:
         -0.88,
     ]
     assert normalized["algorithm_metrics"]["raw_filter_eigenvalues"] == []
+    assert normalized["algorithm_metrics"]["matrix_element_summary"] == {
+        "projected_dimension": 5,
+        "projected_matrix_element_count": 50,
+        "projected_matrix_element_count_scope": "logical_hamiltonian_and_overlap_entries",
+        "projected_matrix_element_count_source": "derived_from_projected_dimension",
+    }
 
 
 def test_normalize_result_rejects_stabilized_branch_projected_spectra() -> None:
@@ -1688,6 +1750,30 @@ def test_normalize_result_for_qse_dataclass() -> None:
     assert normalized["iterations"] == 2
     assert normalized["algorithm_metrics"]["eigenvalues"] == [-0.9, -0.84]
     assert normalized["algorithm_metrics"]["reference_state_energy"] == -0.82
+    assert normalized["algorithm_metrics"]["matrix_element_summary"][
+        "projected_matrix_element_count_source"
+    ] == "derived_from_projected_dimension"
+
+
+def test_normalize_result_preserves_projected_termination_reason() -> None:
+    result = KQDResult(
+        algorithm="kqd",
+        primary_energy=-1.0,
+        primary_iterations=2,
+        converged=False,
+        ritz_values=[-1.0],
+        krylov_rank=2,
+        orthogonality_metrics={
+            "stability_state": "stable",
+            "relative_ritz_residual": 0.2,
+            "residual_convergence_threshold": 1e-6,
+        },
+        stability_summary={"termination_reason": "projected_metric_rank_reduced"},
+    )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["termination_reason"] == "projected_metric_rank_reduced"
 
 
 @pytest.mark.parametrize(
@@ -1775,6 +1861,27 @@ def test_normalize_result_promotes_skqd_work_ledger() -> None:
         "ledger_version": 1,
         "sampler_run_attempts": 2,
         "sampler_returned_raw_sample_rows": 16,
+    }
+
+
+def test_normalize_result_promotes_skqd_core_work_ledger() -> None:
+    result = SKQDResult(
+        algorithm="skqd",
+        primary_energy=-0.81,
+        primary_iterations=2,
+        converged=False,
+        sqd_core={
+            "sci_result_package": {
+                "work_ledger": {"sampler_requested_shots_total": 24}
+            }
+        },
+        krylov_extension_diagnostics={},
+    )
+
+    normalized = normalize_result(result)
+
+    assert normalized["algorithm_metrics"]["work_ledger"] == {
+        "sampler_requested_shots_total": 24
     }
 
 
