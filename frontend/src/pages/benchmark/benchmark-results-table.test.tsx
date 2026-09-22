@@ -129,6 +129,23 @@ describe("BenchmarkResultsTable", () => {
     expect(screen.getByText("1.50 mHa")).toBeInTheDocument();
   });
 
+  it("shows chemical accuracy for valid results when benchmark eligibility is false", async () => {
+    renderBenchmarkResultsTable({
+      grouped: buildGroupedRows({
+        executionMetadata: {
+          benchmarkEligible: false,
+          benchmarkExclusionReason: "projected_solve_diagnostic",
+          projectedSolveIsDiagnostic: true,
+          scientificConverged: false,
+          reportedEnergyIsValid: true,
+        } as NonNullable<BenchmarkEntry["executionMetadata"]>,
+      }),
+    });
+
+    expect(await screen.findByLabelText("Chemically accurate")).toBeInTheDocument();
+    expect(screen.getByText("1.50 mHa")).toBeInTheDocument();
+  });
+
   it("shows the reported execution path for a completed row", async () => {
     renderBenchmarkResultsTable({
       grouped: buildGroupedRows({

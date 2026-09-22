@@ -13,13 +13,10 @@ import { containerSurfaceClassName } from "@/lib/interactive-styles";
 import type { MoleculePreset } from "@/lib/benchmark-presets";
 import { formatDuration } from "@/lib/format-duration";
 import { isTimedOutFailureMessage } from "@/lib/run-failure";
+import { assessChemicalAccuracy } from "@/lib/results/accuracy";
 import { cn } from "@/lib/utils";
 import type { BenchmarkEntry } from "./benchmark-utils";
-import {
-  assessBenchmarkEntry,
-  benchmarkEligibilityMessage,
-  getBenchmarkEligibility,
-} from "./benchmark-utils";
+import { effectiveRefs } from "./benchmark-utils";
 import { BenchmarkMoleculeActions } from "./benchmark-molecule-actions";
 import {
   BenchmarkResultRowActions,
@@ -189,6 +186,17 @@ function ExecutionPathCell({ entry }: { entry: BenchmarkEntry }) {
   );
 }
 
+function assessDisplayedAccuracy(entry: BenchmarkEntry, chemicalAccuracyHa: number) {
+  const refs = effectiveRefs(entry);
+  return assessChemicalAccuracy({
+    energy: entry.energy,
+    hf: refs.hf,
+    fci: refs.fci,
+    thresholdHa: chemicalAccuracyHa,
+    converged: entry.converged,
+  });
+}
+
 function ChemicalAccuracyCell({
   entry,
   chemicalAccuracyHa,
@@ -213,10 +221,8 @@ function ChemicalAccuracyCell({
   if (entry.status !== "completed") {
     return <StatusIndicator icon={Clock} label="Pending" iconClassName="text-muted-foreground" />;
   }
-  const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
+  const assessment = assessDisplayedAccuracy(entry, chemicalAccuracyHa);
   if (!assessment.isScorable) {
-    const eligibility = getBenchmarkEligibility(entry);
-    const message = benchmarkEligibilityMessage(eligibility.reason);
     return (
       <div className="flex items-center gap-3">
         <StatusIndicator
@@ -224,7 +230,7 @@ function ChemicalAccuracyCell({
           label=""
           showLabel={false}
           iconClassName="text-muted-foreground"
-          ariaLabel={`Chemical accuracy unavailable: ${message}`}
+          ariaLabel="Chemical accuracy unavailable: reference or energy data is unavailable"
         />
         <span className="text-xs text-muted-foreground">-</span>
       </div>
@@ -267,7 +273,7 @@ function completedAccuracyState(
   chemicalAccuracyHa: number,
 ): "green" | "amber" | "red" | null {
   if (entry.status !== "completed" || entry.energy === null) return null;
-  const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
+  const assessment = assessDisplayedAccuracy(entry, chemicalAccuracyHa);
   switch (assessment.verdict) {
     case "accurate":
       return "green";

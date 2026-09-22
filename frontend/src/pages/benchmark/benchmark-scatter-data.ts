@@ -1,7 +1,10 @@
 import type { ChartTooltipSection } from "@/components/results/charts/chart-tooltip";
 import type { MoleculePreset } from "@/lib/benchmark-presets";
-import type { AccuracyVerdict } from "@/lib/results/accuracy";
-import { assessBenchmarkEntry, benchmarkEntryDisplayLabel } from "./benchmark-utils";
+import {
+  assessChemicalAccuracy,
+  type AccuracyVerdict,
+} from "@/lib/results/accuracy";
+import { benchmarkEntryDisplayLabel, effectiveRefs } from "./benchmark-utils";
 import type { BenchmarkEntry } from "./benchmark-utils";
 import { buildBenchmarkTooltipLines } from "./benchmark-scatter-tooltips";
 
@@ -104,7 +107,14 @@ export function buildCompletedPoints(
         return [];
       }
 
-      const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
+      const refs = effectiveRefs(entry);
+      const assessment = assessChemicalAccuracy({
+        energy: entry.energy,
+        hf: refs.hf,
+        fci: refs.fci,
+        thresholdHa: chemicalAccuracyHa,
+        converged: entry.converged,
+      });
       if (assessment.absErrorMha == null) return [];
 
       return [
