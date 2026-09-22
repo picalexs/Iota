@@ -93,6 +93,8 @@ def test_api_normalization_selects_compact_result_and_seed_roles() -> None:
     assert row["run_id"] == "run-1"
     assert row["seed"] == 11
     assert row["seed_roles"] == ["algorithm", "transpiler"]
+    assert row["seed_algorithm"] == 11
+    assert row["seed_reference"] is None
     assert row["absolute_error"] == 0.1
     assert row["runtime_seconds"] == 2.5
     assert row["requested_shots"] == 4096
@@ -104,6 +106,53 @@ def test_api_normalization_selects_compact_result_and_seed_roles() -> None:
     assert set(row) >= set(CANONICAL_FIELDS)
     assert "raw_result" not in row
     assert "execution_segments" not in row
+
+
+def test_api_normalization_keeps_sqd_algorithm_and_sampling_seeds_separate() -> None:
+    benchmark = _benchmark()
+    benchmark["entries"][0]["algorithm"] = "sqd"
+    benchmark["entries"][0].pop("seedRoles")
+    run_export = _run_export()
+    run_export["run"]["algorithm"] = "sqd"
+    run_export["run"]["config_json"] = {
+        "advanced_config": {"seed": 11, "sampling_vqe_seed": 17},
+        "backend_options": {"seed_transpiler": 23},
+    }
+
+    row, _ = normalize_api_row(
+        benchmark=benchmark,
+        entry=benchmark["entries"][0],
+        run_export=run_export,
+    )
+
+    assert row["seed"] == 11
+    assert row["seed_roles"] == ["algorithm", "sampling", "transpiler"]
+    assert row["seed_algorithm"] == 11
+    assert row["seed_sampling"] == 17
+    assert row["seed_transpiler"] == 23
+
+
+def test_api_normalization_exports_qse_reference_seed() -> None:
+    benchmark = _benchmark()
+    benchmark["entries"][0]["algorithm"] = "qse"
+    benchmark["entries"][0].pop("seed")
+    benchmark["entries"][0].pop("seedRoles")
+    run_export = _run_export()
+    run_export["run"]["algorithm"] = "qse"
+    run_export["run"]["config_json"] = {
+        "advanced_config": {"reference_method": "vqe", "vqe_reference_seed": 29},
+        "backend_options": {},
+    }
+
+    row, _ = normalize_api_row(
+        benchmark=benchmark,
+        entry=benchmark["entries"][0],
+        run_export=run_export,
+    )
+
+    assert row["seed"] == 29
+    assert row["seed_roles"] == ["reference"]
+    assert row["seed_reference"] == 29
 
 
 def test_api_normalization_excludes_projected_diagnostics_from_comparison() -> None:

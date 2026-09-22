@@ -69,12 +69,35 @@ Each seed is a separate QSS run. The checkpoint records the seed and its roles.
 
 - `simulator` sets `backend_options.seed_simulator`.
 - `transpiler` sets `backend_options.seed_transpiler`.
-- `algorithm` sets the algorithm seed in advanced VQE, SQD, or SKQD options.
+- `algorithm` sets `advanced_config.seed` for VQE or SQD. It sets
+  `advanced_config.base_sampling_options.seed` for SKQD.
+- `sampling` sets SQD's nested VQE seed in
+  `advanced_config.sampling_vqe_seed`. Use it only when
+  `sampling_state_source` is `vqe`.
+- `reference` sets QSE's nested VQE reference seed in
+  `advanced_config.vqe_reference_seed`. Use it only when
+  `reference_method` is `vqe`.
 
-QSE, KQD, and QFD do not expose an algorithm-level seed in this workflow. Their
-default seed roles are simulator and transpiler for local targets. Set
-`seed_roles` explicitly on a variant when the campaign needs a different
-supported combination.
+KQD and QFD do not use algorithm-level randomness. QSE uses the `reference`
+role only for a VQE reference solve. QSE with an HF reference, KQD, and QFD
+use the simulator and transpiler roles for local targets. Set `seed_roles`
+explicitly on a variant to select a supported combination.
+
+The same campaign seed is written to every selected role. Use separate
+algorithm variants when you need to vary one role while holding another role
+constant. For example:
+
+```json
+{
+  "algorithm": "sqd",
+  "mode": "advanced",
+  "seed_roles": ["algorithm", "sampling"],
+  "advanced_config": {"sampling_state_source": "vqe"}
+}
+```
+
+If `noise_profile` is set at the campaign level, the exporter copies it to
+each variant that does not define its own profile.
 
 The default workflow targets `statevector` or `aer_simulator`. IBM Runtime
 submission is blocked unless the caller passes `--allow-ibm`. Do not pass that

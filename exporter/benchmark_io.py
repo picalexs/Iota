@@ -51,6 +51,7 @@ CANONICAL_FIELDS = (
     "seed_roles",
     "seed_algorithm",
     "seed_sampling",
+    "seed_reference",
     "seed_simulator",
     "seed_transpiler",
     "status",
@@ -296,36 +297,28 @@ def _backend_name(config: Mapping[str, Any]) -> str | None:
 
 
 def _config_seed(config: Mapping[str, Any], algorithm: str | None) -> tuple[int | None, list[str]]:
-    advanced = _record(_first(config, "advanced_config", "advancedConfig"))
     algorithm = (algorithm or "").lower()
-    roles: list[str] = []
-
-    if algorithm == "vqe" and _number(_first(advanced, "seed")) is not None:
-        roles.append("algorithm")
-        return _integer(_first(advanced, "seed")), roles
-
-    if algorithm == "sqd" and _number(_first(advanced, "seed")) is not None:
-        roles.append("sampling")
-        return _integer(_first(advanced, "seed")), roles
-
-    if algorithm == "skqd":
-        sampling = _record(_first(advanced, "base_sampling_options", "baseSamplingOptions"))
-        value = _first(sampling, "seed")
-        if _number(value) is not None:
-            roles.append("sampling")
-            return _integer(value), roles
-
-    backend_options = _record(_first(config, "backend_options", "backendOptions"))
-    simulator_seed = _first(backend_options, "seed_simulator", "seedSimulator")
-    if _number(simulator_seed) is not None:
-        roles.append("simulator")
-        return _integer(simulator_seed), roles
-
-    transpiler_seed = _first(backend_options, "seed_transpiler", "seedTranspiler")
-    if _number(transpiler_seed) is not None:
-        roles.append("transpiler")
-        return _integer(transpiler_seed), roles
-
+    seed_fields = _config_seeds(config, algorithm)
+    roles = [
+        role
+        for role, field_name in (
+            ("algorithm", "seed_algorithm"),
+            ("sampling", "seed_sampling"),
+            ("reference", "seed_reference"),
+            ("simulator", "seed_simulator"),
+            ("transpiler", "seed_transpiler"),
+        )
+        if seed_fields[field_name] is not None
+    ]
+    for role, field_name in (
+        ("algorithm", "seed_algorithm"),
+        ("sampling", "seed_sampling"),
+        ("reference", "seed_reference"),
+        ("simulator", "seed_simulator"),
+        ("transpiler", "seed_transpiler"),
+    ):
+        if seed_fields[field_name] is not None:
+            return seed_fields[field_name], roles
     return None, roles
 
 
@@ -336,13 +329,16 @@ def _config_seeds(config: Mapping[str, Any], algorithm: str | None) -> dict[str,
     algorithm_name = (algorithm or "").lower()
     sampling = _record(_first(advanced, "base_sampling_options", "baseSamplingOptions"))
     return {
-        "seed_algorithm": _integer(_first(advanced, "seed"))
-        if algorithm_name == "vqe"
-        else None,
-        "seed_sampling": _integer(
+        "seed_algorithm": _integer(
             _first(sampling, "seed") if algorithm_name == "skqd" else _first(advanced, "seed")
         )
-        if algorithm_name in {"sqd", "skqd"}
+        if algorithm_name in {"vqe", "sqd", "skqd"}
+        else None,
+        "seed_sampling": _integer(_first(advanced, "sampling_vqe_seed"))
+        if algorithm_name == "sqd"
+        else None,
+        "seed_reference": _integer(_first(advanced, "vqe_reference_seed"))
+        if algorithm_name == "qse"
         else None,
         "seed_simulator": _integer(_first(options, "seed_simulator", "seedSimulator")),
         "seed_transpiler": _integer(_first(options, "seed_transpiler", "seedTranspiler")),

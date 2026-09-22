@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover - direct script execution
 SUPPORTED_ALGORITHMS = {"vqe", "qse", "kqd", "qfd", "sqd", "skqd"}
 SUPPORTED_BACKENDS = {"statevector", "aer_simulator", "ibm_runtime"}
 ALGORITHM_SEED_ALGORITHMS = {"vqe", "sqd", "skqd"}
+SEED_ROLES = {"algorithm", "sampling", "reference", "simulator", "transpiler"}
 DEFAULT_BASE_URL = "http://localhost:18000"
 
 
@@ -124,6 +125,9 @@ def validate_campaign(manifest: Mapping[str, Any]) -> dict[str, Any]:
     backend_options = dict(backend.get("options") or manifest.get("backend_options") or {})
     if backend.get("name") is not None:
         backend_options.setdefault("backend_name", backend["name"])
+    noise_profile = manifest.get("noise_profile")
+    if noise_profile is not None and not isinstance(noise_profile, Mapping):
+        raise ExporterError("Campaign noise_profile must be an object")
 
     for variant in variants:
         algorithm = str(variant["algorithm"]).lower()
@@ -134,6 +138,9 @@ def validate_campaign(manifest: Mapping[str, Any]) -> dict[str, Any]:
             raise ExporterError(f"Unsupported mode for {algorithm}: {mode}")
         variant["algorithm"] = algorithm
         variant["mode"] = mode
+        if "noise_profile" not in variant and noise_profile is not None:
+            variant["noise_profile"] = dict(noise_profile)
+        _seed_roles(algorithm, variant, target)
 
     return {
         "name": name,
@@ -194,11 +201,26 @@ def _seed_roles(algorithm: str, variant: Mapping[str, Any], backend_target: str)
     if roles is not None:
         if not isinstance(roles, list) or not all(isinstance(item, str) for item in roles):
             raise ExporterError(f"seed_roles for {algorithm} must be a list of strings")
-        return [item for item in roles if item]
+        normalized = [item.strip().lower() for item in roles if item.strip()]
+        unknown = sorted(set(normalized) - SEED_ROLES)
+        if unknown:
+            raise ExporterError(
+                f"Unsupported seed role(s) for {algorithm}: {', '.join(unknown)}"
+            )
+        if len(normalized) != len(set(normalized)):
+            raise ExporterError(f"Duplicate seed role for {algorithm}")
+        return normalized
     if algorithm in ALGORITHM_SEED_ALGORITHMS and variant.get("mode") == "advanced":
         return ["algorithm"]
     if backend_target == "ibm_runtime":
         return ["transpiler"]
+    if (
+        algorithm == "qse"
+        and variant.get("mode") == "advanced"
+        and str((variant.get("advanced_config") or {}).get("reference_method", "")).lower()
+        == "vqe"
+    ):
+        return ["reference"]
     return ["simulator", "transpiler"]
 
 
@@ -222,6 +244,28 @@ def _build_seeded_config(
         raise ExporterError(
             f"{algorithm} algorithm seeds require mode=advanced with advanced_config"
         )
+    if (
+        any(role in roles for role in {"sampling", "reference"})
+        and variant.get("mode") != "advanced"
+    ):
+        raise ExporterError(
+            f"{algorithm} sampling and reference seeds require mode=advanced with advanced_config"
+        )
+    advanced_variant = dict(variant.get("advanced_config") or {})
+    if "sampling" in roles:
+        if algorithm != "sqd":
+            raise ExporterError(f"{algorithm} has no exposed nested sampling seed field")
+        if str(advanced_variant.get("sampling_state_source", "hf")).lower() != "vqe":
+            raise ExporterError(
+                "SQD sampling seed requires advanced_config.sampling_state_source='vqe'"
+            )
+    if "reference" in roles:
+        if algorithm != "qse":
+            raise ExporterError(f"{algorithm} has no exposed reference seed field")
+        if str(advanced_variant.get("reference_method", "")).lower() != "vqe":
+            raise ExporterError(
+                "QSE reference seed requires advanced_config.reference_method='vqe'"
+            )
 
     backend_options = {
         "selection_policy": "manual",
@@ -254,7 +298,7 @@ def _build_seeded_config(
     if config["mode"] == "easy":
         config["easy_options"] = dict(variant.get("easy_options") or {"goal": "balanced"})
     else:
-        advanced = dict(variant.get("advanced_config") or {})
+        advanced = advanced_variant
         advanced.setdefault("algorithm", algorithm)
         if "algorithm" in roles:
             if algorithm == "skqd":
@@ -263,6 +307,10 @@ def _build_seeded_config(
                 advanced["base_sampling_options"] = sampling
             else:
                 advanced["seed"] = seed
+        if "sampling" in roles:
+            advanced["sampling_vqe_seed"] = seed
+        if "reference" in roles:
+            advanced["vqe_reference_seed"] = seed
         config["advanced_config"] = advanced
 
     if variant.get("noise_profile") is not None:

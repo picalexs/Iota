@@ -107,6 +107,89 @@ def test_campaign_uses_automatic_noisy_aer_precision_by_default(tmp_path: Path) 
     options = payload["backend_options"]
     assert options["shots"] == 1024
     assert "estimator_precision" not in options
+    assert payload["noise_profile"] == manifest["noise_profile"]
+
+
+def test_campaign_can_seed_sqd_and_nested_sampling_vqe(tmp_path: Path) -> None:
+    manifest = _manifest()
+    manifest["algorithms"] = [
+        {
+            "algorithm": "sqd",
+            "mode": "advanced",
+            "seed_roles": ["algorithm", "sampling"],
+            "advanced_config": {
+                "algorithm": "sqd",
+                "sampling_state_source": "vqe",
+            },
+        }
+    ]
+    manifest["seeds"] = [23]
+
+    api = FakeWriteApi()
+    create_campaign(
+        manifest,
+        base_url="http://unused",
+        output_dir=tmp_path,
+        client=api,  # type: ignore[arg-type]
+    )
+
+    payload = next(payload for path, payload in api.posts if path == "/api/runs")
+    assert payload["advanced_config"]["seed"] == 23
+    assert payload["advanced_config"]["sampling_vqe_seed"] == 23
+    assert api.patches[-1][1]["entries"][0]["seedRoles"] == ["algorithm", "sampling"]
+
+
+def test_campaign_can_seed_qse_vqe_reference(tmp_path: Path) -> None:
+    manifest = _manifest()
+    manifest["algorithms"] = [
+        {
+            "algorithm": "qse",
+            "mode": "advanced",
+            "advanced_config": {
+                "algorithm": "qse",
+                "reference_method": "vqe",
+            },
+        }
+    ]
+    manifest["seeds"] = [29]
+
+    api = FakeWriteApi()
+    create_campaign(
+        manifest,
+        base_url="http://unused",
+        output_dir=tmp_path,
+        client=api,  # type: ignore[arg-type]
+    )
+
+    payload = next(payload for path, payload in api.posts if path == "/api/runs")
+    assert payload["advanced_config"]["vqe_reference_seed"] == 29
+    assert api.patches[-1][1]["entries"][0]["seedRoles"] == ["reference"]
+
+
+def test_campaign_rejects_incompatible_seed_roles(tmp_path: Path) -> None:
+    manifest = _manifest()
+    manifest["algorithms"] = [
+        {
+            "algorithm": "sqd",
+            "mode": "advanced",
+            "seed_roles": ["sampling"],
+            "advanced_config": {"algorithm": "sqd", "sampling_state_source": "hf"},
+        }
+    ]
+    with pytest.raises(ExporterError, match="sampling_state_source='vqe'"):
+        create_campaign(
+            manifest,
+            base_url="http://unused",
+            output_dir=tmp_path,
+            client=FakeWriteApi(),  # type: ignore[arg-type]
+        )
+
+
+def test_campaign_rejects_unknown_seed_roles() -> None:
+    manifest = _manifest()
+    manifest["algorithms"] = [{"algorithm": "vqe", "seed_roles": ["random"]}]
+    with pytest.raises(ExporterError, match="Unsupported seed role"):
+        validate_campaign(manifest)
 
 
 def test_campaign_resume_does_not_submit_runs_again(tmp_path: Path) -> None:
