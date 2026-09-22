@@ -61,6 +61,11 @@ def build_basis_selection_summary(
         "actual_basis_dimension": int(actual_dimension),
         "selected_specs_complete": len(selected_specs) == int(actual_dimension),
         "dimension_cap_reached": int(actual_dimension) >= int(dimension_cap),
+        "basis_termination_reason": (
+            "target_rank_reached"
+            if int(actual_dimension) >= int(dimension_cap)
+            else "candidate_pool_exhausted"
+        ),
         "selected_excitation_counts": counts,
         "selected_excitation_specs": serialized_specs,
     }

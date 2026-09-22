@@ -89,7 +89,7 @@ const SECTIONS: HelpSection[] = [
     id: "chemical_accuracy_target_ha",
     title: "Chemical accuracy target",
     summary:
-      "Sets the per-run threshold used when run detail compares the final energy against the available FCI/Exact reference. If this value is absent, the frontend falls back to 1.6e-3 Ha (1.60 mHa).",
+      "Sets the per-run threshold used when run detail compares the final energy against the available CASCI active-space reference. If this value is absent, the frontend falls back to 1.6e-3 Ha (1.60 mHa).",
   },
   {
     id: "optimizer",

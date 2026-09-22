@@ -39,7 +39,7 @@ export function buildBenchmarkBars(
     bars.push({ label: "HF", energy: refs.hf });
   }
   if (refs.fci !== undefined) {
-    bars.push({ label: "FCI/Exact", energy: refs.fci });
+    bars.push({ label: "CASCI active-space", energy: refs.fci });
   }
   return bars.sort((left, right) => {
     if (left.energy == null || right.energy == null) {

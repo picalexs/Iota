@@ -139,7 +139,6 @@ describe("RunForm topology", () => {
     await waitFor(() => expect(ibmButton).toBeEnabled());
     await user.click(ibmButton);
 
-    await screen.findByText(/connections are colored by reported cz\/cx error/i);
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: /backend/i })).toHaveTextContent(
         /least error: ibm_berlin/i,
@@ -228,7 +227,6 @@ describe("RunForm topology", () => {
     await waitFor(() => expect(ibmButton).toBeEnabled());
     await user.click(ibmButton);
 
-    await screen.findByText(/connections are colored by reported cz\/cx error/i);
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: /backend/i })).toHaveTextContent(
         /least error: ibm_aachen/i,

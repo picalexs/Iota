@@ -114,7 +114,7 @@ describe("ExportDropdown", () => {
     dashboardRoot.innerHTML = `
       <section data-dashboard-tile data-tile-title="Energy Δ Plot">
         <figure>
-          <svg aria-label="Best value vs FCI"><path /></svg>
+          <svg aria-label="Best value vs CASCI"><path /></svg>
         </figure>
       </section>
       <svg aria-label="Raw spectrum"></svg>

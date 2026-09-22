@@ -357,6 +357,7 @@ def test_measured_qse_run_returns_diagnostic_not_converged() -> None:
     assert convergence["scientific_converged"] is False
     assert normalized["reported_energy_source"] in {
         "stabilized_projected_diagnostic",
+        "projected_branch_diagnostic",
         "lowest_qse_projected_eigenvalue",
     }
 
@@ -493,7 +494,7 @@ def test_measured_qse_noisy_hf_solve_is_reportable_diagnostic() -> None:
     normalized = normalize_result(result)
     # A reportable diagnostic keeps a finite reported energy.
     assert normalized["reported_energy"] is not None
-    assert normalized["reported_energy_source"] == "lowest_qse_projected_eigenvalue"
+    assert normalized["reported_energy_source"] == "projected_branch_diagnostic"
 
 
 def test_measured_qse_ibm_target_uses_mock_estimator_without_live_access() -> None:

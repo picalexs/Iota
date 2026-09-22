@@ -28,7 +28,7 @@ const ALGORITHM_SUMMARIES: Record<RunAlgorithm, string> = {
 
 function formatReferenceEnergy(preset: MoleculePreset): string {
   if (preset.references.fci === null) return "No ref";
-  return "Ref " + preset.references.fci.toFixed(5) + " Ha";
+  return "Preset ref " + preset.references.fci.toFixed(5) + " Ha";
 }
 
 function formatActiveSpace(preset: MoleculePreset): string {

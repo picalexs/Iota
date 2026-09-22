@@ -243,6 +243,9 @@ precision instead of a fixed shot count. VQE sets `shots_per_pub` and
 `primitive_shots` to `null` for both paths. Adapter metadata keeps requested
 shots separate from observed effective shots. IBM Runtime metadata does not
 infer effective shots from the worker's configured shot value.
+For noisy Aer, an omitted estimator precision is automatic and resolves to
+`1/sqrt(shots)`. A positive precision is a standard-error target, not a literal
+sampler-shot count. An explicit zero selects the exact diagnostic path.
 
 `effective_optimizer_max_iterations` limits the initial VQE gradient-based run
 and all stationary-start retries. Each retry receives only the remaining

@@ -19,9 +19,6 @@ export function RunCreatePage() {
           Back
         </button>
         <h1 className="text-2xl font-bold tracking-tight">New Simulation Run</h1>
-        <p className="text-muted-foreground text-sm">
-          Configure and submit an algorithm-aware quantum simulation run
-        </p>
       </div>
 
       <RunForm key={initialMoleculeId ?? "__no-molecule__"} initialMoleculeId={initialMoleculeId} />

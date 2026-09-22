@@ -25,6 +25,27 @@ def compute_iteration_deltas(
     return delta_energy, occupancy_delta
 
 
+def iteration_values_are_finite(
+    *,
+    energy_value: float,
+    delta_energy: float,
+    occupancy_delta: float,
+    occupancy_vector: np.ndarray,
+    deltas_available: bool = True,
+) -> bool:
+    """Return whether one SQD iteration has finite convergence inputs."""
+    delta_values_are_valid = (
+        bool(np.isfinite(delta_energy) and np.isfinite(occupancy_delta))
+        if deltas_available
+        else bool(not np.isnan(delta_energy) and not np.isnan(occupancy_delta))
+    )
+    return bool(
+        np.isfinite(energy_value)
+        and delta_values_are_valid
+        and np.all(np.isfinite(np.asarray(occupancy_vector, dtype=float)))
+    )
+
+
 def is_iteration_converged(
     *,
     iteration: int,
@@ -36,8 +57,10 @@ def is_iteration_converged(
     min_selected_configurations: int,
 ) -> bool:
     """Return whether one SQD recovery iteration satisfies the convergence gate."""
-    return (
+    return bool(
         iteration > 1
+        and np.isfinite(delta_energy)
+        and np.isfinite(occupancy_delta)
         and delta_energy <= energy_tolerance
         and occupancy_delta <= occupancy_tolerance
         and selected_count >= min_selected_configurations
@@ -107,6 +130,7 @@ def is_iteration_stalled(
 __all__ = [
     "build_iteration_signature",
     "compute_iteration_deltas",
+    "iteration_values_are_finite",
     "is_iteration_converged",
     "is_iteration_stalled",
 ]

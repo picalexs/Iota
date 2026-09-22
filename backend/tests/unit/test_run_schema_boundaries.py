@@ -29,7 +29,7 @@ def test_legacy_run_imports_reexport_specific_schema_types() -> None:
 
 
 def test_backend_options_validate_estimator_precision() -> None:
-    assert BackendOptions().estimator_precision == 0.0
+    assert BackendOptions().estimator_precision is None
     assert BackendOptions(estimator_precision=0.125).estimator_precision == 0.125
 
     for invalid in (-0.1, float("nan"), float("inf")):
@@ -39,6 +39,28 @@ def test_backend_options_validate_estimator_precision() -> None:
             pass
         else:
             raise AssertionError(f"expected invalid precision to fail: {invalid!r}")
+
+
+def test_run_snapshot_omits_automatic_precision_but_keeps_explicit_exact() -> None:
+    automatic = RunCreate(
+        molecule_id="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        algorithm="vqe",
+        mode="easy",
+        backend_target="aer_simulator",
+        noise_profile={
+            "source": "custom_preset",
+            "preset": "depolarizing_cx",
+            "strength": 0.01,
+        },
+        easy_options={"goal": "balanced"},
+    )
+    automatic_options = automatic.snapshot_config()["backend_options"]
+    assert "estimator_precision" not in automatic_options
+
+    exact = automatic.model_copy(
+        update={"backend_options": BackendOptions(estimator_precision=0.0)}
+    )
+    assert exact.snapshot_config()["backend_options"]["estimator_precision"] == 0.0
 
 
 def test_backend_options_keep_aer_tuning_fields_optional_and_bounded() -> None:

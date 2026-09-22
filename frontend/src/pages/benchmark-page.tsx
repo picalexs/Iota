@@ -70,6 +70,8 @@ export function BenchmarkPage() {
     customMolecules,
     grouped,
     backendHelperText,
+    backendCapabilitiesLoading,
+    backendCapabilitiesRefreshing,
     benchmarkConfirmationDescription,
     ibmConfirmationOpen,
     setIbmConfirmationOpen,
@@ -258,6 +260,9 @@ export function BenchmarkPage() {
         failed={visibleStats.failed}
         cancelled={visibleStats.cancelled}
         backendHelperText={backendHelperText}
+        backendCapabilitiesLoading={backendCapabilitiesLoading}
+        backendCapabilitiesRefreshing={backendCapabilitiesRefreshing}
+        onRefreshBackendCapabilities={ensureBackendCapabilitiesLoaded}
         onToggleMolecule={toggleMolecule}
         onToggleAlgorithm={toggleAlgorithm}
         onSetMolecules={setSelectedMolecules}

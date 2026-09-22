@@ -6,14 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormField } from "./form-field";
 import { useValidateRunDebounced } from "@/hooks/use-validate-run-debounced";
 import { useAllMolecules, useRunConfigMetadata } from "@/hooks";
@@ -30,7 +23,6 @@ import { KQDPanel } from "./run-form/advanced-panels/kqd-panel";
 import { QFDPanel } from "./run-form/advanced-panels/qfd-panel";
 import { QSEPanel } from "./run-form/advanced-panels/qse-panel";
 import { SKQDPanel } from "./run-form/advanced-panels/skqd-panel";
-import { forceRefreshBackendCapabilities, getBackendCapabilitiesCached } from "@/api/backends";
 import { showErrorToast } from "@/lib/error-handler";
 import { isMoleculeCompatible } from "@/lib/molecule-compat";
 import { runFormSchema } from "@/lib/run-form-schema";
@@ -54,8 +46,7 @@ import {
   kqdUsesKnownBranchEstimatorPath,
 } from "@/lib/run-form-recommendations";
 import type { ChemicalAccuracyTargetOption } from "@/lib/run-form-recommendations";
-import type { IbmBackendWarmupProgress } from "@/lib/ibm-profile-events";
-import { subscribeToIbmCredentialProfilesChanged } from "@/lib/ibm-profile-events";
+import { useIbmBackendCapabilities } from "@/hooks/use-ibm-backend-capabilities";
 import {
   backendDefaultsForTarget,
   getSelectableDevices,
@@ -97,8 +88,6 @@ const DEFAULT_BACKEND_CAPABILITIES: BackendCapability[] = [
 ];
 
 const EMPTY_MOLECULES: MoleculeResponse[] = [];
-const BACKEND_CAPABILITIES_REFRESH_ERROR = "Failed to refresh backend capabilities.";
-
 type RunFormErrorField = FieldPath<SimulationRunFormData>;
 
 function mergeBackendCapabilities(items: BackendCapability[]): BackendCapability[] {
@@ -159,172 +148,6 @@ type AlgorithmControlsProps = AdvancedAlgorithmControlsProps &
 
 function useRunFormConfigMetadata() {
   return useRunConfigMetadata(loadRunFormConfigMetadata).data ?? null;
-}
-
-function initialBackendCapabilities(): BackendCapability[] {
-  const cachedCapabilities = getBackendCapabilitiesCached();
-  return cachedCapabilities
-    ? mergeBackendCapabilities(cachedCapabilities.backends)
-    : DEFAULT_BACKEND_CAPABILITIES;
-}
-
-function syncBackendCapabilitiesFromCache(
-  applyCapabilities: (items: BackendCapability[]) => void,
-  setCapabilitiesError: (value: string | null) => void,
-  profileId?: string | null,
-): boolean {
-  const cached = getBackendCapabilitiesCached(profileId ?? undefined);
-  if (cached == null) {
-    return false;
-  }
-  applyCapabilities(cached.backends);
-  setCapabilitiesError(null);
-  return true;
-}
-
-function applyBackendCapabilityRefreshDetail(
-  detail: {
-    activeProfileId?: string | null;
-    backendCapabilitiesRefresh?: "started" | "progress" | "completed" | "failed";
-    backendWarmupProgress?: IbmBackendWarmupProgress | null;
-  },
-  syncFromCache: (profileId?: string | null) => boolean,
-  setActiveProfileId: (value: string | null) => void,
-  setCapabilitiesLoading: (value: boolean) => void,
-  setCapabilitiesRefreshing: (value: boolean) => void,
-  setCapabilitiesError: (value: string | null) => void,
-  setWarmupProgress: (value: IbmBackendWarmupProgress | null) => void,
-): void {
-  if (detail.activeProfileId !== undefined) {
-    setActiveProfileId(detail.activeProfileId ?? null);
-  }
-
-  if (
-    detail.backendCapabilitiesRefresh === "started" ||
-    detail.backendCapabilitiesRefresh === "progress"
-  ) {
-    const synced = syncFromCache(detail.activeProfileId ?? undefined);
-    setCapabilitiesLoading(!synced);
-    setCapabilitiesRefreshing(true);
-    setCapabilitiesError(null);
-    setWarmupProgress(detail.backendWarmupProgress ?? null);
-    return;
-  }
-
-  const synced = syncFromCache(detail.activeProfileId ?? undefined);
-  if (!synced && detail.backendCapabilitiesRefresh === "failed") {
-    setCapabilitiesError(BACKEND_CAPABILITIES_REFRESH_ERROR);
-  } else if (synced) {
-    setCapabilitiesError(null);
-  }
-
-  setCapabilitiesLoading(false);
-  setCapabilitiesRefreshing(false);
-  setWarmupProgress(detail.backendWarmupProgress ?? null);
-}
-
-function useBackendCapabilitiesState() {
-  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
-  const [backendCapabilities, setBackendCapabilities] = useState(initialBackendCapabilities);
-  const [capabilitiesLoading, setCapabilitiesLoading] = useState(
-    () => getBackendCapabilitiesCached() == null,
-  );
-  const [capabilitiesRefreshing, setCapabilitiesRefreshing] = useState(false);
-  const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
-  const [backendWarmupProgress, setBackendWarmupProgress] =
-    useState<IbmBackendWarmupProgress | null>(null);
-
-  const applyCapabilities = useCallback((items: BackendCapability[]) => {
-    setBackendCapabilities(mergeBackendCapabilities(items));
-  }, []);
-
-  const syncCapabilitiesFromCache = useCallback(
-    (profileId?: string | null) => {
-      return syncBackendCapabilitiesFromCache(
-        applyCapabilities,
-        setCapabilitiesError,
-        profileId ?? undefined,
-      );
-    },
-    [applyCapabilities],
-  );
-
-  useEffect(() => {
-    if (syncCapabilitiesFromCache()) {
-      setCapabilitiesLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setCapabilitiesLoading(true);
-    setBackendWarmupProgress({ loadedProfiles: 0, totalProfiles: 1 });
-
-    void forceRefreshBackendCapabilities(activeProfileId ?? undefined)
-      .then((data) => {
-        if (cancelled) {
-          return;
-        }
-        applyCapabilities(data.backends);
-        setCapabilitiesError(null);
-        setBackendWarmupProgress({ loadedProfiles: 1, totalProfiles: 1 });
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-        setCapabilitiesError(BACKEND_CAPABILITIES_REFRESH_ERROR);
-        setBackendWarmupProgress({ loadedProfiles: 0, totalProfiles: 1 });
-      })
-      .finally(() => {
-        if (cancelled) {
-          return;
-        }
-        setCapabilitiesLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeProfileId, applyCapabilities, syncCapabilitiesFromCache]);
-
-  const refreshCapabilities = useCallback(async () => {
-    setCapabilitiesRefreshing(true);
-    setBackendWarmupProgress({ loadedProfiles: 0, totalProfiles: 1 });
-    try {
-      const data = await forceRefreshBackendCapabilities(activeProfileId ?? undefined);
-      applyCapabilities(data.backends);
-      setCapabilitiesError(null);
-      setBackendWarmupProgress({ loadedProfiles: 1, totalProfiles: 1 });
-    } catch {
-      setCapabilitiesError(BACKEND_CAPABILITIES_REFRESH_ERROR);
-      setBackendWarmupProgress({ loadedProfiles: 0, totalProfiles: 1 });
-    } finally {
-      setCapabilitiesRefreshing(false);
-    }
-  }, [activeProfileId, applyCapabilities]);
-
-  useEffect(() => {
-    return subscribeToIbmCredentialProfilesChanged((detail) => {
-      applyBackendCapabilityRefreshDetail(
-        detail,
-        syncCapabilitiesFromCache,
-        setActiveProfileId,
-        setCapabilitiesLoading,
-        setCapabilitiesRefreshing,
-        setCapabilitiesError,
-        setBackendWarmupProgress,
-      );
-    });
-  }, [syncCapabilitiesFromCache]);
-
-  return {
-    backendCapabilities,
-    capabilitiesLoading,
-    capabilitiesRefreshing,
-    capabilitiesError,
-    backendWarmupProgress,
-    refreshCapabilities,
-  };
 }
 
 function buildIncompatibleMoleculeIds(molecules: MoleculeResponse[]) {
@@ -629,13 +452,20 @@ export function RunForm({ initialMoleculeId = null }: RunFormProps) {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const configMetadata = useRunFormConfigMetadata();
   const {
-    backendCapabilities,
+    backendCapabilities: loadedBackendCapabilities,
     capabilitiesLoading,
     capabilitiesRefreshing,
     capabilitiesError,
     backendWarmupProgress,
     refreshCapabilities,
-  } = useBackendCapabilitiesState();
+  } = useIbmBackendCapabilities();
+  const backendCapabilities = useMemo(
+    () =>
+      loadedBackendCapabilities == null
+        ? DEFAULT_BACKEND_CAPABILITIES
+        : mergeBackendCapabilities(loadedBackendCapabilities.backends),
+    [loadedBackendCapabilities],
+  );
   const moleculesQuery = useAllMolecules();
 
   const defaultValues = useMemo(
@@ -832,7 +662,6 @@ export function RunForm({ initialMoleculeId = null }: RunFormProps) {
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <CardHeader>
             <CardTitle>Create Simulation Run</CardTitle>
-            <CardDescription>Configure an algorithm-aware simulation run</CardDescription>
           </CardHeader>
 
           <CardContent className="flex flex-col gap-8">

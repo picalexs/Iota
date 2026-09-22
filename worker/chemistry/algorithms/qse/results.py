@@ -9,7 +9,10 @@ import numpy as np
 
 from worker.chemistry.algorithms.qse.basis import real_scalar
 from worker.chemistry.progress import ProgressCallback
-from worker.chemistry.projected_subspace import projected_convergence_reason
+from worker.chemistry.projected_subspace import (
+    projected_convergence_reason,
+    projected_matrix_converged,
+)
 from worker.chemistry.reference_descriptor import build_reference_descriptor
 from worker.chemistry.types import QSEResult
 
@@ -27,6 +30,11 @@ class QSECompletionPayload:
     overlap_condition: float
     relative_residual: float
     residual_tolerance: float
+    termination_reason: str
+    basis_termination_reason: str | None = None
+    numerical_stable: bool = False
+    projected_solver_converged: bool = False
+    scientific_converged: bool | None = None
     execution_mode: str | None = None
     sector_dimension: int | None = None
     num_spatial_orbitals: int | None = None
@@ -43,11 +51,34 @@ def build_qse_completion_payload(
     diagnostics: dict[str, Any],
     relative_residual: float,
     residual_tolerance: float,
+    termination_reason: str | None = None,
     execution_mode: str | None = None,
     sector_dimension: int | None = None,
     num_spatial_orbitals: int | None = None,
 ) -> QSECompletionPayload:
     """Build the completed QSE progress payload object."""
+    basis_selection = diagnostics.get("basis_selection")
+    basis_termination_reason = (
+        basis_selection.get("basis_termination_reason")
+        if isinstance(basis_selection, dict)
+        else None
+    )
+    resolved_termination_reason = termination_reason or diagnostics.get("termination_reason")
+    if resolved_termination_reason is None and execution_mode == "measured_matrix_elements":
+        resolved_termination_reason = "measured_matrix_elements_diagnostic"
+    numerical_stable = projected_matrix_converged(diagnostics)
+    projected_solver_converged = bool(
+        numerical_stable
+        and np.isfinite(relative_residual)
+        and relative_residual <= residual_tolerance
+    )
+    scientific_converged = (
+        False
+        if execution_mode == "measured_matrix_elements"
+        else None
+        if projected_solver_converged
+        else False
+    )
     return QSECompletionPayload(
         subspace_dim=subspace_dim,
         primary_energy=primary_energy,
@@ -58,6 +89,16 @@ def build_qse_completion_payload(
         overlap_condition=float(diagnostics.get("overlap_condition", 0.0)),
         relative_residual=relative_residual,
         residual_tolerance=residual_tolerance,
+        termination_reason=resolved_termination_reason
+        or projected_convergence_reason(
+            diagnostics,
+            relative_residual=relative_residual,
+            residual_tolerance=residual_tolerance,
+        ),
+        basis_termination_reason=basis_termination_reason,
+        numerical_stable=numerical_stable,
+        projected_solver_converged=projected_solver_converged,
+        scientific_converged=scientific_converged,
         execution_mode=execution_mode,
         sector_dimension=sector_dimension,
         num_spatial_orbitals=num_spatial_orbitals,
@@ -87,7 +128,13 @@ def emit_qse_completion(
         "overlap_condition": payload.overlap_condition,
         "relative_residual": payload.relative_residual,
         "residual_tolerance": payload.residual_tolerance,
+        "termination_reason": payload.termination_reason,
+        "numerical_stable": payload.numerical_stable,
+        "projected_solver_converged": payload.projected_solver_converged,
+        "scientific_converged": payload.scientific_converged,
     }
+    if payload.basis_termination_reason is not None:
+        event["basis_termination_reason"] = payload.basis_termination_reason
     if payload.execution_mode is not None:
         event["execution_mode"] = payload.execution_mode
     if payload.sector_dimension is not None:
@@ -192,6 +239,10 @@ def build_qse_result(
         key: value for key, value in diagnostics.items() if key != "basis_selection"
     }
     conditioning_summary["termination_reason"] = termination_reason
+    if isinstance(basis_selection, dict):
+        conditioning_summary["basis_termination_reason"] = basis_selection.get(
+            "basis_termination_reason"
+        )
     return QSEResult(
         algorithm="qse",
         primary_energy=normalized_eigenvalues[0],

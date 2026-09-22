@@ -102,11 +102,11 @@ describe("ConvergenceTile", () => {
 
     const energyChart = getFirstLinePlot();
     expect(within(energyChart).getByText("HF -1.11600 Ha")).toBeInTheDocument();
-    expect(within(energyChart).getByText("FCI -1.13700 Ha")).toBeInTheDocument();
+    expect(within(energyChart).getByText("CASCI -1.13700 Ha")).toBeInTheDocument();
 
     const legend = screen.getByTestId("chart-legend");
     expect(within(legend).getByText("HF -1.11600 Ha")).toBeInTheDocument();
-    expect(within(legend).getByText("FCI/Exact -1.13700 Ha")).toBeInTheDocument();
+    expect(within(legend).getByText("CASCI active-space -1.13700 Ha")).toBeInTheDocument();
   });
 
   it("formats iteration ticks as whole numbers", () => {
@@ -148,8 +148,8 @@ describe("ConvergenceTile", () => {
     }
     expect(charts).toHaveLength(2);
     expect(within(energyChart).getByText("y label Energy (Ha)")).toBeInTheDocument();
-    expect(within(energyChart).getByText("FCI -1.13700 Ha")).toBeInTheDocument();
-    expect(within(logChart).getByText("y label log10|E-FCI|")).toBeInTheDocument();
+    expect(within(energyChart).getByText("CASCI -1.13700 Ha")).toBeInTheDocument();
+    expect(within(logChart).getByText("y label log10|E-CASCI|")).toBeInTheDocument();
     expect(within(logChart).getByText("raw points 2")).toBeInTheDocument();
   });
 
@@ -164,7 +164,7 @@ describe("ConvergenceTile", () => {
       throw new Error("Expected a convergence chart");
     }
     expect(charts).toHaveLength(1);
-    expect(within(logChart).getByText("y label log10|E-FCI|")).toBeInTheDocument();
+    expect(within(logChart).getByText("y label log10|E-CASCI|")).toBeInTheDocument();
     expect(within(logChart).getByText("y tick 0.612")).toBeInTheDocument();
   });
 });

@@ -27,7 +27,7 @@ describe("backend card state", () => {
         },
         selectable: true,
       }),
-    ).toBe("1 IBM hardware backend ready.");
+    ).toBe("Loaded 1 IBM backend.");
   });
 
   it("shows refresh progress when IBM backends are being refreshed", () => {
@@ -43,7 +43,7 @@ describe("backend card state", () => {
         selectable: true,
         capabilitiesRefreshing: true,
       }),
-    ).toBe("Refreshing 2 IBM hardware backends...");
+    ).toBe("Refreshing IBM Runtime backends (2 loaded)…");
   });
 
   it("uses capability reasons for selectable and unavailable cards", () => {

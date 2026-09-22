@@ -319,7 +319,7 @@ class TestOnJobSuccess:
         assert insert_result_params["converged"] is False
         persisted_metrics = json.loads(insert_result_params["algorithm_metrics"])
         assert persisted_metrics["samples_per_batch"] == 256
-        assert persisted_metrics["benchmark_provenance"]["schema_version"] == 1
+        assert persisted_metrics["benchmark_provenance"]["schema_version"] == 2
         assert persisted_metrics["benchmark_provenance"]["energy"]["reported_energy"] == -1.221
 
         raw_result = json.loads(insert_result_params["raw_result"])

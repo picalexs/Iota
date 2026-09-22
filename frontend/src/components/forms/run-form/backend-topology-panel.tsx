@@ -644,7 +644,7 @@ export function BackendTopologyPanel({ target, device, mode }: BackendTopologyPa
                   strokeWidth: 5,
                   testId: `backend-topology-edge-${source}-${targetNode}`,
                   hoverLines: state.hovered
-                    ? [{ stroke: "#ef4444", strokeWidth: 7 }]
+                    ? [{ stroke: DEFAULT_TOPOLOGY_COLOR, strokeWidth: 7 }]
                     : undefined,
                 };
               }}
@@ -687,10 +687,6 @@ export function BackendTopologyPanel({ target, device, mode }: BackendTopologyPa
               }}
             />
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Connections are colored by reported CZ/CX error. Hover any qubit or connection for
-            details.
-          </p>
         </div>
       )}
 

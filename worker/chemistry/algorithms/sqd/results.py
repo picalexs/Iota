@@ -184,6 +184,12 @@ def _build_sci_result_package(
         "termination_reason": state.termination_reason,
         "energy_tol": options.energy_tol,
         "occupancies_tol": options.occupancies_tol,
+        "convergence_mode": "self_consistent_recovery",
+        "convergence_energy_estimator": "best_batch_energy",
+        "convergence_occupancy_estimator": "mean_over_batches",
+        "convergence_criterion": (
+            "absolute_energy_delta_and_max_occupancy_delta_with_selected_configuration_floor"
+        ),
         "norb": options.norb,
         "nelec": [options.num_elec_a, options.num_elec_b],
         "sampling_source": sampling_source,

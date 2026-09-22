@@ -154,6 +154,8 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     backendSelectionRequired,
     backendReady,
     backendHelperText,
+    backendCapabilitiesLoading,
+    backendCapabilitiesRefreshing,
     resolvedBackendName,
   } = useBackendCapabilityState({
     selectedBackendMode,
@@ -552,6 +554,8 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     customMolecules,
     grouped,
     backendHelperText,
+    backendCapabilitiesLoading,
+    backendCapabilitiesRefreshing,
     benchmarkConfirmationDescription: describeBenchmarkBackendMode(
       selectedBackendMode,
       resolvedBackendName,

@@ -193,7 +193,13 @@ def _energy_provenance(result: AlgorithmResult) -> dict[str, Any]:
                 "reported_energy": None,
             }
         if _projected_energy_is_diagnostic(result):
-            return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
+            return _primary_energy_provenance(result, "stabilized_projected_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
+        if _is_branch_estimator_result(result):
+            return _primary_energy_provenance(result, "projected_branch_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         return _primary_energy_provenance(result, "lowest_krylov_ritz_value")
 
     if isinstance(result, QFDResult):
@@ -204,7 +210,13 @@ def _energy_provenance(result: AlgorithmResult) -> dict[str, Any]:
                 "reported_energy": None,
             }
         if _projected_energy_is_diagnostic(result):
-            return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
+            return _primary_energy_provenance(result, "stabilized_projected_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
+        if _is_branch_estimator_result(result):
+            return _primary_energy_provenance(result, "projected_branch_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         return _primary_energy_provenance(result, "lowest_filter_eigenvalue")
 
     if isinstance(result, QSEResult):
@@ -215,7 +227,13 @@ def _energy_provenance(result: AlgorithmResult) -> dict[str, Any]:
                 "reported_energy": None,
             }
         if _projected_energy_is_diagnostic(result):
-            return _primary_energy_provenance(result, "stabilized_projected_diagnostic")
+            return _primary_energy_provenance(result, "stabilized_projected_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
+        if _is_branch_estimator_result(result):
+            return _primary_energy_provenance(result, "projected_branch_diagnostic") | {
+                "projected_solve_is_diagnostic": True,
+            }
         return _primary_energy_provenance(result, "lowest_qse_projected_eigenvalue")
 
     if isinstance(result, SKQDResult):
@@ -330,10 +348,10 @@ def _kqd_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[
             "required stabilization or rank reduction."
         )
     elif branch_estimator:
-        source = "lowest_krylov_ritz_value"
+        source = "projected_branch_diagnostic"
         selection_rule = (
-            "Use the lowest retained Ritz value from the stable noisy projected "
-            "Krylov solve."
+            "Keep the lowest retained Ritz value as a diagnostic because the "
+            "branch estimator does not provide a full-space residual."
         )
     else:
         source = "lowest_krylov_ritz_value"
@@ -361,10 +379,10 @@ def _qfd_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[
             "required stabilization or rank reduction."
         )
     elif branch_estimator:
-        source = "lowest_filter_eigenvalue"
+        source = "projected_branch_diagnostic"
         selection_rule = (
-            "Use the lowest retained eigenvalue from the stable noisy filtered "
-            "projected solve."
+            "Keep the lowest retained eigenvalue as a diagnostic because the "
+            "branch estimator does not provide a full-space residual."
         )
     else:
         source = "lowest_filter_eigenvalue"
@@ -379,6 +397,16 @@ def _qfd_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[
 
 def _qse_energy_policy(policy: dict[str, Any], result: AlgorithmResult) -> dict[str, Any]:
     assert isinstance(result, QSEResult)
+    if _is_branch_estimator_result(result):
+        return {
+            **policy,
+            "primary_energy_source": "projected_branch_diagnostic",
+            "selection_rule": (
+                "Keep the lowest projected QSE eigenvalue as a diagnostic because "
+                "measured matrix elements do not provide a full-space residual."
+            ),
+            "candidate_energy_fields": ["eigenvalues", "reference_state_energy"],
+        }
     return {
         **policy,
         "primary_energy_source": "lowest_qse_projected_eigenvalue",
@@ -875,10 +903,26 @@ def _sqd_convergence_metadata(result: SQDResult, metrics: dict[str, Any]) -> dic
     selected_count = int(selected) if isinstance(selected, (int, float)) else None
     selected_floor = package.get("min_selected_configurations")
     selected_floor = int(selected_floor) if isinstance(selected_floor, (int, float)) else None
+    termination_reason = package.get("termination_reason")
+    termination_reason = termination_reason if isinstance(termination_reason, str) else None
+    criterion_values_available = (
+        delta is not None
+        and occupancy_delta is not None
+        and selected_count is not None
+        and selected_floor is not None
+    )
     result_metadata = {
-        "scientific_converged": _boolean_or_none(result.converged),
+        "optimizer_converged": None,
+        "numerical_stable": _finite_float(result.primary_energy) is not None,
+        "scientific_converged": (
+            _boolean_or_none(result.converged) if criterion_values_available else None
+        ),
+        "termination_reason": termination_reason,
+        "convergence_mode": "self_consistent_recovery",
+        "convergence_energy_estimator": "best_batch_energy",
+        "convergence_occupancy_estimator": "mean_over_batches",
         "convergence_criterion": (
-            "energy_delta_and_occupancy_delta_with_selected_configuration_floor"
+            "absolute_energy_delta_and_max_occupancy_delta_with_selected_configuration_floor"
         ),
         "convergence_value": {
             "energy_delta": delta,
@@ -891,8 +935,10 @@ def _sqd_convergence_metadata(result: SQDResult, metrics: dict[str, Any]) -> dic
             "selected_configurations": selected_floor,
         },
     }
-    if delta is None or occupancy_delta is None:
-        result_metadata["convergence_failure_reason"] = "initial_iteration_delta_unavailable"
+    if not criterion_values_available:
+        result_metadata["convergence_failure_reason"] = "convergence_inputs_unavailable"
+    elif termination_reason not in {None, "converged"}:
+        result_metadata["convergence_failure_reason"] = termination_reason
     return result_metadata
 
 
@@ -907,10 +953,13 @@ def _projected_convergence_metadata(
     residual = _finite_float(diagnostics.get("relative_ritz_residual"))
     threshold = _finite_float(diagnostics.get("residual_convergence_threshold"))
     metadata = {
+        "numerical_stable": stable,
+        "projected_solver_converged": None,
         "projected_system_stable": stable,
         "convergence_criterion": "projected_overlap_condition_and_generalized_residual",
         "convergence_value": residual,
         "convergence_threshold": threshold,
+        "termination_reason": None,
     }
     if residual is None:
         metadata.update(
@@ -924,6 +973,7 @@ def _projected_convergence_metadata(
         )
     elif stable is False:
         metadata.update(
+            projected_solver_converged=False,
             scientific_converged=False,
             convergence_failure_reason=(
                 "projected_metric_rank_reduced"
@@ -937,6 +987,8 @@ def _projected_convergence_metadata(
             convergence_failure_reason="projected_system_stability_unavailable",
         )
     else:
+        projected_converged = residual <= threshold
+        metadata["projected_solver_converged"] = projected_converged
         if _is_branch_estimator_result(result):
             summary = getattr(result, "matrix_element_summary", {})
             projected_converged = summary.get("projected_solver_converged")
@@ -945,6 +997,9 @@ def _projected_convergence_metadata(
             metadata.update(
                 scientific_converged=None,
                 projected_solver_converged=projected_converged,
+                numerical_stable=True,
+                projected_solve_is_diagnostic=True,
+                termination_reason="full_space_residual_unavailable",
                 convergence_criterion=(
                     "projected_overlap_stability_and_residual; "
                     "full_space_ritz_residual_unavailable"
@@ -952,9 +1007,14 @@ def _projected_convergence_metadata(
                 convergence_failure_reason="full_space_residual_unavailable",
             )
         else:
-            scientific_converged = bool(result.converged) and residual <= threshold
-            metadata["scientific_converged"] = scientific_converged
-            if not scientific_converged:
+            scientific_converged = bool(result.converged) and projected_converged
+            if scientific_converged:
+                metadata["scientific_converged"] = None
+                metadata["convergence_failure_reason"] = (
+                    "scientific_completeness_evidence_unavailable"
+                )
+            else:
+                metadata["scientific_converged"] = False
                 metadata["convergence_failure_reason"] = "solver_reported_not_converged"
     return metadata
 
@@ -967,10 +1027,13 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
     residual = _finite_float(metrics.get("relative_residual"))
     threshold = _finite_float(metrics.get("convergence_threshold"))
     metadata = {
+        "numerical_stable": stable,
+        "projected_solver_converged": None,
         "projected_system_stable": stable,
         "convergence_criterion": "projected_ritz_residual",
         "convergence_value": residual,
         "convergence_threshold": threshold,
+        "termination_reason": None,
     }
     if residual is None:
         metadata.update(
@@ -984,6 +1047,7 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
         )
     elif stable is False:
         metadata.update(
+            projected_solver_converged=False,
             scientific_converged=False,
             convergence_failure_reason="projected_system_unstable",
         )
@@ -993,9 +1057,24 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
             convergence_failure_reason="projected_system_stability_unavailable",
         )
     else:
-        scientific_converged = bool(result.converged) and residual <= threshold
-        metadata["scientific_converged"] = scientific_converged
-        if not scientific_converged:
+        projected_converged = residual <= threshold
+        metadata["projected_solver_converged"] = projected_converged
+        if result.execution_mode == "measured_matrix_elements":
+            metadata.update(
+                scientific_converged=False,
+                projected_solve_is_diagnostic=True,
+                termination_reason="measured_matrix_elements_diagnostic",
+                convergence_failure_reason="measured_matrix_elements_diagnostic",
+            )
+            return metadata
+        scientific_converged = bool(result.converged) and projected_converged
+        if scientific_converged:
+            metadata["scientific_converged"] = None
+            metadata["convergence_failure_reason"] = (
+                "scientific_completeness_evidence_unavailable"
+            )
+        else:
+            metadata["scientific_converged"] = False
             metadata["convergence_failure_reason"] = "solver_reported_not_converged"
     return metadata
 
@@ -1076,6 +1155,8 @@ def _convergence_metadata(result: AlgorithmResult, metrics: dict[str, Any]) -> d
         "optimizer_converged": _boolean_or_none(result.converged),
         "scientific_converged": _boolean_or_none(result.converged),
         "budget_exhausted": None,
+        "numerical_stable": energy_finite,
+        "projected_solver_converged": None,
         "projected_system_stable": None,
         "energy_finite": energy_finite,
         "energy_sane": None,
@@ -1083,6 +1164,7 @@ def _convergence_metadata(result: AlgorithmResult, metrics: dict[str, Any]) -> d
         "convergence_value": None,
         "convergence_threshold": None,
         "convergence_failure_reason": None,
+        "termination_reason": None,
     }
     if isinstance(result, VQEResult):
         metadata["budget_exhausted"] = _vqe_budget_exhausted(result)

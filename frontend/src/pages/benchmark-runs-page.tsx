@@ -68,9 +68,6 @@ export function BenchmarkRunsPage() {
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8">
       <div className="flex min-w-0 flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight">Benchmark Runs</h1>
-        <p className="text-sm text-muted-foreground">
-          Review saved benchmark batches, filter the history, and open their dashboards.
-        </p>
       </div>
 
       {createError ? (

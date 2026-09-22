@@ -199,7 +199,7 @@ describe("SummaryTile", () => {
     expect(screen.getByText("Chemically accurate")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "1.40 mHa difference from FCI/Exact · 0.20 mHa under 1.60 mHa threshold",
+        "1.40 mHa difference from CASCI active-space · 0.20 mHa under 1.60 mHa threshold",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("-75.998100 Ha")).toBeInTheDocument();

@@ -130,39 +130,13 @@ export function getNoiseReferenceDevice(
   devices: BackendDeviceSummary[],
 ): BackendDeviceSummary | null {
   if (noiseProfile?.source !== "backend_derived") return null;
-  return (
-    devices.find((device) => device.name === noiseProfile.reference_backend) ?? {
-      name: noiseProfile.reference_backend,
-      simulator: false,
-      operational: true,
-      pending_jobs: null,
-      num_qubits: null,
-      error_rate: null,
-    }
-  );
+  return devices.find((device) => device.name === noiseProfile.reference_backend) ?? null;
 }
 
 export function buildNoiseReferenceOptions(
   devices: BackendDeviceSummary[],
-  noiseProfile: NoiseProfile | null,
+  _noiseProfile: NoiseProfile | null,
 ): BackendDeviceSummary[] {
-  if (
-    noiseProfile?.source === "backend_derived" &&
-    noiseProfile.reference_backend.trim().length > 0 &&
-    !devices.some((device) => device.name === noiseProfile.reference_backend)
-  ) {
-    return [
-      {
-        name: noiseProfile.reference_backend,
-        simulator: false,
-        operational: true,
-        pending_jobs: null,
-        num_qubits: null,
-        error_rate: null,
-      },
-      ...devices,
-    ];
-  }
   return devices;
 }
 

@@ -15,7 +15,11 @@ import { formatDuration } from "@/lib/format-duration";
 import { isTimedOutFailureMessage } from "@/lib/run-failure";
 import { cn } from "@/lib/utils";
 import type { BenchmarkEntry } from "./benchmark-utils";
-import { assessBenchmarkEntry } from "./benchmark-utils";
+import {
+  assessBenchmarkEntry,
+  benchmarkEligibilityMessage,
+  getBenchmarkEligibility,
+} from "./benchmark-utils";
 import { BenchmarkMoleculeActions } from "./benchmark-molecule-actions";
 import {
   BenchmarkResultRowActions,
@@ -150,6 +154,7 @@ function executionPathLabel(entry: BenchmarkEntry): string {
     aer_statevector_evolution: "Aer statevector evolution",
     dense_classical: "Local dense classical",
     sector_matrix_free: "Local matrix-free",
+    statevector_exact: "Statevector exact",
   };
   const pathLabel = metadata?.actualPathClass
     ? pathLabels[metadata.actualPathClass]
@@ -164,6 +169,8 @@ function executionPathLabel(entry: BenchmarkEntry): string {
       return "IBM Runtime";
     case "local_classical":
       return "Local classical";
+    case "statevector":
+      return "Statevector exact";
     default:
       return "Unknown";
   }
@@ -208,6 +215,8 @@ function ChemicalAccuracyCell({
   }
   const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
   if (!assessment.isScorable) {
+    const eligibility = getBenchmarkEligibility(entry);
+    const message = benchmarkEligibilityMessage(eligibility.reason);
     return (
       <div className="flex items-center gap-3">
         <StatusIndicator
@@ -215,7 +224,7 @@ function ChemicalAccuracyCell({
           label=""
           showLabel={false}
           iconClassName="text-muted-foreground"
-          ariaLabel="Chemical accuracy unknown"
+          ariaLabel={`Chemical accuracy unavailable: ${message}`}
         />
         <span className="text-xs text-muted-foreground">-</span>
       </div>
@@ -270,12 +279,11 @@ function completedAccuracyState(
 }
 
 function getDisplayReferences({ preset, rows }: BenchmarkGroupedRows) {
-  return (
-    rows.find((entry) => entry.classicalRefs)?.classicalRefs ?? {
-      hf: preset.references.hf,
-      fci: preset.references.fci,
-    }
-  );
+  const runtimeReferences = rows.find((entry) => entry.classicalRefs)?.classicalRefs;
+  if (runtimeReferences) {
+    return { ...runtimeReferences, label: "CASCI active-space" };
+  }
+  return { ...preset.references, label: "Preset reference" };
 }
 
 function runRowClassName({
@@ -442,7 +450,11 @@ function BenchmarkResultGroup({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground md:shrink-0">
           {displayRefs.hf !== 0 && <span>HF: {displayRefs.hf.toFixed(5)} Ha</span>}
-          {displayRefs.fci !== null && <span>Ref: {displayRefs.fci.toFixed(5)} Ha</span>}
+          {displayRefs.fci !== null && (
+            <span>
+              {displayRefs.label}: {displayRefs.fci.toFixed(5)} Ha
+            </span>
+          )}
           {onMoleculeAction ? (
             <BenchmarkMoleculeActions
               entries={getMoleculeActionEntries?.(preset.key) ?? rows}

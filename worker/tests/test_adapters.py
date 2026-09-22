@@ -1278,7 +1278,7 @@ def test_normalize_result_accepts_stable_branch_projected_spectrum(algorithm: st
                 "dropped_rank": 0,
             },
         )
-        source = "lowest_krylov_ritz_value"
+        source = "projected_branch_diagnostic"
     else:
         result = QFDResult(
             algorithm=algorithm,
@@ -1295,12 +1295,13 @@ def test_normalize_result_accepts_stable_branch_projected_spectrum(algorithm: st
                 "dropped_rank": 0,
             },
         )
-        source = "lowest_filter_eigenvalue"
+        source = "projected_branch_diagnostic"
 
     normalized = normalize_result(result)
 
     assert normalized["reported_energy"] == pytest.approx(result.primary_energy)
     assert normalized["reported_energy_source"] == source
+    assert normalized["projected_solve_is_diagnostic"] is True
 
 
 def test_normalize_result_does_not_infer_projected_convergence_without_residual() -> None:
@@ -1324,6 +1325,76 @@ def test_normalize_result_does_not_infer_projected_convergence_without_residual(
     assert convergence["projected_system_stable"] is True
     assert convergence["scientific_converged"] is None
     assert convergence["convergence_failure_reason"] == "projected_residual_unavailable"
+
+
+@pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
+def test_normalize_result_does_not_infer_scientific_convergence_from_one_projected_solve(
+    algorithm: str,
+) -> None:
+    diagnostics = {
+        "stability_state": "stable",
+        "overlap_condition": 1.0,
+        "overlap_min_eigenvalue": 1.0,
+        "relative_ritz_residual": 1e-12,
+        "residual_convergence_threshold": 1e-8,
+    }
+    if algorithm == "kqd":
+        result = KQDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            ritz_values=[-1.0],
+            krylov_rank=2,
+            orthogonality_metrics=diagnostics,
+            stability_summary=diagnostics,
+        )
+    else:
+        result = QFDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            filter_eigenvalues=[-1.0],
+            conditioning_summary=diagnostics,
+            stability_summary=diagnostics,
+        )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["numerical_stable"] is True
+    assert convergence["projected_solver_converged"] is True
+    assert convergence["scientific_converged"] is None
+    assert convergence["convergence_failure_reason"] == (
+        "scientific_completeness_evidence_unavailable"
+    )
+
+
+def test_normalize_result_keeps_qse_scientific_status_indeterminate_without_hierarchy_evidence() -> None:
+    result = QSEResult(
+        algorithm="qse",
+        primary_energy=-1.0,
+        primary_iterations=2,
+        converged=True,
+        eigenvalues=[-1.0],
+        overlap_condition=1.0,
+        reference_state_energy=-0.9,
+        relative_residual=1e-12,
+        convergence_threshold=1e-8,
+        conditioning_summary={
+            "stability_state": "stable",
+            "overlap_min_eigenvalue": 1.0,
+        },
+    )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["numerical_stable"] is True
+    assert convergence["projected_solver_converged"] is True
+    assert convergence["scientific_converged"] is None
+    assert convergence["convergence_failure_reason"] == (
+        "scientific_completeness_evidence_unavailable"
+    )
 
 
 def test_normalize_result_rejects_unstable_projected_convergence() -> None:

@@ -60,7 +60,7 @@ export function BenchmarkBarsTile({
   return (
     <DashboardTile
       title="Benchmark Comparison"
-      helpText="Horizontal comparison of HF, FCI/Exact (when available), and this run's energy. Chemical accuracy is the outcome; the energy trajectory explains how the run got there."
+      helpText="Horizontal comparison of HF, the CASCI active-space reference when available, and this run's energy. Chemical accuracy is the outcome; the energy trajectory explains how the run got there."
       editMode={editMode}
     >
       {pending ? (
@@ -86,7 +86,7 @@ export function BenchmarkBarsTile({
       {bars.length > 0 && accuracy.isScorable && accuracy.errorMha !== null && (
         <p className="mt-2 text-xs text-muted-foreground">
           {formatAccuracyVerdict(accuracy.verdict)}. Δ {accuracy.errorMha >= 0 ? "+" : ""}
-          {accuracy.errorMha.toFixed(2)} mHa vs FCI/Exact.
+          {accuracy.errorMha.toFixed(2)} mHa vs CASCI active-space.
         </p>
       )}
     </DashboardTile>

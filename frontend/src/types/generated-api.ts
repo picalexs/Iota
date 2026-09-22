@@ -987,10 +987,9 @@ export interface components {
             device?: ("CPU" | "GPU") | null;
             /**
              * Estimator Precision
-             * @description Estimator standard-error budget. Zero requests exact ideal-estimator values.
-             * @default 0
+             * @description Estimator standard-error budget. Omit or set null to derive 1/sqrt(shots) for noisy Aer. Zero requests exact estimator values.
              */
-            estimator_precision: number;
+            estimator_precision?: number | null;
             /**
              * Max Parallel Experiments
              * @description Bound Aer parallel experiments per worker.
@@ -2207,7 +2206,6 @@ export interface components {
          *       "algorithm": "vqe",
          *       "backend_options": {
          *         "aer_method": "automatic",
-         *         "estimator_precision": 0,
          *         "optimization_level": 1,
          *         "selection_policy": "manual",
          *         "shots": 4096

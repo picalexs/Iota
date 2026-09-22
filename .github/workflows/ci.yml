@@ -44,9 +44,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-          cache-dependency-path: requirements-ci.lock
+          cache-dependency-path: requirements-ci.txt
       - name: Install CI tools
-        run: python -m pip install -r requirements-ci.lock
+        run: python -m pip install -r requirements-ci.txt
       - name: Compile Python source
         run: python -m compileall backend worker shared scripts/contracts
       - name: Run Ruff
@@ -67,10 +67,10 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: |
-            backend/requirements.lock
-            requirements-ci.lock
+            backend/requirements.txt
+            requirements-ci.txt
       - name: Install backend requirements
-        run: python -m pip install -r backend/requirements.lock -r requirements-ci.lock
+        run: python -m pip install -r backend/requirements.txt -r requirements-ci.txt
       - name: Run backend tests
         env:
           PYTHONPATH: .:backend
@@ -91,10 +91,10 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: |
-            worker/requirements.lock
-            requirements-ci.lock
+            worker/requirements.txt
+            requirements-ci.txt
       - name: Install worker requirements
-        run: python -m pip install -r worker/requirements.lock -r requirements-ci.lock
+        run: python -m pip install -r worker/requirements.txt -r requirements-ci.txt
       - name: Run worker tests
         env:
           PYTHONPATH: .
@@ -115,8 +115,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: |
-            backend/requirements.lock
-            requirements-ci.lock
+            backend/requirements.txt
+            requirements-ci.txt
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -125,7 +125,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: |
-          python -m pip install -r backend/requirements.lock -r requirements-ci.lock
+          python -m pip install -r backend/requirements.txt -r requirements-ci.txt
           npm --prefix frontend ci
       - name: Check generated API types
         run: npm --prefix frontend run check:generated-types

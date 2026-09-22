@@ -92,12 +92,7 @@ def emit_kqd_completion(
     if progress_callback is None:
         return
     diagnostic_only = payload.stability_state != "stable" or not payload.projected_solver_converged
-    scientific_converged = payload.projected_solver_converged
-    if (
-        payload.matrix_element_strategy == "branch_estimator"
-        and payload.projected_solver_converged
-    ):
-        scientific_converged = None
+    scientific_converged = None
     progress_callback(
         {
             "algorithm": "kqd",

@@ -13,6 +13,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -50,6 +51,7 @@ interface NoiseModelPanelProps {
   defaultNoiseProfile: () => NoiseProfile;
   referenceDevices: BackendDeviceSummary[];
   onRefresh?: () => void;
+  loading?: boolean;
   refreshing?: boolean;
 }
 
@@ -189,6 +191,7 @@ export function NoiseModelPanel({
   defaultNoiseProfile,
   referenceDevices,
   onRefresh,
+  loading,
   refreshing,
 }: NoiseModelPanelProps) {
   const referenceOptions = buildNoiseReferenceOptions(referenceDevices, noiseProfile);
@@ -208,6 +211,7 @@ export function NoiseModelPanel({
     noiseProfile?.source === "custom_preset" ? `/info/noise-models/${noiseProfile.preset}` : null;
   const selectedBackendName =
     noiseProfile?.source === "backend_derived" ? noiseProfile.reference_backend : "";
+  const referenceBackendsBusy = loading === true || refreshing === true;
 
   return (
     <div className="rounded-lg border border-border/70 bg-card p-3 dark:bg-muted/20">
@@ -359,17 +363,28 @@ export function NoiseModelPanel({
                   )}
                 </div>
               ) : (
-                <Input
-                  aria-label="IBM noise reference"
-                  value={noiseProfile.reference_backend}
-                  onChange={(event) =>
-                    onNoiseProfileChange({
-                      ...noiseProfile,
-                      reference_backend: event.target.value,
-                    })
-                  }
-                  disabled={disabled || mode !== "advanced"}
-                />
+                <div className="flex gap-2">
+                  <div
+                    className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm text-muted-foreground"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {referenceBackendsBusy ? <Spinner className="size-4" /> : null}
+                    {referenceBackendsBusy
+                      ? loading
+                        ? "Loading IBM reference backends…"
+                        : "Refreshing IBM reference backends…"
+                      : "No IBM reference backends available."}
+                  </div>
+                  {onRefresh && (
+                    <BackendRefreshButton
+                      onClick={onRefresh}
+                      disabled={disabled}
+                      refreshing={refreshing}
+                      aria-label="Refresh noise reference backends"
+                    />
+                  )}
+                </div>
               )}
               <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
                 {target === "aer_simulator"

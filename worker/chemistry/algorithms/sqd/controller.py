@@ -8,6 +8,7 @@ from collections.abc import Callable
 import numpy as np
 
 from worker.chemistry.algorithms.sqd.config import SQDOptions
+from worker.chemistry.algorithms.sqd.convergence import iteration_values_are_finite
 from worker.chemistry.algorithms.sqd.iteration import SQDIterationOutcome
 from worker.chemistry.algorithms.sqd.recovery import SQDDependencies
 from worker.chemistry.algorithms.sqd.state import SQDRunState
@@ -49,20 +50,32 @@ def run_sqd_recovery_loop(
             "selected=%d/%d (%.1f%%) elapsed=%.3fs",
             iteration,
             outcome.batch_outcome.energy_value,
-            outcome.delta_energy if np.isfinite(outcome.delta_energy) else 0.0,
-            outcome.occupancy_delta if np.isfinite(outcome.occupancy_delta) else 0.0,
+            outcome.delta_energy,
+            outcome.occupancy_delta,
             int(outcome.sampling.selected_bits.shape[0]),
             int(outcome.sampling.raw_bitstring_matrix.shape[0]),
             100.0 * outcome.sampling.postselection_weight,
             outcome.iter_elapsed,
         )
-        converged = is_converged(
-            iteration=iteration,
+        numerically_valid = iteration_values_are_finite(
+            energy_value=outcome.batch_outcome.energy_value,
             delta_energy=outcome.delta_energy,
             occupancy_delta=outcome.occupancy_delta,
-            selected_count=int(outcome.sampling.selected_bits.shape[0]),
-            options=options,
+            occupancy_vector=outcome.occupancy_vector,
+            deltas_available=iteration > 1,
         )
+        converged = False
+        if not numerically_valid:
+            state.termination_reason = "invalid_numerics"
+            state.converged = False
+        else:
+            converged = is_converged(
+                iteration=iteration,
+                delta_energy=outcome.delta_energy,
+                occupancy_delta=outcome.occupancy_delta,
+                selected_count=int(outcome.sampling.selected_bits.shape[0]),
+                options=options,
+            )
         if converged:
             state.termination_reason = "converged"
             state.converged = True
