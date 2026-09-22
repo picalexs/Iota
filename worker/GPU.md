@@ -163,6 +163,27 @@ only that the parent worker can import Aer and discover a GPU. Run an actual
 local smoke job on the target host before making performance claims. Do not
 use an IBM Runtime job for this check.
 
+## Algorithm support lanes
+
+Use the same scientific inputs when comparing these paths:
+
+- VQE uses Aer Estimator evaluations. The optimizer and result processing stay
+  on the CPU.
+- SQD and SKQD use Aer sampling. SBD selected-CI is optional. Arbitrary SKQD
+  sampled-union solving stays on the CPU.
+- KQD and QFD use Aer state evolution or branch-estimator circuits when the
+  selected problem fits the supported circuit path. Large sector matrix-free
+  execution is a CPU representation and is not an Aer GPU run. An explicit
+  Aer GPU request fails instead of selecting that fallback.
+- QSE uses measured Aer matrix elements for an explicit Aer GPU request with
+  a Hartree-Fock reference. The local exact projected path remains a CPU
+  reference lane.
+
+Keep local exact, ideal Aer, noisy Aer, chemistry-provider GPU, and IBM results
+in separate comparison lanes. A GPU queue name alone is not evidence of GPU
+execution. Use the result-level Aer metadata and provider metadata recorded in
+`backend_execution`.
+
 ## Aer noisy-run settings
 
 The benchmark UI uses 256 shots by default for backend-derived noise. You can
