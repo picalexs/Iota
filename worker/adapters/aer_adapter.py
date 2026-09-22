@@ -424,6 +424,7 @@ class AerAdapter(BackendAdapter):
         noise_configuration = resolve_aer_noise_profile(
             context.noise_profile,
             context.backend_options,
+            simulator_method=method,
         )
         self._cached_context_key = cache_key
         self._cached_backend_options = dict(backend_options)

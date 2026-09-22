@@ -132,6 +132,7 @@ def resolve_aer_noise_profile(
     backend_options: Mapping[str, Any] | None = None,
     *,
     backend_loader: BackendLoader | None = None,
+    simulator_method: str = "automatic",
 ) -> AerNoiseConfiguration:
     """Build a validated Aer noise model and its reproducibility metadata."""
     normalized = normalize_noise_profile(profile)
@@ -143,8 +144,9 @@ def resolve_aer_noise_profile(
             normalized,
             backend_options or {},
             backend_loader=backend_loader or _load_runtime_backend,
+            simulator_method=simulator_method,
         )
-    return _resolve_custom_noise(normalized)
+    return _resolve_custom_noise(normalized, simulator_method=simulator_method)
 
 
 def _resolve_backend_derived_noise(
@@ -152,6 +154,7 @@ def _resolve_backend_derived_noise(
     backend_options: Mapping[str, Any],
     *,
     backend_loader: BackendLoader,
+    simulator_method: str,
 ) -> AerNoiseConfiguration:
     from qiskit_aer.noise import NoiseModel
 
@@ -175,7 +178,7 @@ def _resolve_backend_derived_noise(
         ) from exc
 
     resolved_backend = _backend_name(backend) or reference_backend
-    basis_gates = _basis_gates(noise_model)
+    basis_gates = _basis_gates(noise_model, method=simulator_method)
     coupling_map = _coupling_map(backend)
     summary: dict[str, Any] = {
         "enabled": True,
@@ -200,7 +203,11 @@ def _resolve_backend_derived_noise(
     )
 
 
-def _resolve_custom_noise(profile: dict[str, Any]) -> AerNoiseConfiguration:
+def _resolve_custom_noise(
+    profile: dict[str, Any],
+    *,
+    simulator_method: str,
+) -> AerNoiseConfiguration:
     from qiskit_aer.noise import NoiseModel
 
     preset = profile["preset"]
@@ -237,7 +244,7 @@ def _resolve_custom_noise(profile: dict[str, Any]) -> AerNoiseConfiguration:
         )
         noise_model.add_all_qubit_quantum_error(one_qubit_error.tensor(one_qubit_error), ["cx"])
 
-    basis_gates = _basis_gates(noise_model)
+    basis_gates = _basis_gates(noise_model, method=simulator_method)
     enabled = _noise_model_has_errors(noise_model)
     summary = {
         "enabled": enabled,
@@ -331,15 +338,28 @@ def _noise_model_has_errors(noise_model: Any) -> bool:
     return bool(model_dict.get("errors")) if isinstance(model_dict, dict) else False
 
 
-def _basis_gates(noise_model: Any) -> tuple[str, ...]:
+def _basis_gates(noise_model: Any, *, method: str = "automatic") -> tuple[str, ...]:
     values = getattr(noise_model, "basis_gates", ())
     if not isinstance(values, (list, tuple, set)):
         return ()
+    allowed_gates = _aer_basis_gates(method)
     return tuple(
         gate
         for gate in (str(value) for value in values)
         if gate not in _AER_UNSUPPORTED_BASIS_GATES
+        and (allowed_gates is None or gate in allowed_gates)
     )
+
+
+def _aer_basis_gates(method: str) -> frozenset[str] | None:
+    """Return Aer's method-specific basis gates for noise-model options."""
+    from qiskit_aer.backends.backend_utils import BASIS_GATES
+
+    normalized_method = str(method or "automatic").strip().lower()
+    values = BASIS_GATES.get(normalized_method)
+    if not isinstance(values, (list, tuple, set, frozenset)):
+        return None
+    return frozenset(str(value) for value in values)
 
 
 def _coupling_map(backend: Any) -> tuple[tuple[int, int], ...]:

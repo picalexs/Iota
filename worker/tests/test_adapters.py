@@ -286,7 +286,7 @@ def test_aer_estimator_returns_declared_standard_error(precision: float, expecte
 def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_builds(
     monkeypatch,
 ) -> None:
-    build_noise_calls: list[tuple[dict[str, object] | None, dict[str, object]]] = []
+    build_noise_calls: list[tuple[dict[str, object] | None, dict[str, object], str]] = []
     estimator_options: list[_PrimitiveOptions] = []
     sampler_options: list[_PrimitiveOptions] = []
     noise_model = object()
@@ -300,8 +300,8 @@ def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_b
             del default_shots, seed
             sampler_options.append(options)
 
-    def fake_resolve_noise_profile(noise_profile, backend_options):
-        build_noise_calls.append((noise_profile, backend_options))
+    def fake_resolve_noise_profile(noise_profile, backend_options, *, simulator_method):
+        build_noise_calls.append((noise_profile, backend_options, simulator_method))
         return AerNoiseConfiguration(
             noise_model=noise_model,
             summary={"enabled": True, "source": "custom_preset"},
@@ -340,6 +340,7 @@ def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_b
                 "strength": 0.02,
             },
             {"method": "automatic", "shots": 512, "seed_simulator": 11},
+            "automatic",
         )
     ]
     assert first_metadata["noise_summary"] == {"enabled": True, "source": "custom_preset"}

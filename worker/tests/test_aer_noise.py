@@ -11,7 +11,17 @@ from worker.exceptions import NoiseConfigurationError
 
 
 class _FakeNoiseModel:
-    basis_gates = ["rz", "sx", "x", "cx", "delay"]
+    basis_gates = [
+        "rz",
+        "sx",
+        "x",
+        "cx",
+        "delay",
+        "if_else",
+        "measure",
+        "reset",
+        "xslow",
+    ]
 
     def to_dict(self):
         return {"basis_gates": list(self.basis_gates), "errors": []}
@@ -45,6 +55,7 @@ def test_backend_derived_noise_uses_live_reference_temperature_and_topology(monk
         },
         {"token": "secret", "instance": "instance"},
         backend_loader=load_backend,
+        simulator_method="statevector",
     )
 
     assert calls == [("ibm_test", {"token": "secret", "instance": "instance"})]
@@ -65,10 +76,12 @@ def test_backend_derived_noise_uses_live_reference_temperature_and_topology(monk
     assert "secret" not in str(resolved.summary)
 
 
-def test_backend_derived_noise_drops_delay_from_aer_basis_gates() -> None:
-    noise_model = SimpleNamespace(basis_gates=["x", "delay", "cx"])
+def test_noise_basis_gates_are_filtered_for_aer_method() -> None:
+    noise_model = SimpleNamespace(
+        basis_gates=["x", "delay", "cx", "if_else", "measure", "reset", "xslow"]
+    )
 
-    assert _basis_gates(noise_model) == ("x", "cx")
+    assert _basis_gates(noise_model, method="statevector") == ("x", "cx")
 
 
 def test_backend_derived_noise_rejects_simulator_reference() -> None:
