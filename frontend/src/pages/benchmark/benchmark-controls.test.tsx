@@ -165,7 +165,7 @@ describe("BenchmarkControls", () => {
 
     await flushBasisSetLoad();
 
-    const shotsInput = screen.getByLabelText("Shots");
+    const shotsInput = screen.getByLabelText("Backend shots");
     await user.clear(shotsInput);
     expect(shotsInput).toHaveValue(null);
 
@@ -258,9 +258,9 @@ describe("BenchmarkControls", () => {
       />,
     );
 
-    await screen.findByLabelText("Shots");
+    await screen.findByLabelText("Backend shots");
 
-    expect(screen.getByLabelText("Shots")).toBeDisabled();
+    expect(screen.getByLabelText("Backend shots")).toBeDisabled();
     expect(screen.getByLabelText("Transpiler seed")).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Dynamical decoupling" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Twirling" })).toBeDisabled();
@@ -269,7 +269,7 @@ describe("BenchmarkControls", () => {
   it("hides IBM Runtime policy controls for local backends", async () => {
     render(<BenchmarkControls {...makeDefaultProps()} />);
 
-    await screen.findByLabelText("Shots");
+    await screen.findByLabelText("Backend shots");
 
     expect(
       screen.queryByRole("checkbox", { name: "Dynamical decoupling" }),

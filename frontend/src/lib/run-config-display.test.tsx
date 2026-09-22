@@ -86,6 +86,7 @@ describe("formatConfigRows", () => {
     expect(rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ group: "Backend", label: "Backend name" }),
+        expect.objectContaining({ group: "Backend", label: "Backend shots" }),
         expect.objectContaining({ group: "Backend", label: "Noise source" }),
         expect.objectContaining({ group: "Options", label: "Goal" }),
         expect.objectContaining({

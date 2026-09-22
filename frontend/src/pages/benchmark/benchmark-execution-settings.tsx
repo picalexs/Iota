@@ -326,7 +326,7 @@ export function BenchmarkExecutionSettings({
       >
         <div className="flex min-w-0 flex-col gap-1.5">
           <Label htmlFor="benchmark-shots" className="text-xs text-muted-foreground">
-            Shots
+            Backend shots
           </Label>
           <Input
             id="benchmark-shots"
