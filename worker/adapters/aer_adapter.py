@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import weakref
 from collections.abc import Callable, Mapping
 from typing import Any
@@ -38,8 +39,11 @@ class _ResultObservingJob:
         return getattr(self._job, name)
 
     def result(self, *args: Any, **kwargs: Any) -> Any:
+        started = time.monotonic()
         result = self._job.result(*args, **kwargs)
-        self._observer(extract_aer_result_metadata(result))
+        metadata = extract_aer_result_metadata(result)
+        metadata["aer_simulation_seconds"] = time.monotonic() - started
+        self._observer(metadata)
         return result
 
 
@@ -276,6 +280,14 @@ class AerAdapter(BackendAdapter):
     def _record_result_metadata(self, metadata: dict[str, Any]) -> None:
         if not metadata:
             return
+        simulation_seconds = metadata.get("aer_simulation_seconds")
+        if isinstance(simulation_seconds, (int, float)):
+            previous = self._last_metadata.get("aer_simulation_seconds", 0.0)
+            if isinstance(previous, (int, float)):
+                metadata = {
+                    **metadata,
+                    "aer_simulation_seconds": float(previous) + float(simulation_seconds),
+                }
         self._last_metadata.update(metadata)
 
     def _build_primitive_options(

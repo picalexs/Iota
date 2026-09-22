@@ -236,13 +236,16 @@ def build_qubit_hamiltonian(
         scf_elapsed,
     )
 
+    reference_transfer_seconds = 0.0
     if reference_resolution.actual_device == "GPU":
         to_cpu = getattr(mf, "to_cpu", None)
         if not callable(to_cpu):
             raise RuntimeError(
                 "GPU4PySCF RHF does not provide to_cpu(); cannot safely continue to CPU CASCI"
             )
+        t_transfer = time.monotonic()
         mf = to_cpu()
+        reference_transfer_seconds = time.monotonic() - t_transfer
 
     mo_coeff = getattr(mf, "mo_coeff", None)
     if mo_coeff is None:
@@ -374,6 +377,7 @@ def build_qubit_hamiltonian(
         "reference_provider": reference_resolution.provider,
         "reference_density_fitting": reference_resolution.actual_device == "GPU",
         "reference_gpu_fallback_reason": reference_resolution.fallback_reason,
+        "reference_transfer_seconds": reference_transfer_seconds,
         "scf_device": reference_resolution.actual_device,
         "casci_device": "CPU",
         "reference_basis": molecule.basis,

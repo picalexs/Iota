@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from worker.adapters.base import BackendExecutionContext
@@ -112,6 +113,42 @@ def _requested_device(value: Any) -> DeviceRequest:
     if isinstance(value, str):
         return DeviceRequest(value.strip().upper())
     return DeviceRequest.CPU
+
+
+def _runtime_worker_metadata() -> dict[str, Any]:
+    """Return queue and worker identity without making identity execution proof."""
+    queue_name = os.getenv("QUEUE_NAME") or None
+    worker_name = os.getenv("RQ_WORKER_NAME") or None
+    try:
+        from rq import get_current_job, get_current_worker
+
+        job = get_current_job()
+        queue_name = queue_name or getattr(job, "origin", None)
+        worker = get_current_worker()
+        worker_name = worker_name or getattr(worker, "name", None)
+    except Exception:
+        pass
+    return {
+        "queue_name": str(queue_name) if queue_name else None,
+        "worker_name": str(worker_name) if worker_name else None,
+    }
+
+
+def _gpu_options(backend_context: BackendExecutionContext) -> dict[str, Any]:
+    options = backend_context.backend_options
+    return {
+        key: options[key]
+        for key in (
+            "device",
+            "batched_shots_gpu",
+            "cuStateVec_enable",
+            "blocking_enable",
+            "max_parallel_threads",
+            "max_parallel_experiments",
+            "max_parallel_shots",
+        )
+        if key in options
+    }
 
 
 def _stage_plan_metadata(
@@ -325,6 +362,10 @@ def merge_backend_metadata(
         "optimization_level": backend_context.optimization_level,
         "noise_summary": {"enabled": bool(backend_context.noise_profile)},
         "resource_metadata": dict(backend_context.resource_metadata),
+        **_runtime_worker_metadata(),
+        "gpu_id": os.getenv("CUDA_VISIBLE_DEVICES") or None,
+        "gpu_options": _gpu_options(backend_context),
+        "provider_version": adapter_metadata.get("aer_version"),
         "execution_plan": _stage_plan_metadata(
             algorithm=algorithm,
             backend_context=backend_context,

@@ -166,6 +166,14 @@ def dispatch_and_finalize_run(
     total_wall = execution_duration_seconds(progress_state)
     timing_components = dict(progress_state.get("timing_components") or {})
     timing_components["algorithm_dispatch_seconds"] = algorithm_seconds
+    resource_metadata = prepared.backend_context.resource_metadata
+    for source_key, timing_key in (
+        ("aer_simulation_seconds", "aer_simulation_seconds"),
+        ("reference_transfer_seconds", "reference_transfer_seconds"),
+    ):
+        value = resource_metadata.get(source_key)
+        if isinstance(value, (int, float)):
+            timing_components[timing_key] = max(float(value), 0.0)
     timing_components["segment_wall_seconds"] = segment_wall
     timing_components["total_wall_seconds"] = total_wall
     measured_seconds = sum(

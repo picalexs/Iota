@@ -51,6 +51,7 @@ def test_setup_payload_combines_chemistry_and_backend_metadata() -> None:
     assert payload["hf_energy"] == -1.0
     assert payload["execution_plan"]["execution_lane"] == "local_exact"
     assert payload["execution_plan"]["plan_is_runtime_proof"] is False
+    assert payload["gpu_options"] == {}
 
 
 def test_result_metadata_keeps_gpu_capability_separate_from_execution_proof() -> None:

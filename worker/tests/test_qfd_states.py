@@ -195,6 +195,7 @@ def test_qfd_dense_aer_evolution_persists_result_metadata_on_context() -> None:
     metadata = context.resource_metadata["aer_state_evolution"]
     assert metadata["actual_device"] == "CPU"
     assert metadata["device_verified"] is True
+    assert metadata["aer_simulation_seconds"] >= 0.0
     assert metadata["aer_experiment_metadata"]["method"] == "statevector"
 
 

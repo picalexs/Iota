@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import numpy as np
@@ -200,8 +201,10 @@ def aer_pauli_time_evolution_state(
     if seed_simulator is not None:
         run_options["seed_simulator"] = seed_simulator
 
+    simulation_started = time.monotonic()
     result = simulator.run(transpiled, **run_options).result()
     captured_metadata = extract_aer_result_metadata(result)
+    captured_metadata["aer_simulation_seconds"] = time.monotonic() - simulation_started
     if result_metadata is not None:
         result_metadata.update(captured_metadata)
     data = result.data(0)
