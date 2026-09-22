@@ -5,19 +5,19 @@
 #    pip-compile --output-file=backend/requirements.txt backend/requirements.in
 #
 alembic==1.18.4
-    # via -r backend/requirements.in
+    # via -r requirements.in
 annotated-doc==0.0.4
     # via fastapi
 annotated-types==0.7.0
     # via pydantic
 anyio==4.14.2
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   httpx
     #   sse-starlette
     #   starlette
 asyncpg==0.31.0
-    # via -r backend/requirements.in
+    # via -r requirements.in
 certifi==2026.4.22
     # via
     #   httpcore
@@ -35,13 +35,13 @@ croniter==6.2.2
     # via rq
 cryptography==50.0.0
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   pyspnego
     #   requests-ntlm
 dill==0.4.1
     # via qiskit
 fastapi==0.135.3
-    # via -r backend/requirements.in
+    # via -r requirements.in
 greenlet==3.5.0
     # via sqlalchemy
 h11==0.16.0
@@ -51,14 +51,14 @@ h11==0.16.0
 httpcore==1.0.9
     # via httpx
 httpx==0.28.1
-    # via -r backend/requirements.in
+    # via -r requirements.in
 ibm-cloud-sdk-core==3.24.4
     # via ibm-platform-services
 ibm-platform-services==0.75.0
     # via qiskit-ibm-runtime
 idna==3.19
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   anyio
     #   httpx
     #   requests
@@ -68,7 +68,7 @@ markupsafe==3.0.3
     # via mako
 numpy==1.26.4
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   qiskit
     #   qiskit-ibm-runtime
     #   rustworkx
@@ -76,22 +76,22 @@ numpy==1.26.4
 packaging==26.2
     # via qiskit-ibm-runtime
 psycopg2-binary==2.9.11
-    # via -r backend/requirements.in
+    # via -r requirements.in
 pycparser==3.0
     # via cffi
 pydantic==2.13.4
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   fastapi
     #   pydantic-settings
     #   qiskit-ibm-runtime
 pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.15.0
-    # via -r backend/requirements.in
+    # via -r requirements.in
 pyjwt==2.14.0
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   ibm-cloud-sdk-core
 pyspnego==0.12.1
     # via requests-ntlm
@@ -102,17 +102,17 @@ python-dateutil==2.9.0.post0
     #   qiskit-ibm-runtime
 python-dotenv==1.2.2
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   pydantic-settings
 qiskit==2.3.0
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   qiskit-ibm-runtime
 qiskit-ibm-runtime==0.45.1
-    # via -r backend/requirements.in
+    # via -r requirements.in
 redis==7.4.0
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   rq
 requests==2.34.2
     # via
@@ -122,24 +122,24 @@ requests==2.34.2
 requests-ntlm==1.3.0
     # via qiskit-ibm-runtime
 rq==2.7.0
-    # via -r backend/requirements.in
+    # via -r requirements.in
 rustworkx==0.17.1
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   qiskit
 scipy==1.17.1
     # via qiskit
 six==1.17.0
     # via python-dateutil
-sqlalchemy==2.0.49
+sqlalchemy==2.0.54
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   alembic
 sse-starlette==2.4.1
-    # via -r backend/requirements.in
+    # via -r requirements.in
 starlette==1.3.1
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   fastapi
 stevedore==5.7.0
     # via qiskit
@@ -165,4 +165,4 @@ urllib3==2.7.0
     #   qiskit-ibm-runtime
     #   requests
 uvicorn==0.44.0
-    # via -r backend/requirements.in
+    # via -r requirements.in
