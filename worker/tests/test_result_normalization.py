@@ -55,11 +55,14 @@ def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
             "energy": -1.2,
             "iterations": 2,
             "converged": False,
-            "algorithm_metrics": {
-                "backend_execution": {
-                    "actual_execution_target": "local_classical",
-                    "actual_path_class": "sector_matrix_free",
-                    "backend_primitives_used": False,
+                "algorithm_metrics": {
+                    "backend_execution": {
+                        "actual_execution_target": "local_classical",
+                        "actual_path_class": "sector_matrix_free",
+                        "requested_device": None,
+                        "actual_device": None,
+                        "aer_version": None,
+                        "backend_primitives_used": False,
                     "primitive_family": None,
                     "requested_shots": 4096,
                     "effective_shots": None,
@@ -82,6 +85,9 @@ def test_normalize_result_builds_canonical_benchmark_provenance() -> None:
             "requested_target": "ibm_runtime",
             "actual_execution_target": "local_classical",
             "actual_path_class": "sector_matrix_free",
+            "requested_device": None,
+            "actual_device": None,
+            "aer_version": None,
             "backend_primitives_used": False,
             "primitive_family": None,
             "requested_shots": 4096,
