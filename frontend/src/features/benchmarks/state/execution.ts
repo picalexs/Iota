@@ -14,12 +14,12 @@ import { invalidateBenchmarkRunQueries, invalidateRunsQueries } from "@/hooks/us
 import { logAppWarning } from "@/lib/app-logger";
 import { getErrorMessage } from "@/lib/error-handler";
 import type { MoleculePreset } from "@/lib/benchmark-presets";
+import type { BenchmarkExecutionSettings } from "@/types/benchmark";
 import {
   buildInitialEntries,
   getBenchmarkMoleculeBlocker,
   requiresIbmConfirmation,
   submitBenchmarkEntry,
-  type BenchmarkBackendMode,
 } from "@/pages/benchmark/benchmark-utils";
 import {
   acquireMolecule,
@@ -104,8 +104,7 @@ export function useBenchmarkExecutionStartActions({
   selectedPresets,
   activeVariants,
   selectedBasis,
-  selectedBackendMode,
-  resolvedBackendName,
+  execution,
   stopPolling,
   startPolling,
   runGenerationRef,
@@ -130,8 +129,7 @@ export function useBenchmarkExecutionStartActions({
   selectedPresets: readonly MoleculePreset[];
   activeVariants: readonly BenchmarkAlgorithmVariant[];
   selectedBasis: string;
-  selectedBackendMode: BenchmarkBackendMode;
-  resolvedBackendName: string | null;
+  execution: BenchmarkExecutionSettings;
   stopPolling: () => void;
   startPolling: (entries?: BenchmarkEntry[]) => void;
   runGenerationRef: RefObject<number>;
@@ -157,7 +155,7 @@ export function useBenchmarkExecutionStartActions({
 }) {
   const runBenchmark = useCallback(
     async (runOptions: { ibmRuntimeConfirmed?: boolean } = {}) => {
-      if (requiresIbmConfirmation(selectedBackendMode) && !runOptions.ibmRuntimeConfirmed) {
+      if (requiresIbmConfirmation(execution.mode) && !runOptions.ibmRuntimeConfirmed) {
         setIbmConfirmationOpen(true);
         return;
       }
@@ -169,8 +167,7 @@ export function useBenchmarkExecutionStartActions({
         selectedPresets,
         activeVariants,
         selectedBasis,
-        selectedBackendMode,
-        resolvedBackendName,
+        execution,
         stopPolling,
         startPolling,
         runGenerationRef,
@@ -198,9 +195,8 @@ export function useBenchmarkExecutionStartActions({
       buildBenchmarkPayload,
       buildBenchmarkSignature,
       queryClient,
-      resolvedBackendName,
       runGenerationRef,
-      selectedBackendMode,
+      execution,
       selectedBasis,
       selectedPresets,
       selectedSavedBenchmarkId,
@@ -349,8 +345,7 @@ async function submitInitialBenchmarkEntries({
   initialEntries,
   selectedPresets,
   selectedBasis,
-  selectedBackendMode,
-  resolvedBackendName,
+  execution,
   guardedSetEntries,
   persistSubmittedEntries,
   options,
@@ -360,8 +355,7 @@ async function submitInitialBenchmarkEntries({
   initialEntries: BenchmarkEntry[];
   selectedPresets: readonly MoleculePreset[];
   selectedBasis: string;
-  selectedBackendMode: BenchmarkBackendMode;
-  resolvedBackendName: string | null;
+  execution: BenchmarkExecutionSettings;
   guardedSetEntries: (updater: (entries: BenchmarkEntry[]) => BenchmarkEntry[]) => void;
   persistSubmittedEntries?: (
     snapshot: SavedBenchmarkRun,
@@ -376,17 +370,14 @@ async function submitInitialBenchmarkEntries({
   let currentEntries = initialEntries;
   const submitted = await mapWithConcurrencyLimit(
     initialEntries,
-    getBenchmarkSubmissionConcurrency(selectedBackendMode),
+    getBenchmarkSubmissionConcurrency(execution.mode),
     async (entry) => {
       const moleculeResult = moleculeIdMap.get(entry.preset.key);
       const result = await submitBenchmarkEntry(
         entry,
         moleculeResult,
         selectedBasis,
-        {
-          mode: selectedBackendMode,
-          backendName: resolvedBackendName,
-        },
+        execution,
         guardedSetEntries,
         options,
       );
@@ -440,8 +431,7 @@ export async function executeBenchmarkRun({
   selectedPresets,
   activeVariants,
   selectedBasis,
-  selectedBackendMode,
-  resolvedBackendName,
+  execution,
   stopPolling,
   startPolling,
   runGenerationRef,
@@ -465,8 +455,7 @@ export async function executeBenchmarkRun({
   selectedPresets: readonly MoleculePreset[];
   activeVariants: readonly BenchmarkAlgorithmVariant[];
   selectedBasis: string;
-  selectedBackendMode: BenchmarkBackendMode;
-  resolvedBackendName: string | null;
+  execution: BenchmarkExecutionSettings;
   stopPolling: () => void;
   startPolling: (entries?: BenchmarkEntry[]) => void;
   runGenerationRef: RefObject<number>;
@@ -530,8 +519,7 @@ export async function executeBenchmarkRun({
     initialEntries,
     selectedPresets,
     selectedBasis,
-    selectedBackendMode,
-    resolvedBackendName,
+    execution,
     guardedSetEntries,
     persistSubmittedEntries,
     options,
