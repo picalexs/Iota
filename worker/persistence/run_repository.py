@@ -271,6 +271,7 @@ class SqlRunRepository:
         for_update: bool = False,
     ) -> str | None:
         """Read a run status, optionally restricting the result to one generation."""
+        # These interpolated fragments are fixed internal SQL clauses. All values remain bound.
         where = "id = :run_id"
         params: dict[str, Any] = {"run_id": run_id}
         if execution_generation is not None:
@@ -278,7 +279,7 @@ class SqlRunRepository:
             params["execution_generation"] = execution_generation
         lock_clause = " FOR UPDATE" if for_update else ""
         row = self._session.execute(
-            text(f"SELECT status FROM runs WHERE {where}{lock_clause}"),
+            text(f"SELECT status FROM runs WHERE {where}{lock_clause}"),  # nosec B608
             params,
         ).fetchone()
         return str(row[0]) if row and row[0] is not None else None
@@ -292,7 +293,7 @@ class SqlRunRepository:
         """Read status and generation, optionally locking the run row."""
         lock_clause = " FOR UPDATE" if for_update else ""
         row = self._session.execute(
-            text(f"SELECT status, execution_generation FROM runs WHERE id = :run_id{lock_clause}"),
+            text(f"SELECT status, execution_generation FROM runs WHERE id = :run_id{lock_clause}"),  # nosec B608
             {"run_id": run_id},
         ).fetchone()
         if row is None:
@@ -308,7 +309,7 @@ class SqlRunRepository:
                 "UPDATE runs "
                 "SET status = 'RUNNING', updated_at = :now, "
                 "metadata = COALESCE(metadata, "
-                f"{self._empty_json_expression()}) || {self._json_expression('runtime_metadata')} "
+                f"{self._empty_json_expression()}) || {self._json_expression('runtime_metadata')} "  # nosec B608
                 "WHERE id = :run_id AND execution_generation = :execution_generation "
                 "AND status IN ('CREATED', 'QUEUED')"
             ),
@@ -457,7 +458,7 @@ class SqlRunRepository:
         """Publish cumulative timing without changing run control state."""
         update_result = self._session.execute(
             text(
-                "UPDATE runs SET updated_at = :now, metadata = COALESCE(metadata, "
+                "UPDATE runs SET updated_at = :now, metadata = COALESCE(metadata, "  # nosec B608
                 f"{self._empty_json_expression()}) || {self._json_expression('runtime_metadata')} "
                 "WHERE id = :run_id AND execution_generation = :execution_generation "
                 "AND status IN ("
@@ -519,7 +520,7 @@ class SqlRunRepository:
         """Move a worker-interrupted run to FAILED or PAUSED once."""
         update_result = self._session.execute(
             text(
-                "UPDATE runs SET status = :status, updated_at = :now, "
+                "UPDATE runs SET status = :status, updated_at = :now, "  # nosec B608
                 "metadata = COALESCE(metadata, "
                 f"{self._empty_json_expression()}) || {self._json_expression('runtime_metadata')} "
                 "WHERE id = :run_id AND execution_generation = :execution_generation "
@@ -544,7 +545,7 @@ class SqlRunRepository:
         """Set a matching run to RUNNING after an already-started execution resumes."""
         update_result = self._session.execute(
             text(
-                "UPDATE runs "
+                "UPDATE runs "  # nosec B608
                 "SET status = 'RUNNING', updated_at = :now, "
                 "metadata = COALESCE(metadata, "
                 f"{self._empty_json_expression()}) || {self._json_expression('runtime_metadata')} "
@@ -587,7 +588,7 @@ class SqlRunRepository:
         normalized_payload = normalize_payload_value(payload)
         checkpoint_row = self._session.execute(
             text(
-                "INSERT INTO run_checkpoints "
+                "INSERT INTO run_checkpoints "  # nosec B608
                 "(id, run_id, execution_generation, algorithm, checkpoint_version, "
                 f"payload, created_at) VALUES (:id, :run_id, :execution_generation, :algorithm, "
                 f"'1.0', {self._json_expression('payload')}, :created_at) RETURNING id"
@@ -621,7 +622,7 @@ class SqlRunRepository:
         metadata_json = json.dumps(normalize_payload_value(metadata), allow_nan=False, default=str)
         update_result = self._session.execute(
             text(
-                "UPDATE ibm_runtime_jobs "
+                "UPDATE ibm_runtime_jobs "  # nosec B608
                 "SET execution_generation = :execution_generation, "
                 "primitive_type = COALESCE(:primitive_type, primitive_type), "
                 "backend_name = COALESCE(:backend_name, backend_name), "
@@ -648,7 +649,7 @@ class SqlRunRepository:
 
         self._session.execute(
             text(
-                "INSERT INTO ibm_runtime_jobs "
+                "INSERT INTO ibm_runtime_jobs "  # nosec B608
                 "(id, run_id, execution_generation, ibm_job_id, "
                 "primitive_type, backend_name, status, submitted_at, "
                 "completed_at, metadata, created_at, updated_at) "
@@ -694,7 +695,7 @@ class SqlRunRepository:
         )
         self._session.execute(
             text(
-                "UPDATE runs SET status = :status, "
+                "UPDATE runs SET status = :status, "  # nosec B608
                 "ibm_job_id = COALESCE(:ibm_job_id, ibm_job_id), "
                 "updated_at = :now, "
                 f"metadata = {metadata_expression} "
@@ -751,7 +752,7 @@ class SqlRunRepository:
         normalized_payload = normalize_payload_value(payload)
         self._session.execute(
             text(
-                "INSERT INTO run_events (run_id, sequence, type, payload, created_at) "
+                "INSERT INTO run_events (run_id, sequence, type, payload, created_at) "  # nosec B608
                 f"VALUES (:run_id, :sequence, :type, {self._json_expression('payload')}, :created_at)"
             ),
             {
@@ -767,7 +768,7 @@ class SqlRunRepository:
         """Persist the latest estimate without committing the caller's transaction."""
         self._session.execute(
             text(
-                "UPDATE runs SET latest_estimate = "
+                "UPDATE runs SET latest_estimate = "  # nosec B608
                 f"{self._json_expression('estimate')}, updated_at = :now WHERE id = :run_id"
             ),
             {
@@ -798,7 +799,7 @@ class SqlRunRepository:
         raw_result = result_fields["raw_result"]
         self._session.execute(
             text(
-                "INSERT INTO run_results "
+                "INSERT INTO run_results "  # nosec B608
                 "(id, run_id, energy, final_energy, best_observed_energy, "
                 "reported_energy, reported_energy_source, reference_energy, "
                 "reference_basis, signed_error, iterations, optimal_parameters, "
@@ -876,7 +877,7 @@ class SqlRunRepository:
             generation_clause = "AND :execution_generation IS NULL"
         return self._session.execute(
             text(
-                "UPDATE runs SET status = 'COMPLETED', updated_at = :now, "
+                "UPDATE runs SET status = 'COMPLETED', updated_at = :now, "  # nosec B608
                 "metadata = COALESCE(metadata, "
                 f"{self._empty_json_expression()}) || {self._json_expression('runtime_metadata')} "
                 "WHERE id = :run_id "
@@ -904,7 +905,7 @@ class SqlRunRepository:
         )
         return self._session.execute(
             text(
-                "UPDATE runs SET status = 'FAILED', updated_at = :now, "
+                "UPDATE runs SET status = 'FAILED', updated_at = :now, "  # nosec B608
                 "metadata = COALESCE(metadata, "
                 f"{self._empty_json_expression()}) || {self._json_expression('error')} "
                 "WHERE id = :run_id "
@@ -934,7 +935,7 @@ class SqlRunRepository:
         )
         return self._session.execute(
             text(
-                "UPDATE runs SET status = 'EXCLUDED', updated_at = :now, "
+                "UPDATE runs SET status = 'EXCLUDED', updated_at = :now, "  # nosec B608
                 "metadata = COALESCE(metadata, "
                 f"{self._empty_json_expression()}) || {self._json_expression('exclusion')} "
                 "WHERE id = :run_id "

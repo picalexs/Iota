@@ -11,10 +11,10 @@ WORKDIR /app
 
 ENV PYTHONPATH=/app
 
-COPY backend/requirements.lock .
+COPY backend/requirements.txt .
 COPY shared /app/shared
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install -r requirements.lock
+    python -m pip install -r requirements.txt
 
 COPY backend/. .
 
