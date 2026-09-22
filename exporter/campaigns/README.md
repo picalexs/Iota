@@ -44,3 +44,11 @@ runs queued or running. Use the matching `output/paper-*/submission.json` files
 to resume interrupted submission. Export completed data later with
 `exporter/export_benchmark.py` and create plots with
 `exporter/plot_benchmark.py`.
+
+To resume all campaigns with one command, run:
+
+```bash
+exporter/campaigns/resume_all.sh
+```
+
+Set `QSS_BASE_URL` when the API is not at `http://localhost:18000`.
