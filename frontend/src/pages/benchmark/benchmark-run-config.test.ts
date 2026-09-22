@@ -66,7 +66,7 @@ describe("benchmark-run-config", () => {
     );
 
     expect(config.backend_target).toBe("aer_simulator");
-    expect(config.backend_options?.backend_name).toBe("aer_simulator");
+    expect(config.backend_options?.backend_name).toBe("ibm_kyiv");
     expect(config.noise_profile).toEqual({
       source: "backend_derived",
       reference_backend: "ibm_kyiv",

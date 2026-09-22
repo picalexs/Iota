@@ -33,6 +33,7 @@ class SKQDExtensionOutcome:
     basis_rank: int
     residual_diagnostics: dict[str, float]
     ground_state: np.ndarray | None
+    seed_fallback_reason: str | None = None
 
 
 def execute_skqd_extension(
@@ -61,6 +62,7 @@ def execute_skqd_extension(
             sqd_result,
             action=plan.sector_action,
         )
+        seed_fallback_reason = seed_source if sqd_seed is None else None
         krylov_seed = (
             sqd_seed
             if sqd_seed is not None
@@ -87,6 +89,7 @@ def execute_skqd_extension(
             sqd_result,
             target_size=plan.operator.shape[0],
         )
+        seed_fallback_reason = seed_source if sqd_seed is None else None
         krylov_seed = (
             sqd_seed
             if sqd_seed is not None
@@ -115,6 +118,7 @@ def execute_skqd_extension(
         basis_rank=basis_rank,
         residual_diagnostics=residual_diagnostics,
         ground_state=ground_state,
+        seed_fallback_reason=seed_fallback_reason,
     )
 
 

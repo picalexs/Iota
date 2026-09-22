@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from worker.chemistry import kqd_solver, qfd_solver
 from worker.chemistry.projected_subspace import (
     orthonormalize_candidate,
+    projected_convergence_reason,
     projected_matrix_converged,
 )
 
@@ -54,9 +54,32 @@ def test_projected_matrix_converged_applies_the_shared_stability_gate(
     assert projected_matrix_converged(diagnostics) is expected
 
 
-def test_kqd_and_qfd_keep_legacy_convergence_aliases() -> None:
-    assert kqd_solver._projected_matrix_converged is projected_matrix_converged
-    assert qfd_solver._projected_matrix_converged is projected_matrix_converged
+@pytest.mark.parametrize(
+    ("relative_residual", "expected_reason"),
+    [
+        (1e-6, "converged"),
+        (np.nextafter(1e-6, 0.0), "converged"),
+        (np.nextafter(1e-6, np.inf), "residual_tolerance_not_met"),
+        (np.nan, "residual_tolerance_not_met"),
+        (np.inf, "residual_tolerance_not_met"),
+    ],
+)
+def test_projected_convergence_reason_has_explicit_residual_boundaries(
+    relative_residual: float,
+    expected_reason: str,
+) -> None:
+    assert (
+        projected_convergence_reason(
+            {
+                "stability_state": "stable",
+                "overlap_condition": 1.0,
+                "overlap_min_eigenvalue": 1.0,
+            },
+            relative_residual=relative_residual,
+            residual_tolerance=1e-6,
+        )
+        == expected_reason
+    )
 
 
 def test_orthonormalize_candidate_projects_and_normalizes() -> None:
@@ -80,7 +103,11 @@ def test_orthonormalize_candidate_rejects_dependent_vector() -> None:
     assert norm == pytest.approx(0.0)
 
 
-def test_skqd_keeps_legacy_orthonormalization_alias() -> None:
-    from worker.chemistry import skqd_solver
+def test_orthonormalize_candidate_keeps_small_nonzero_direction() -> None:
+    candidate, norm = orthonormalize_candidate(
+        np.array([1e-13, 0.0], dtype=complex),
+        [],
+    )
 
-    assert skqd_solver._orthonormalize_krylov_candidate is orthonormalize_candidate
+    assert norm == pytest.approx(1e-13)
+    np.testing.assert_allclose(candidate, [1.0, 0.0])

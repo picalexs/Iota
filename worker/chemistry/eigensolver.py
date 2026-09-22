@@ -174,7 +174,12 @@ def solve_exact_generalized_eigensystem(
     diagnostics["relative_generalized_residual"] = float(relative_residuals[0])
     diagnostics["max_generalized_residual_norm"] = float(np.max(residual_norms))
     diagnostics["max_relative_generalized_residual"] = float(np.max(relative_residuals))
-    diagnostics["stability_state"] = "stable" if diagnostics["dropped_rank"] == 0 else "invalid"
+    # A positive semidefinite exact metric can lose rank when the generated
+    # projected states are linearly dependent. The retained solve is still a
+    # finite diagnostic, but it must not claim full projected convergence.
+    diagnostics["stability_state"] = (
+        "stable" if diagnostics["dropped_rank"] == 0 else "stabilized"
+    )
     return eigenvalues, generalized_eigenvectors, diagnostics
 
 
@@ -267,8 +272,10 @@ def solve_stabilized_generalized_eigenproblem(
     if isinstance(max_standard_error, (int, float)) and np.isfinite(float(max_standard_error)):
         threshold = max(threshold, 4.0 * float(max_standard_error))
         resolved_max_standard_error: float | None = float(max_standard_error)
+        uncertainty_cutoff_method = "four_times_max_overlap_entry_standard_error_heuristic"
     else:
         resolved_max_standard_error = None
+        uncertainty_cutoff_method = "regularization_and_condition_floor_only"
 
     retained_mask = psd_overlap_eigvals > threshold
     retained_eigvals = np.asarray(psd_overlap_eigvals[retained_mask], dtype=float)
@@ -285,6 +292,7 @@ def solve_stabilized_generalized_eigenproblem(
 
     diagnostics: dict[str, Any] = {
         "stability_state": "invalid",
+        "raw_spectrum_definition": "regularized_unfiltered_generalized_spectrum",
         "psd_projected": psd_projected,
         "threshold": float(threshold),
         "raw_projected_rank": int(overlap_eigvals.size),
@@ -303,6 +311,8 @@ def solve_stabilized_generalized_eigenproblem(
         else 0.0,
         "projected_overlap_max_eigenvalue": projected_overlap_max,
         "max_standard_error": resolved_max_standard_error,
+        "overlap_uncertainty_cutoff_method": uncertainty_cutoff_method,
+        "overlap_uncertainty_is_matrix_level_bound": False,
         "regularization": float(regularization),
         "condition_limit": float(_NOISY_PROJECTED_OVERLAP_CONDITION_LIMIT),
         # Keep the common keys aligned with the retained projected solve.

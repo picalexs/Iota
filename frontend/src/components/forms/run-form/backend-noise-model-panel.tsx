@@ -13,6 +13,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
@@ -50,6 +51,7 @@ interface NoiseModelPanelProps {
   defaultNoiseProfile: () => NoiseProfile;
   referenceDevices: BackendDeviceSummary[];
   onRefresh?: () => void;
+  loading?: boolean;
   refreshing?: boolean;
 }
 
@@ -61,6 +63,31 @@ interface NoiseReferenceCommandItemProps {
   badgeLabel?: string;
   className?: string;
   label?: string;
+}
+
+function defaultCustomNoiseProfile(preset: CustomNoisePreset): NoiseProfile {
+  if (preset === "readout_bias") {
+    return {
+      source: "custom_preset",
+      preset,
+      p01: 0.01,
+      p10: 0.02,
+    };
+  }
+  if (preset === "thermal_relaxation") {
+    return {
+      source: "custom_preset",
+      preset,
+      t1_us: 100,
+      t2_us: 80,
+      gate_time_us: 0.1,
+    };
+  }
+  return {
+    source: "custom_preset",
+    preset,
+    strength: 0.01,
+  };
 }
 
 function NoiseReferenceCommandItem({
@@ -164,6 +191,7 @@ export function NoiseModelPanel({
   defaultNoiseProfile,
   referenceDevices,
   onRefresh,
+  loading,
   refreshing,
 }: NoiseModelPanelProps) {
   const referenceOptions = buildNoiseReferenceOptions(referenceDevices, noiseProfile);
@@ -183,6 +211,7 @@ export function NoiseModelPanel({
     noiseProfile?.source === "custom_preset" ? `/info/noise-models/${noiseProfile.preset}` : null;
   const selectedBackendName =
     noiseProfile?.source === "backend_derived" ? noiseProfile.reference_backend : "";
+  const referenceBackendsBusy = loading === true || refreshing === true;
 
   return (
     <div className="rounded-lg border border-border/70 bg-card p-3 dark:bg-muted/20">
@@ -225,11 +254,7 @@ export function NoiseModelPanel({
                   onNoiseProfileChange(
                     next === "backend_derived"
                       ? defaultNoiseProfile()
-                      : {
-                          source: "custom_preset",
-                          preset: "depolarizing_cx",
-                          strength: 0.01,
-                        },
+                      : defaultCustomNoiseProfile("depolarizing_cx"),
                   )
                 }
               >
@@ -338,26 +363,36 @@ export function NoiseModelPanel({
                   )}
                 </div>
               ) : (
-                <Input
-                  aria-label="IBM noise reference"
-                  value={noiseProfile.reference_backend}
-                  onChange={(event) =>
-                    onNoiseProfileChange({
-                      ...noiseProfile,
-                      reference_backend: event.target.value,
-                    })
-                  }
-                  disabled={disabled || mode !== "advanced"}
-                />
+                <div className="flex gap-2">
+                  <div
+                    className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md border border-border/70 bg-background px-3 py-2 text-sm text-muted-foreground"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {referenceBackendsBusy ? <Spinner className="size-4" /> : null}
+                    {referenceBackendsBusy
+                      ? loading
+                        ? "Loading IBM reference backends…"
+                        : "Refreshing IBM reference backends…"
+                      : "No IBM reference backends available."}
+                  </div>
+                  {onRefresh && (
+                    <BackendRefreshButton
+                      onClick={onRefresh}
+                      disabled={disabled}
+                      refreshing={refreshing}
+                      aria-label="Refresh noise reference backends"
+                    />
+                  )}
+                </div>
               )}
               <div className="rounded-md border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
                 {target === "aer_simulator"
-                  ? "The run stays local on Aer while the noise model mirrors the selected IBM backend calibration or fake-provider snapshot."
+                  ? "The run stays local on Aer while the noise model uses a live calibration snapshot from the selected IBM backend."
                   : "Backend-derived noise follows the selected backend calibration metadata."}
               </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+              ) : (
               <div className="grid gap-2">
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -372,10 +407,7 @@ export function NoiseModelPanel({
                 <Select
                   value={noiseProfile.preset}
                   onValueChange={(next) =>
-                    onNoiseProfileChange({
-                      ...noiseProfile,
-                      preset: next as CustomNoisePreset,
-                    })
+                    onNoiseProfileChange(defaultCustomNoiseProfile(next as CustomNoisePreset))
                   }
                 >
                   <SelectTrigger
@@ -390,38 +422,120 @@ export function NoiseModelPanel({
                     <SelectItem value="readout_bias">Readout bias</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Strength
-                  </p>
-                  <InfoPageHelp
-                    href={selectedNoiseInfoHref ?? "/info/noise-models"}
-                    label="noise strength"
-                    short="The preset detail page explains what increasing the strength knob means for this noise family."
-                  />
-                </div>
-                <Input
-                  aria-label="Noise strength"
-                  type="number"
+              {noiseProfile.preset === "depolarizing_cx" && (
+                <NoiseNumberField
+                  label="CX probability"
+                  help="Probability of a depolarizing error after each CX gate."
+                  value={noiseProfile.strength}
                   min={0}
                   max={1}
                   step={0.001}
-                  value={noiseProfile.strength}
-                  onChange={(event) =>
-                    onNoiseProfileChange({
-                      ...noiseProfile,
-                      strength: Number(event.target.value),
-                    })
-                  }
+                  onChange={(value) => onNoiseProfileChange({ ...noiseProfile, strength: value })}
                   disabled={disabled || mode !== "advanced"}
                 />
-              </div>
+              )}
+              {noiseProfile.preset === "readout_bias" && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <NoiseNumberField
+                    label="P(1|0)"
+                    help="Probability of recording 1 when the true value is 0."
+                    value={noiseProfile.p01}
+                    min={0}
+                    max={1}
+                    step={0.001}
+                    onChange={(value) => onNoiseProfileChange({ ...noiseProfile, p01: value })}
+                    disabled={disabled || mode !== "advanced"}
+                  />
+                  <NoiseNumberField
+                    label="P(0|1)"
+                    help="Probability of recording 0 when the true value is 1."
+                    value={noiseProfile.p10}
+                    min={0}
+                    max={1}
+                    step={0.001}
+                    onChange={(value) => onNoiseProfileChange({ ...noiseProfile, p10: value })}
+                    disabled={disabled || mode !== "advanced"}
+                  />
+                </div>
+              )}
+              {noiseProfile.preset === "thermal_relaxation" && (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <NoiseNumberField
+                    label="T1 (μs)"
+                    help="Longitudinal relaxation time in microseconds."
+                    value={noiseProfile.t1_us}
+                    min={0}
+                    step={1}
+                    onChange={(value) => onNoiseProfileChange({ ...noiseProfile, t1_us: value })}
+                    disabled={disabled || mode !== "advanced"}
+                  />
+                  <NoiseNumberField
+                    label="T2 (μs)"
+                    help="Transverse relaxation time in microseconds."
+                    value={noiseProfile.t2_us}
+                    min={0}
+                    step={1}
+                    onChange={(value) => onNoiseProfileChange({ ...noiseProfile, t2_us: value })}
+                    disabled={disabled || mode !== "advanced"}
+                  />
+                  <NoiseNumberField
+                    label="Gate time (μs)"
+                    help="Duration used for each listed gate in microseconds."
+                    value={noiseProfile.gate_time_us}
+                    min={0}
+                    step={0.01}
+                    onChange={(value) =>
+                      onNoiseProfileChange({ ...noiseProfile, gate_time_us: value })
+                    }
+                    disabled={disabled || mode !== "advanced"}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function NoiseNumberField({
+  label,
+  help,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  help: string;
+  value: number;
+  min: number;
+  max?: number;
+  step: number;
+  onChange: (value: number) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="grid gap-2">
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <InfoPageHelp href="/info/noise-models" label={label} short={help} />
+      </div>
+      <Input
+        aria-label={label}
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        disabled={disabled}
+      />
     </div>
   );
 }

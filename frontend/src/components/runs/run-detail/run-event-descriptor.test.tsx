@@ -94,6 +94,19 @@ describe("getIterationUpdatePresentation", () => {
     expect(presentation.summary).toBe("SQD iter 1 · Sampling 24576 samples");
   });
 
+  it("distinguishes SQD recovery rounds that reuse the measured set", () => {
+    const presentation = getIterationUpdatePresentation({
+      algorithm: "sqd",
+      step: "sampling",
+      phase_iteration: 2,
+      total_samples: 24576,
+      sample_set_reused: true,
+    });
+
+    expect(presentation.label).toBe("Measured set reused");
+    expect(presentation.summary).toBe("SQD iter 2 · Reusing 24576 measured samples");
+  });
+
   it("shows QSE reference optimization separately from the main solve", () => {
     const presentation = getIterationUpdatePresentation({
       algorithm: "qse",

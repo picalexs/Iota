@@ -9,7 +9,10 @@ import numpy as np
 
 from worker.chemistry.overlap import overlap_metrics
 from worker.chemistry.progress import ProgressCallback
-from worker.chemistry.projected_subspace import projected_convergence_reason
+from worker.chemistry.projected_subspace import (
+    projected_convergence_reason,
+    projected_matrix_converged,
+)
 from worker.chemistry.types import KQDResult
 
 
@@ -26,6 +29,7 @@ class KQDCompletionPayload:
     trotter_steps: int
     relative_residual: float
     residual_tolerance: float
+    projected_solver_converged: bool
     termination_reason: str
     matrix_element_strategy: Any
     min_ritz: float | None
@@ -47,6 +51,18 @@ def build_kqd_completion_payload(
     kqd_elapsed: float,
 ) -> KQDCompletionPayload:
     """Build the completed KQD progress payload object."""
+    relative_residual = solve_data.residual_diagnostics["relative_ritz_residual"]
+    projected_solver_converged = projected_matrix_converged(diagnostics) and (
+        relative_residual <= kqd_config.residual_tolerance
+    )
+    branch_estimator = matrix_element_summary.get("matrix_element_strategy") == "branch_estimator"
+    termination_reason = projected_convergence_reason(
+        diagnostics,
+        relative_residual=relative_residual,
+        residual_tolerance=kqd_config.residual_tolerance,
+    )
+    if branch_estimator and projected_solver_converged:
+        termination_reason = "full_space_residual_unavailable"
     return KQDCompletionPayload(
         basis_rank=solve_data.basis_rank,
         primary_energy=primary_energy,
@@ -55,13 +71,10 @@ def build_kqd_completion_payload(
         time_evolution_backend=time_evolution_backend,
         time_step=kqd_config.time_step,
         trotter_steps=kqd_config.trotter_steps,
-        relative_residual=solve_data.residual_diagnostics["relative_ritz_residual"],
+        relative_residual=relative_residual,
         residual_tolerance=kqd_config.residual_tolerance,
-        termination_reason=projected_convergence_reason(
-            diagnostics,
-            relative_residual=solve_data.residual_diagnostics["relative_ritz_residual"],
-            residual_tolerance=kqd_config.residual_tolerance,
-        ),
+        projected_solver_converged=projected_solver_converged,
+        termination_reason=termination_reason,
         matrix_element_strategy=matrix_element_summary.get("matrix_element_strategy"),
         min_ritz=float(ritz_values[0]) if ritz_values.size else None,
         max_ritz=float(ritz_values[-1]) if ritz_values.size else None,
@@ -78,9 +91,8 @@ def emit_kqd_completion(
     """Emit a completed KQD progress event when a callback is configured."""
     if progress_callback is None:
         return
-    diagnostic_only = (
-        payload.stability_state != "stable" or payload.termination_reason != "converged"
-    )
+    diagnostic_only = payload.stability_state != "stable" or not payload.projected_solver_converged
+    scientific_converged = None
     progress_callback(
         {
             "algorithm": "kqd",
@@ -106,6 +118,8 @@ def emit_kqd_completion(
             "relative_residual": payload.relative_residual,
             "residual_tolerance": payload.residual_tolerance,
             "termination_reason": payload.termination_reason,
+            "projected_solver_converged": payload.projected_solver_converged,
+            "scientific_converged": scientific_converged,
             "matrix_element_strategy": payload.matrix_element_strategy,
             "wall_seconds": payload.wall_seconds,
         }
@@ -143,6 +157,11 @@ def build_kqd_result(
         relative_residual=solve_data.residual_diagnostics["relative_ritz_residual"],
         residual_tolerance=kqd_config.residual_tolerance,
     )
+    if (
+        matrix_element_summary.get("matrix_element_strategy") == "branch_estimator"
+        and matrix_element_summary.get("projected_solver_converged") is True
+    ):
+        termination_reason = "full_space_residual_unavailable"
     rank_reduced = int(diagnostics.get("dropped_rank", 0) or 0) > 0
     diagnostic_only = bool(diagnostics.get("diagnostic_only", False)) or rank_reduced
     return KQDResult(

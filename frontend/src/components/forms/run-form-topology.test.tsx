@@ -16,6 +16,22 @@ import {
 beforeEach(resetRunFormTestState);
 
 describe("RunForm topology", () => {
+  it("does not render a synthetic topology without an IBM profile", async () => {
+    const user = userEvent.setup();
+    renderRunForm();
+    await screen.findByText("Create Simulation Run");
+
+    const aerButton = getButtonById("backend-option-aer_simulator");
+    await waitFor(() => expect(aerButton).toBeEnabled());
+    await user.click(aerButton);
+    await user.click(screen.getByRole("checkbox", { name: /noise model/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Backend topology")).not.toBeInTheDocument();
+      expect(getTopologyNodeLabelCount()).toBe(0);
+    });
+  });
+
   it("updates the topology panel when the active IBM profile changes", async () => {
     const user = userEvent.setup();
     let activeProfileId: string | null = "profile-1";
@@ -123,7 +139,6 @@ describe("RunForm topology", () => {
     await waitFor(() => expect(ibmButton).toBeEnabled());
     await user.click(ibmButton);
 
-    await screen.findByText(/connections are colored by reported cz\/cx error/i);
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: /backend/i })).toHaveTextContent(
         /least error: ibm_berlin/i,
@@ -212,7 +227,6 @@ describe("RunForm topology", () => {
     await waitFor(() => expect(ibmButton).toBeEnabled());
     await user.click(ibmButton);
 
-    await screen.findByText(/connections are colored by reported cz\/cx error/i);
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: /backend/i })).toHaveTextContent(
         /least error: ibm_aachen/i,

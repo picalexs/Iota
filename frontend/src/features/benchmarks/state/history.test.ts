@@ -8,6 +8,7 @@ import * as legacyHistoryActions from "@/pages/benchmark/benchmark-history-actio
 import {
   deriveBenchmarkHistorySelection,
   filterAndSortSavedBenchmarkRuns,
+  getSavedBenchmarkStatus,
   type BenchmarkHistorySelection,
 } from "./history";
 
@@ -116,5 +117,18 @@ describe("filterAndSortSavedBenchmarkRuns", () => {
     expect(
       filterAndSortSavedBenchmarkRuns(runs, "finished", "all", "name", "asc").map((run) => run.id),
     ).toEqual(["a-finished", "z-finished"]);
+  });
+
+  it("labels mixed terminal rows as partial", () => {
+    const run = savedRun("mixed", [
+      entry("completed", "completed", "run-1"),
+      entry("failed", "failed", "run-2"),
+      entry("cancelled", "cancelled", "run-3"),
+    ]);
+
+    expect(getSavedBenchmarkStatus(run)).toBe("partial");
+    expect(
+      filterAndSortSavedBenchmarkRuns([run], "partial", "all", "name", "asc"),
+    ).toEqual([run]);
   });
 });

@@ -17,6 +17,7 @@ import { BenchmarkAdvancedAlgorithmSection } from "./benchmark-advanced-algorith
 import { BenchmarkModeSection } from "./benchmark-mode-section";
 import { useBenchmarkBasisSets } from "./use-benchmark-basis-sets";
 import type { BenchmarkAlgorithmVariant, BenchmarkVariantMode } from "./benchmark-variants";
+import { kqdRequiresBranchEstimatorForBackendMode } from "./benchmark-variants";
 import {
   getBackendNameLabel,
   getBenchmarkCompletionRatio,
@@ -26,6 +27,8 @@ import {
   shouldShowBenchmarkResetResults,
 } from "@/features/benchmarks/state/control-selectors";
 import { useBenchmarkMoleculeWorkspace } from "./use-benchmark-molecule-workspace";
+import { BackendRefreshButton } from "@/components/forms/run-form/backend-refresh-button";
+import { Spinner } from "@/components/ui/spinner";
 
 interface BenchmarkControlsProps {
   benchmarkMode?: BenchmarkVariantMode;
@@ -51,7 +54,13 @@ interface BenchmarkControlsProps {
   restartInProgress: boolean;
   total: number;
   done: number;
+  completed?: number;
+  failed?: number;
+  cancelled?: number;
   backendHelperText?: string | null;
+  backendCapabilitiesLoading?: boolean;
+  backendCapabilitiesRefreshing?: boolean;
+  onRefreshBackendCapabilities?: () => void;
   onToggleMolecule: (key: string) => void;
   onToggleAlgorithm: (algorithm: RunAlgorithm) => void;
   onSetMolecules: (keys: string[]) => void;
@@ -107,7 +116,13 @@ export function BenchmarkControls({
   restartInProgress,
   total,
   done,
+  completed = done,
+  failed = 0,
+  cancelled = 0,
   backendHelperText,
+  backendCapabilitiesLoading = false,
+  backendCapabilitiesRefreshing = false,
+  onRefreshBackendCapabilities,
   onToggleMolecule,
   onToggleAlgorithm,
   onSetMolecules,
@@ -252,6 +267,9 @@ export function BenchmarkControls({
               disabledAlgorithms={disabledAlgorithms}
               algorithmVariants={algorithmVariants}
               chemicalAccuracyHa={chemicalAccuracyHa}
+              requiresBranchEstimator={kqdRequiresBranchEstimatorForBackendMode(
+                selectedBackendMode,
+              )}
               onAddAdvancedVariant={onAddAdvancedVariant}
               onSetAdvancedVariantCount={onSetAdvancedVariantCount}
               onDuplicateAdvancedVariant={onDuplicateAdvancedVariant}
@@ -277,13 +295,25 @@ export function BenchmarkControls({
           selectedBackendName={selectedBackendName}
           onBackendNameChange={onBackendNameChange}
           ibmBackends={ibmBackends}
+          backendCapabilitiesLoading={backendCapabilitiesLoading}
+          backendCapabilitiesRefreshing={backendCapabilitiesRefreshing}
           chemicalAccuracyHa={chemicalAccuracyHa}
           chemicalAccuracyTargetOptions={chemicalAccuracyTargetOptions}
           onChemicalAccuracyChange={onChemicalAccuracyChange}
         />
 
         {backendHelperText ? (
-          <p className="text-xs text-muted-foreground">{backendHelperText}</p>
+          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            {(backendCapabilitiesLoading || backendCapabilitiesRefreshing) && <Spinner />}
+            <p className="min-w-0 flex-1">{backendHelperText}</p>
+            {onRefreshBackendCapabilities ? (
+              <BackendRefreshButton
+                onClick={onRefreshBackendCapabilities}
+                refreshing={backendCapabilitiesRefreshing}
+                aria-label="Refresh IBM backend availability"
+              />
+            ) : null}
+          </div>
         ) : null}
 
         <BenchmarkActionBar
@@ -306,6 +336,9 @@ export function BenchmarkControls({
           total={total}
           completionRatio={completionRatio}
           done={done}
+          completed={completed}
+          failed={failed}
+          cancelled={cancelled}
           showResetResults={showResetResults}
           onClear={onClear}
         />

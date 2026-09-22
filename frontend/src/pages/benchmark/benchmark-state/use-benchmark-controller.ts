@@ -154,6 +154,8 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     backendSelectionRequired,
     backendReady,
     backendHelperText,
+    backendCapabilitiesLoading,
+    backendCapabilitiesRefreshing,
     resolvedBackendName,
   } = useBackendCapabilityState({
     selectedBackendMode,
@@ -211,6 +213,7 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     removeAdvancedVariant,
   } = useBenchmarkVariantSelectionState({
     benchmarkMode,
+    selectedBackendMode,
     selectedAlgorithms,
     algorithmVariants,
     selectedPresets,
@@ -445,6 +448,7 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     handleResumeBenchmark,
     handleRestartBenchmark,
     handleBenchmarkEntryAction,
+    handleBenchmarkMoleculeAction,
   } = useBenchmarkControlActions({
     entries,
     selectedSavedBenchmarkId,
@@ -550,6 +554,8 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     customMolecules,
     grouped,
     backendHelperText,
+    backendCapabilitiesLoading,
+    backendCapabilitiesRefreshing,
     benchmarkConfirmationDescription: describeBenchmarkBackendMode(
       selectedBackendMode,
       resolvedBackendName,
@@ -585,6 +591,7 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     handleResumeBenchmark,
     handleRestartBenchmark,
     handleBenchmarkEntryAction,
+    handleBenchmarkMoleculeAction,
     handleCancelBenchmark,
   };
 }

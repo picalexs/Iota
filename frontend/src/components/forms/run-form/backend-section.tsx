@@ -176,6 +176,7 @@ export function BackendSection({
           backendOptions={backendOptions}
           selectedBackendDevice={selectedBackendDevice}
           selectableDevices={selectableDevices}
+          capabilitiesLoading={capabilitiesLoading}
           disabled={disabled}
           error={error}
           onBackendChoice={handleBackendChoice}

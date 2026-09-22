@@ -3,6 +3,15 @@
 from worker.exceptions.backend_error import BackendError
 from worker.exceptions.chemistry_error import ChemistryError
 from worker.exceptions.ibm_timeout_error import IBMTimeoutError
+from worker.exceptions.invalid_result_error import InvalidResultError
+from worker.exceptions.noise_configuration_error import NoiseConfigurationError
 from worker.exceptions.run_excluded_error import RunExcludedError
 
-__all__ = ["ChemistryError", "BackendError", "IBMTimeoutError", "RunExcludedError"]
+__all__ = [
+    "ChemistryError",
+    "BackendError",
+    "IBMTimeoutError",
+    "InvalidResultError",
+    "NoiseConfigurationError",
+    "RunExcludedError",
+]

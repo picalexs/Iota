@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from worker.chemistry.projected_subspace import projected_diagnostic_energy_is_reportable
+from worker.exceptions import InvalidResultError
 from worker.persistence.run_repository import normalize_payload_value
 
 ResultPersistencePayload = tuple[
@@ -42,10 +43,22 @@ def terminal_runtime_metadata(
 def _coerce_non_negative_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    numeric = int(value)
-    if numeric < 0:
+    numeric = float(value)
+    if not math.isfinite(numeric) or not numeric.is_integer() or numeric < 0:
         return None
-    return numeric
+    return int(numeric)
+
+
+def _required_non_negative_int(value: Any, *, field: str) -> int:
+    if value is None:
+        return 0
+    normalized = _coerce_non_negative_int(value)
+    if normalized is None:
+        raise InvalidResultError(
+            f"invalid_{field}",
+            f"solver result field '{field}' must be a finite non-negative integer",
+        )
+    return normalized
 
 
 def _completed_iterations_from_estimate(latest_estimate: Any) -> int | None:
@@ -159,7 +172,7 @@ def normalize_result_for_persistence(
     converged_raw = result.get("converged")
     algorithm_metrics_raw = result.get("algorithm_metrics")
 
-    iterations = int(iterations_raw) if isinstance(iterations_raw, (int, float)) else 0
+    iterations = _required_non_negative_int(iterations_raw, field="iterations")
     optimal_parameters_value = (
         normalize_payload_value(optimal_parameters_raw)
         if isinstance(optimal_parameters_raw, list)
@@ -183,6 +196,14 @@ def normalize_result_for_persistence(
         raw_payload=raw_payload,
         algorithm_metrics=algorithm_metrics_raw,
     )
+    if isinstance(algorithm_metrics_raw, dict):
+        algorithm_metrics_raw["benchmark_provenance"] = _build_benchmark_provenance(
+            result=result,
+            metrics=algorithm_metrics_raw,
+            energy_provenance=provenance,
+            converged=converged,
+        )
+        raw_payload["algorithm_metrics"] = algorithm_metrics_raw
     energy = _persisted_energy(provenance)
 
     return (
@@ -197,7 +218,11 @@ def normalize_result_for_persistence(
 
 
 def _finite_float(value: Any) -> float | None:
-    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+    if (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(float(value))
+    ):
         return float(value)
     return None
 
@@ -216,7 +241,7 @@ def _projected_energy_is_reportable(
     result: dict[str, Any],
     metrics: dict[str, Any],
 ) -> bool:
-    """Accept stable or reportable-diagnostic branch energies; reject unstable ones."""
+    """Accept stable or reportable-diagnostic projected energies."""
     algorithm = result.get("algorithm")
     if not isinstance(algorithm, str):
         algorithm = metrics.get("algorithm")
@@ -224,15 +249,15 @@ def _projected_energy_is_reportable(
         return True
 
     matrix_summary = metrics.get("matrix_element_summary")
-    if not isinstance(matrix_summary, dict):
-        return True
-    if matrix_summary.get("matrix_element_strategy") != "branch_estimator":
-        return True
+    branch_estimator = (
+        isinstance(matrix_summary, dict)
+        and matrix_summary.get("matrix_element_strategy") == "branch_estimator"
+    )
 
     diagnostics = _projected_stability_diagnostics(metrics)
-    if not isinstance(diagnostics, dict):
-        return False
-    return projected_diagnostic_energy_is_reportable(diagnostics)
+    if isinstance(diagnostics, dict) and "stability_state" in diagnostics:
+        return projected_diagnostic_energy_is_reportable(diagnostics)
+    return not branch_estimator
 
 
 def _projected_stability_diagnostics(metrics: dict[str, Any]) -> Any:
@@ -244,7 +269,7 @@ def _projected_stability_diagnostics(metrics: dict[str, Any]) -> Any:
 
 
 def _projected_energy_is_stabilized_diagnostic(metrics: dict[str, Any]) -> bool:
-    """Return whether a reportable branch energy is a rank-reduced diagnostic."""
+    """Return whether a reportable projected energy is rank-reduced and diagnostic."""
     diagnostics = _projected_stability_diagnostics(metrics)
     if not isinstance(diagnostics, dict):
         return False
@@ -347,6 +372,11 @@ def _extract_energy_provenance(
     if not isinstance(reference_basis, str):
         reference_basis = None
 
+    convergence = metrics.get("convergence")
+    convergence = convergence if isinstance(convergence, dict) else {}
+    canonical_scientific_status = convergence.get("scientific_converged")
+    canonical_diagnostic = convergence.get("projected_solve_is_diagnostic") is True
+
     if not _projected_energy_is_reportable(result=result, metrics=metrics):
         return {
             "final_energy": None,
@@ -374,13 +404,106 @@ def _extract_energy_provenance(
             "signed_error": signed_error,
         }
 
-    return {
+    provenance = {
         "final_energy": final_energy,
         "best_observed_energy": best_observed_energy,
         "reported_energy": reported_energy,
         "reported_energy_is_valid": reported_energy is not None,
-        "reported_energy_source": source,
+        "reported_energy_source": (
+            "projected_branch_diagnostic" if canonical_diagnostic else source
+        ),
         "reference_energy": reference_energy,
         "reference_basis": reference_basis,
         "signed_error": signed_error,
+    }
+    if "scientific_converged" in convergence:
+        provenance["scientific_converged"] = canonical_scientific_status
+    if canonical_diagnostic:
+        provenance["projected_solve_is_diagnostic"] = True
+    return provenance
+
+
+def _first_mapping(*values: Any) -> dict[str, Any]:
+    for value in values:
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def _benchmark_work_ledger(metrics: dict[str, Any]) -> dict[str, Any] | None:
+    matrix_summary = metrics.get("matrix_element_summary")
+    sci_package = metrics.get("sci_result_package")
+    optimizer_diagnostics = metrics.get("optimizer_diagnostics")
+    return next(
+        (
+            candidate
+            for candidate in (
+                metrics.get("work_ledger"),
+                _first_mapping(matrix_summary).get("work_ledger"),
+                _first_mapping(sci_package).get("work_ledger"),
+                _first_mapping(optimizer_diagnostics).get("work_ledger"),
+            )
+            if isinstance(candidate, dict)
+        ),
+        None,
+    )
+
+
+def _build_benchmark_provenance(
+    *,
+    result: dict[str, Any],
+    metrics: dict[str, Any],
+    energy_provenance: dict[str, Any],
+    converged: bool,
+) -> dict[str, Any]:
+    execution = _first_mapping(metrics.get("backend_execution"))
+    noise_summary = _first_mapping(execution.get("noise_summary"))
+    reference = _first_mapping(metrics.get("reference_provenance"))
+    reported_energy_is_valid = energy_provenance.get("reported_energy_is_valid") is True
+    projected_solve_is_diagnostic = bool(
+        energy_provenance.get("projected_solve_is_diagnostic", False)
+    )
+    scientific_converged = energy_provenance.get("scientific_converged", converged)
+    benchmark_exclusion_reason: str | None = None
+    if reference.get("validity_status") != "valid":
+        benchmark_exclusion_reason = "reference_provenance_unavailable"
+    elif str(reference.get("method") or "").upper() != "CASCI":
+        benchmark_exclusion_reason = "reference_method_unsupported"
+    elif energy_provenance.get("reference_energy") is None:
+        benchmark_exclusion_reason = "missing_reference_energy"
+    elif not reported_energy_is_valid:
+        benchmark_exclusion_reason = "reported_energy_invalid"
+    elif projected_solve_is_diagnostic:
+        benchmark_exclusion_reason = "projected_solve_diagnostic"
+    elif scientific_converged is not True:
+        benchmark_exclusion_reason = "scientific_convergence_not_established"
+    return {
+        "schema_version": 2,
+        "execution": {
+            "requested_target": result.get("backend_target")
+            or execution.get("backend_target"),
+            "actual_execution_target": execution.get("actual_execution_target"),
+            "actual_path_class": execution.get("actual_path_class"),
+            "backend_primitives_used": execution.get("backend_primitives_used"),
+            "primitive_family": execution.get("primitive_family"),
+            "requested_shots": execution.get("requested_shots"),
+            "effective_shots": execution.get("effective_shots"),
+            "requested_estimator_precision": execution.get("requested_estimator_precision"),
+            "effective_estimator_precision": execution.get("effective_estimator_precision"),
+            "measurement_mode": execution.get("measurement_mode"),
+            "simulator_method": execution.get("simulator_method"),
+            "noise_source": noise_summary.get("source"),
+            "noise_fingerprint": noise_summary.get("model_fingerprint_sha256"),
+        },
+        "work_ledger": _benchmark_work_ledger(metrics),
+        "reference": reference,
+        "benchmark_eligible": benchmark_exclusion_reason is None,
+        "benchmark_exclusion_reason": benchmark_exclusion_reason,
+        "energy": {
+            "reported_energy": energy_provenance.get("reported_energy"),
+            "reported_energy_is_valid": energy_provenance.get("reported_energy_is_valid"),
+            "reported_energy_source": energy_provenance.get("reported_energy_source"),
+            "projected_solve_is_diagnostic": projected_solve_is_diagnostic,
+            "scientific_converged": scientific_converged,
+        },
     }

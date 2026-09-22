@@ -126,10 +126,23 @@ describe("runFormSchema", () => {
         },
         noise_profile: {
           source: "backend_derived",
-          reference_backend: "aer_simulator",
+          reference_backend: "ibm_brisbane",
         },
       }).success,
     ).toBe(true);
+  });
+
+  it("rejects simulator names as backend-derived noise references", () => {
+    const result = runFormSchema.safeParse({
+      ...validFormData,
+      backend_target: "aer_simulator",
+      noise_profile: {
+        source: "backend_derived",
+        reference_backend: "aer_simulator",
+      },
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it("accepts KQD on ideal Aer statevector simulation", () => {
@@ -156,11 +169,13 @@ describe("runFormSchema", () => {
         noise_profile: {
           source: "custom_preset",
           preset: "readout_bias",
-          strength: 0.01,
+          p01: 0.01,
+          p10: 0.02,
         },
         advanced_kqd: {
           ...validFormData.advanced_kqd,
           krylov_dim: 8,
+          evolution_method: "trotter",
         },
       }).success,
     ).toBe(true);
@@ -175,7 +190,8 @@ describe("runFormSchema", () => {
       noise_profile: {
         source: "custom_preset",
         preset: "readout_bias",
-        strength: 0.01,
+        p01: 0.01,
+        p10: 0.02,
       },
       advanced_kqd: {
         ...validFormData.advanced_kqd,
@@ -186,6 +202,30 @@ describe("runFormSchema", () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues.map((issue) => issue.path.join("."))).toEqual(
       expect.arrayContaining(["advanced_kqd.krylov_dim"]),
+    );
+  });
+
+  it("rejects exact KQD evolution when noisy Aer selects the estimator path", () => {
+    const result = runFormSchema.safeParse({
+      ...validFormData,
+      algorithm: "kqd",
+      mode: "advanced",
+      backend_target: "aer_simulator",
+      noise_profile: {
+        source: "custom_preset",
+        preset: "readout_bias",
+        p01: 0.01,
+        p10: 0.02,
+      },
+      advanced_kqd: {
+        ...validFormData.advanced_kqd,
+        evolution_method: "exact",
+      },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path.join("."))).toContain(
+      "advanced_kqd.evolution_method",
     );
   });
 
@@ -233,9 +273,35 @@ describe("runFormSchema", () => {
         advanced_kqd: {
           ...validFormData.advanced_kqd,
           krylov_dim: 4,
+          evolution_method: "trotter",
         },
       }).success,
     ).toBe(true);
+  });
+
+  it("rejects exact KQD evolution on IBM because the measured path needs circuits", () => {
+    const result = runFormSchema.safeParse({
+      ...validFormData,
+      algorithm: "kqd",
+      mode: "advanced",
+      backend_target: "ibm_runtime",
+      backend_options: {
+        ...validFormData.backend_options,
+        backend_name: "ibm_brisbane",
+      },
+      advanced_kqd: {
+        ...validFormData.advanced_kqd,
+        evolution_method: "exact",
+      },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toContainEqual(
+      expect.objectContaining({
+        path: ["advanced_kqd", "evolution_method"],
+        message: expect.stringContaining("Trotter"),
+      }),
+    );
   });
 
   it("rejects KQD IBM matrix-element runs above the hardware cap", () => {
@@ -289,6 +355,10 @@ describe("runFormSchema", () => {
       },
       easy_options: {
         goal: "balanced",
+      },
+      advanced_kqd: {
+        ...validFormData.advanced_kqd,
+        evolution_method: "trotter",
       },
     });
 

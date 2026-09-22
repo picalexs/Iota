@@ -55,6 +55,7 @@ def estimate_total_iterations(
     config_payload: dict[str, Any],
     num_qubits: int | None = None,
     backend_target: BackendTarget | str | None = None,
+    noise_profile_enabled: bool | None = None,
 ) -> int:
     """Estimate total iterations from algorithm-native configuration payloads."""
     return _estimate_total_iterations(
@@ -66,6 +67,7 @@ def estimate_total_iterations(
             if isinstance(backend_target, BackendTarget)
             else backend_target
         ),
+        noise_profile_enabled=noise_profile_enabled,
     )
 
 
@@ -81,6 +83,7 @@ def build_estimate_snapshot(
     seconds_per_iteration: float | None = None,
     total_iterations_override: int | None = None,
     extra_fields: dict[str, Any] | None = None,
+    noise_profile_enabled: bool | None = None,
 ) -> dict[str, Any]:
     """Build a normalized estimate payload with remaining/total projections."""
     _ = backend_target
@@ -89,6 +92,7 @@ def build_estimate_snapshot(
         config_payload=config_payload,
         num_qubits=num_qubits,
         backend_target=backend_target,
+        noise_profile_enabled=noise_profile_enabled,
     )
     remaining_iterations = max(total_iterations - max(completed_iterations, 0), 0)
     total_seconds = (
@@ -122,6 +126,7 @@ def build_estimate_snapshot(
                 if isinstance(backend_target, BackendTarget)
                 else backend_target
             ),
+            noise_profile_enabled=noise_profile_enabled,
         )
     )
     if seconds_per_iteration is not None:
@@ -264,6 +269,7 @@ def build_initial_estimate_for_run_request(
         seconds_per_iteration=seconds_per_iteration,
         total_iterations_override=total_iterations_override,
         extra_fields=extra_fields,
+        noise_profile_enabled=run_in.noise_profile is not None,
     )
 
 

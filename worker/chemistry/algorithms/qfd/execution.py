@@ -10,6 +10,7 @@ import numpy as np
 
 from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.projected_execution import (
+    ProjectedExecutionPolicy,
     prepare_projected_execution,
 )
 
@@ -50,6 +51,7 @@ def prepare_qfd_execution(
     num_qubits_fn: QubitResolver,
     backend_label_fn: BackendLabeler,
     prepare_dense_spectrum_fn: SpectrumPreparer,
+    execution_policy: ProjectedExecutionPolicy | None = None,
 ) -> QFDExecutionPlan:
     """Resolve QFD's branch, sector, or dense execution resources."""
     use_aer = getattr(backend_context, "backend_target", None) == "aer_simulator"
@@ -63,6 +65,7 @@ def prepare_qfd_execution(
         resolve_operator_matrix_fn=resolve_operator_matrix_fn,
         num_qubits_fn=num_qubits_fn,
         backend_label_fn=backend_label_fn,
+        execution_policy=execution_policy,
     )
     eigenvalues, eigenvectors, reference_projection = prepare_dense_spectrum_fn(
         hamiltonian=hamiltonian,

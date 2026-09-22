@@ -205,6 +205,13 @@ def _validate_create_request(
         molecule_active_space_n_electrons=n_electrons,
         molecule_active_space_n_orbitals=n_orbitals,
         molecule_multiplicity=int(molecule.multiplicity),
+        molecule_atoms=molecule.atoms,
+        molecule_charge=int(molecule.charge or 0),
+        molecule_active_space_method=(
+            molecule.active_space.get("method")
+            if isinstance(molecule.active_space, dict)
+            else None
+        ),
         require_ibm_confirmation=True,
         ibm_credentials_available=bool(profile_credentials),
     )

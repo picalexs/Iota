@@ -134,11 +134,12 @@ class IBMAdapter(BackendAdapter):
                 kwargs,
                 context=resolved,
             ),
+            allow_sampler_submission_retries=False,
         )
 
     def run_vqe(self, *, hamiltonian: object, config: dict) -> object:
         """Run VQE using IBM Runtime backend."""
-        from worker.chemistry.vqe_solver import run_vqe
+        from worker.chemistry.algorithms.vqe.workflow import run_vqe
 
         return run_vqe(
             hamiltonian=hamiltonian,
@@ -159,6 +160,7 @@ class IBMAdapter(BackendAdapter):
                 fallback=_backend_resolution_fallback(resolved),
             )
         requested_backend_name = _requested_backend_name(resolved)
+        observed_shots = self._last_runtime_observation.get("shots")
         metadata: dict[str, Any] = {
             "backend_target": self.capabilities.backend_target,
             "requested_target": resolved.backend_target,
@@ -175,13 +177,15 @@ class IBMAdapter(BackendAdapter):
             "selection_policy": _selection_policy(resolved),
             "backend_primitives_used": True,
             "primitive_family": "qiskit_ibm_runtime",
-            "shots": int(self._last_runtime_observation.get("shots", resolved.shots)),
+            "shots": int(observed_shots) if isinstance(observed_shots, (int, float)) else None,
             "requested_shots": (
                 resolved.requested_shots
                 if resolved.requested_shots is not None
                 else resolved.shots
             ),
-            "effective_shots": int(self._last_runtime_observation.get("shots", resolved.shots)),
+            "effective_shots": (
+                int(observed_shots) if isinstance(observed_shots, (int, float)) else None
+            ),
             "requested_estimator_precision": (
                 resolved.requested_estimator_precision
                 if resolved.requested_estimator_precision is not None
@@ -820,7 +824,9 @@ class _RuntimeTranspiler:
             return self._pass_manager
 
         try:
-            from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+            from qiskit.transpiler.preset_passmanagers import (
+                generate_preset_pass_manager,
+            )
         except Exception as exc:
             raise BackendError(
                 "Qiskit transpiler preset pass managers are unavailable; "

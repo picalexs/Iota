@@ -1,7 +1,7 @@
 """Tests for the SQD result-normalization boundary."""
 
-from worker.chemistry import sqd_solver
 from worker.chemistry.algorithms.sqd import results as sqd_result
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 
 
 def test_solver_keeps_result_helpers_as_compatibility_aliases() -> None:

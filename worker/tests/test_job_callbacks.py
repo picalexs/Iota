@@ -172,18 +172,26 @@ class TestOnJobSuccess:
         executed_sqls = [str(c.args[0]) for c in session.execute.call_args_list]
         assert any("run_results" in sql for sql in executed_sqls)
 
-    def test_non_dict_result_raises_in_test_mode(self) -> None:
-        """Replaces old graceful-skip test: non-dict result must raise in test mode (F1)."""
+    def test_non_dict_result_marks_run_failed_without_completion(self) -> None:
         job = make_job()
         session = make_session_mock()
-
-        import pytest
 
         with patch("worker.jobs.callbacks.get_db_session") as mock_ctx:
             mock_ctx.return_value.__enter__ = lambda s: session
             mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
-            with pytest.raises(RuntimeError, match="non-dict result"):
-                on_job_success(job, MagicMock(), result=None)
+
+            on_job_success(job, MagicMock(), result=None)
+
+        executed_calls = [
+            (str(call.args[0]), call.args[1] if len(call.args) > 1 else {})
+            for call in session.execute.call_args_list
+        ]
+        failure_update = next(
+            params for sql, params in executed_calls if "SET status = 'FAILED'" in sql
+        )
+        failure_metadata = json.loads(failure_update["error"])
+        assert failure_metadata["reason"] == "non_dict_result"
+        assert not any("SET status = 'COMPLETED'" in sql for sql, _ in executed_calls)
 
     def test_inserts_status_changed_run_event(self) -> None:
         job = make_job()
@@ -309,11 +317,14 @@ class TestOnJobSuccess:
         assert insert_result_params["iterations"] == 17
         assert insert_result_params["optimal_parameters"] == "[]"
         assert insert_result_params["converged"] is False
-        assert insert_result_params["algorithm_metrics"] == json.dumps({"samples_per_batch": 256})
+        persisted_metrics = json.loads(insert_result_params["algorithm_metrics"])
+        assert persisted_metrics["samples_per_batch"] == 256
+        assert persisted_metrics["benchmark_provenance"]["schema_version"] == 2
+        assert persisted_metrics["benchmark_provenance"]["energy"]["reported_energy"] == -1.221
 
         raw_result = json.loads(insert_result_params["raw_result"])
         assert raw_result["algorithm"] == "sqd"
-        assert raw_result["algorithm_metrics"] == {"samples_per_batch": 256}
+        assert raw_result["algorithm_metrics"] == persisted_metrics
         assert raw_result["primary_energy"] == -1.221
         assert raw_result["primary_iterations"] == 17
 
@@ -321,7 +332,7 @@ class TestOnJobSuccess:
         assert result_event_payload["algorithm"] == "sqd"
         assert result_event_payload["energy"] == -1.221
         assert result_event_payload["iterations"] == 17
-        assert result_event_payload["algorithm_metrics"] == {"samples_per_batch": 256}
+        assert result_event_payload["algorithm_metrics"] == persisted_metrics
 
     def test_persists_skqd_solution_provenance(self) -> None:
         job = make_job()

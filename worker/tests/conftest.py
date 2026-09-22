@@ -11,6 +11,25 @@ import pytest
 from qiskit.quantum_info import SparsePauliOp
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Filter known third-party warnings without hiding QSS warnings."""
+    config.addinivalue_line(
+        "filterwarnings",
+        "ignore:^splu converted its input to CSC format$:"
+        "scipy.sparse.SparseEfficiencyWarning",
+    )
+    config.addinivalue_line(
+        "filterwarnings",
+        "ignore:^spsolve is more efficient.*:"
+        "scipy.sparse.SparseEfficiencyWarning",
+    )
+    config.addinivalue_line(
+        "filterwarnings",
+        "ignore:^Since backends now support running jobs that contain both fractional gates "
+        "and dynamic circuit.*:DeprecationWarning:stevedore.extension",
+    )
+
+
 @pytest.fixture
 def sample_run_id() -> str:
     """Return a deterministic sample run id."""

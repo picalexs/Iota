@@ -1,8 +1,9 @@
 import "./benchmark-page.test-mocks";
 
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
+import { notifyIbmCredentialProfilesChanged } from "@/lib/ibm-profile-events";
 import { benchmarkKeys, runKeys } from "@/hooks/query-keys";
 import type { BenchmarkEntry } from "./benchmark/benchmark-utils";
 import {
@@ -172,7 +173,7 @@ describe("BenchmarkPage submission", () => {
       expect.objectContaining({
         backend_target: "aer_simulator",
         backend_options: expect.objectContaining({
-          backend_name: "aer_simulator",
+          backend_name: "ibm_kyiv",
         }),
         noise_profile: {
           source: "backend_derived",
@@ -353,6 +354,38 @@ describe("BenchmarkPage submission", () => {
         screen.getByRole("option", { name: "Aer simulator with backend noise" }),
       ).not.toHaveAttribute("aria-disabled", "true"),
     );
+    await waitFor(() =>
+      expect(screen.getByRole("option", { name: "IBM Quantum backend" })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      ),
+    );
+  });
+
+  it("updates IBM benchmark options when the shared capability refresh completes", async () => {
+    let cachedCapabilities: typeof backendCapabilitiesResponse | null = null;
+    (getBackendCapabilitiesCached as ReturnType<typeof vi.fn>).mockImplementation(
+      () => cachedCapabilities,
+    );
+    (fetchBackendCapabilities as ReturnType<typeof vi.fn>).mockReturnValue(
+      new Promise(() => undefined),
+    );
+
+    renderBenchmarkPage();
+
+    const backendTrigger = await screen.findByRole("combobox", { name: "Backend" });
+    await userEvent.click(backendTrigger);
+    expect(
+      screen.getByRole("option", { name: "IBM Quantum backend (Checking IBM...)" }),
+    ).toHaveAttribute("aria-disabled", "true");
+
+    cachedCapabilities = backendCapabilitiesResponse;
+    await act(async () => {
+      notifyIbmCredentialProfilesChanged({
+        backendCapabilitiesRefresh: "completed",
+      });
+    });
+
     await waitFor(() =>
       expect(screen.getByRole("option", { name: "IBM Quantum backend" })).not.toHaveAttribute(
         "aria-disabled",

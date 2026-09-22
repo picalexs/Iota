@@ -241,6 +241,7 @@ class MoleculeService:
             multiplicity=multiplicity,
             active_space=active_space,
             atoms=atom_models,
+            charge=charge,
         )
         return MoleculeImportPreviewResponse(
             source=source,
@@ -255,6 +256,7 @@ class MoleculeService:
                 multiplicity=multiplicity,
                 active_space=active_space,
                 atoms=atom_models,
+                charge=charge,
             ),
             visualizable=bool(capability_fields["visualizable"]),
             runnable_algorithms=list(capability_fields["runnable_algorithms"]),

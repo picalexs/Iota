@@ -9,18 +9,18 @@ from qiskit.quantum_info import SparsePauliOp
 from worker.adapters.aer_adapter import AerAdapter
 from worker.adapters.base import BackendExecutionContext
 from worker.adapters.result_adapter import normalize_result
-from worker.chemistry.hamiltonian_action import build_hamiltonian_action
-from worker.chemistry.skqd_solver import (
+from worker.chemistry.algorithms.skqd.workflow import (
     _build_krylov_extension,
     _build_sector_krylov_extension,
     _seed_state_from_sqd_result,
     run_skqd,
 )
+from worker.chemistry.hamiltonian_action import build_hamiltonian_action
 from worker.chemistry.types import SQDResult
 
 SQD_SEED_ARTIFACT_ID = "sqd.iteration.1.sampler"
-RUN_SQD_PATCH_TARGET = "worker.chemistry.skqd_solver.run_sqd"
-BUILD_KRYLOV_EXTENSION_PATCH_TARGET = "worker.chemistry.skqd_solver._build_krylov_extension"
+RUN_SQD_PATCH_TARGET = "worker.chemistry.algorithms.skqd.workflow.run_sqd"
+BUILD_KRYLOV_EXTENSION_PATCH_TARGET = "worker.chemistry.algorithms.skqd.workflow._build_krylov_extension"
 
 
 def _sector_hamiltonian(*, norb: int = 7, n_alpha: int = 1, n_beta: int = 1) -> Any:
@@ -111,6 +111,8 @@ def test_run_skqd_uses_shared_config_and_emits_canonical_progress(
     assert skqd_events[-1]["stage"] == "completed"
     assert skqd_events[-1]["iteration"] == result.krylov_extension_diagnostics["basis_rank"]
     assert skqd_events[-1]["overall_iterations"] == result.primary_iterations
+    assert skqd_events[-1]["seeded_from_sqd"] is False
+    assert skqd_events[-1]["seeded_from_sqd_occupancies"] is False
     metrics = normalize_result(result)["algorithm_metrics"]
     assert metrics["circuit_artifact_policy"]["name"] == "all_or_windowed_sqd_iterations"
     assert len(metrics["circuit_artifacts"]) == 1
@@ -164,6 +166,8 @@ def test_run_skqd_defaults_to_sample_union_selected_ci(
     assert diagnostics["reference_descriptor"]["state_fingerprint"]
     assert diagnostics["sqd_core_status"] == "not_run"
     assert diagnostics["sqd_iterations"] == 0
+    assert diagnostics["extension_attempted"] is False
+    assert diagnostics["extension_status"] == "not_applicable"
     # The compact mock spans its full CI sector, so the sample-union path now
     # reports a genuine convergence verdict instead of a hardcoded False.
     assert diagnostics["selected_solution_converged"] is True
@@ -177,6 +181,31 @@ def test_run_skqd_defaults_to_sample_union_selected_ci(
     assert diagnostics["krylov_prefix_summaries"][-1]["sample_count"] == 8
     assert result.primary_iterations == 2
     assert result.converged is True
+
+
+@pytest.mark.parametrize(
+    "backend_context",
+    [
+        BackendExecutionContext(backend_target="ibm_runtime"),
+        BackendExecutionContext(backend_target="aer_simulator"),
+        BackendExecutionContext(
+            backend_target="aer_simulator",
+            noise_profile={"source": "backend_derived"},
+        ),
+    ],
+    ids=("ibm-runtime", "ideal-aer", "noisy-aer"),
+)
+def test_run_skqd_fails_closed_when_requested_sampler_is_missing(
+    backend_context: BackendExecutionContext,
+    mock_hamiltonian_bundle: object,
+) -> None:
+    with pytest.raises(RuntimeError, match="refusing to fall back"):
+        run_skqd(
+            hamiltonian=mock_hamiltonian_bundle,
+            backend=None,
+            config={"algorithm": "skqd"},
+            backend_context=backend_context,
+        )
 
 
 def test_run_skqd_aer_samples_each_krylov_circuit() -> None:
@@ -345,11 +374,13 @@ def test_run_skqd_preserves_core_when_extension_fails(
     assert diagnostics["extension_status"] == "failed"
     assert diagnostics["extension_failure_reason"] == "RuntimeError: synthetic extension failure"
     assert diagnostics["extension_energy"] is None
+    assert diagnostics["algorithm_variant"] == "local_statevector_krylov_extension"
+    assert diagnostics["reference_policy"] == "unavailable"
     assert diagnostics["extension_improved_sqd"] is None
     assert diagnostics["extension_cost"]["wall_time_seconds"] >= 0.0
 
 
-def test_seed_state_from_sqd_result_preserves_electron_count() -> None:
+def test_seed_state_from_sqd_result_does_not_infer_state_from_occupancies() -> None:
     sqd_result = SQDResult(
         algorithm="sqd",
         primary_energy=-1.0,
@@ -366,13 +397,10 @@ def test_seed_state_from_sqd_result_preserves_electron_count() -> None:
 
     state = _seed_state_from_sqd_result(sqd_result, target_size=2**8)
 
-    assert state is not None
-    basis_index = int(np.argmax(np.abs(state)))
-    occupied_qubits = [qubit for qubit in range(8) if basis_index & (1 << qubit)]
-    assert occupied_qubits == [0, 1, 4, 5]
+    assert state is None
 
 
-def test_seed_state_from_sqd_result_uses_sector_correct_bitstring_probabilities() -> None:
+def test_seed_state_from_sqd_result_does_not_infer_phase_from_probabilities() -> None:
     sqd_result = SQDResult(
         algorithm="sqd",
         primary_energy=-1.0,
@@ -394,10 +422,7 @@ def test_seed_state_from_sqd_result_uses_sector_correct_bitstring_probabilities(
 
     state = _seed_state_from_sqd_result(sqd_result, target_size=2**4)
 
-    assert state is not None
-    assert state[15] == pytest.approx(0.0)
-    assert abs(state[5]) ** 2 == pytest.approx(0.25)
-    assert abs(state[10]) ** 2 == pytest.approx(0.75)
+    assert state is None
 
 
 def test_krylov_extension_reports_energy_from_orthonormal_basis() -> None:
@@ -476,7 +501,7 @@ def test_run_skqd_sector_path_does_not_materialize_dense_matrix(monkeypatch: Any
 
     monkeypatch.setattr(RUN_SQD_PATCH_TARGET, _fake_run_sqd)
     monkeypatch.setattr(
-        "worker.chemistry.skqd_solver.resolve_operator_matrix",
+        "worker.chemistry.algorithms.skqd.workflow.resolve_operator_matrix",
         _fail_dense_resolution,
     )
 

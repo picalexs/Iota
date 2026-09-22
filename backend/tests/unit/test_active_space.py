@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Any, cast
 
 from app.models.molecule import Molecule
+from app.schemas.molecule import AtomSchema
 from app.services.active_space import (
     derive_active_space_from_atoms,
     extract_active_space,
+    minimum_basis_active_orbital_limit,
     should_refresh_derived_active_space,
 )
 
@@ -68,6 +70,40 @@ def test_derive_active_space_uses_bounded_frontier_estimate_for_larger_imports()
     assert active_space["n_orbitals"] == 8
     assert active_space["method"] == "automatic_frontier_estimate"
     assert active_space["total_valence_orbitals"] > active_space["n_orbitals"]
+
+
+def test_derive_active_space_accounts_for_frozen_core_capacity() -> None:
+    active_space = derive_active_space_from_atoms(
+        [
+            {"symbol": "F", "x": -0.7, "y": 0.0, "z": 0.0},
+            {"symbol": "O", "x": 0.7, "y": 0.0, "z": 0.0},
+            {"symbol": "H", "x": 1.0, "y": 0.6, "z": -0.6},
+        ]
+    )
+
+    assert active_space is not None
+    assert active_space["n_electrons"] == 8
+    assert active_space["n_orbitals"] == 6
+
+
+def test_minimum_basis_active_orbital_limit_preserves_water_capacity() -> None:
+    atoms = [
+        {"symbol": "O", "x": 0.0, "y": 0.0, "z": 0.0},
+        {"symbol": "H", "x": 0.0, "y": 0.8, "z": -0.3},
+        {"symbol": "H", "x": 0.0, "y": -0.8, "z": -0.3},
+    ]
+
+    assert minimum_basis_active_orbital_limit(atoms, active_electrons=4) == 4
+
+
+def test_minimum_basis_active_orbital_limit_accepts_atom_models() -> None:
+    atoms = [
+        AtomSchema(symbol="O", x=0.0, y=0.0, z=0.0),
+        AtomSchema(symbol="H", x=0.0, y=0.8, z=-0.3),
+        AtomSchema(symbol="H", x=0.0, y=-0.8, z=-0.3),
+    ]
+
+    assert minimum_basis_active_orbital_limit(atoms, active_electrons=4) == 4
 
 
 def test_should_refresh_legacy_unbounded_automatic_active_space() -> None:

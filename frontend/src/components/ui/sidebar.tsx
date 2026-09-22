@@ -520,7 +520,7 @@ function SidebarMenuSubButton({
       data-size={size}
       data-active={isActive}
       className={cn(
-        "text-sidebar-foreground ring-sidebar-ring flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md border border-transparent px-2 outline-hidden transition-[border-color,background-color,color,box-shadow] focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 hover:border-sidebar-hover-border hover:bg-sidebar-hover hover:text-sidebar-foreground active:bg-sidebar-hover active:text-sidebar-foreground [&>svg]:text-sidebar-accent-foreground",
+        "text-sidebar-foreground ring-sidebar-ring flex h-7 w-full min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md border border-transparent px-2 outline-hidden transition-[border-color,background-color,color,box-shadow] focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 hover:border-sidebar-hover-border hover:bg-sidebar-hover hover:text-sidebar-foreground active:bg-sidebar-hover active:text-sidebar-foreground [&>svg]:text-sidebar-accent-foreground",
         "data-[active=true]:border-sidebar-selected-border data-[active=true]:bg-sidebar-selected data-[active=true]:text-sidebar-selected-foreground data-[active=true]:shadow-[var(--shadow-sidebar-selected)]",
         size === "sm" && "text-xs",
         size === "md" && "text-sm",

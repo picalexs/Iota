@@ -1,4 +1,4 @@
-import type { IbmBackendWarmupProgress } from "@/lib/ibm-profile-events";
+import type { IbmBackendStatus, IbmBackendWarmupProgress } from "@/lib/ibm-profile-events";
 import type { BackendCapability, BackendTarget } from "@/types/run";
 import { BACKEND_LABELS } from "./backend-section-shared";
 
@@ -42,7 +42,7 @@ function formatIbmReadyLabel(capability: BackendCapability | undefined): string 
     return null;
   }
 
-  return `${backendCount} IBM hardware backend${backendCount === 1 ? "" : "s"} ready.`;
+  return `Loaded ${backendCount} IBM backend${backendCount === 1 ? "" : "s"}.`;
 }
 
 function formatIbmRefreshingLabel(capability: BackendCapability | undefined): string | null {
@@ -55,7 +55,23 @@ function formatIbmRefreshingLabel(capability: BackendCapability | undefined): st
     return null;
   }
 
-  return `Refreshing ${backendCount} IBM hardware backend${backendCount === 1 ? "" : "s"}...`;
+  return `Refreshing IBM Runtime backends${backendCount > 0 ? ` (${backendCount} loaded)` : ""}…`;
+}
+
+export function getIbmBackendStatus(
+  capability: BackendCapability | undefined,
+  options: { loading?: boolean; refreshing?: boolean } = {},
+): IbmBackendStatus {
+  if (options.loading === true || options.refreshing === true) {
+    return "loading";
+  }
+  if (capability?.credential_configured === false || capability?.credentials_usable === false) {
+    return "inactive";
+  }
+  if ((capability?.backends?.length ?? 0) > 0 && capability?.enabled === true) {
+    return "ready";
+  }
+  return "unavailable";
 }
 
 export function isBackendSelectable(capability: BackendCapability | undefined): boolean {

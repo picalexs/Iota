@@ -31,6 +31,7 @@ import {
   setBackgroundRefreshTimer,
   storeBackendCapabilitiesCache,
 } from "./backend-capabilities-cache";
+import { notifyIbmCredentialProfilesChanged } from "@/lib/ibm-profile-events";
 
 export { setActiveBackendCapabilitiesProfile } from "./backend-capabilities-cache";
 
@@ -318,21 +319,43 @@ export async function refreshBackendCapabilitiesWithWarmupRetry(
 }
 
 let autoRefreshInterval: ReturnType<typeof setInterval> | null = null;
+const BACKEND_CAPABILITIES_AUTO_REFRESH_INTERVAL_MS = 1000 * 60;
 
 export function startBackendCapabilitiesAutoRefresh(): void {
   if (autoRefreshInterval != null) return;
-  autoRefreshInterval = setInterval(
-    () => {
-      for (const key of getBackendCapabilitiesRefreshKeys()) {
-        if (hasBackendCapabilitiesRequest(key)) {
-          continue;
-        }
-        const profileId = key === ACTIVE_BACKEND_CAPABILITIES_CACHE_KEY ? null : key;
-        void forceRefreshBackendCapabilities(profileId).catch(() => undefined);
+  autoRefreshInterval = setInterval(() => {
+    for (const key of getBackendCapabilitiesRefreshKeys()) {
+      if (hasBackendCapabilitiesRequest(key)) {
+        continue;
       }
-    },
-    1000 * 60 * 10,
-  );
+      const profileId = key === ACTIVE_BACKEND_CAPABILITIES_CACHE_KEY ? null : key;
+      const activeProfileId = getActiveBackendCapabilitiesProfile();
+      const isActiveProfile = profileId === activeProfileId;
+      if (isActiveProfile) {
+        notifyIbmCredentialProfilesChanged({
+          activeProfileId,
+          backendCapabilitiesRefresh: "started",
+        });
+      }
+      void forceRefreshBackendCapabilities(profileId)
+        .then(() => {
+          if (isActiveProfile) {
+            notifyIbmCredentialProfilesChanged({
+              activeProfileId,
+              backendCapabilitiesRefresh: "completed",
+            });
+          }
+        })
+        .catch(() => {
+          if (isActiveProfile) {
+            notifyIbmCredentialProfilesChanged({
+              activeProfileId,
+              backendCapabilitiesRefresh: "failed",
+            });
+          }
+        });
+    }
+  }, BACKEND_CAPABILITIES_AUTO_REFRESH_INTERVAL_MS);
 }
 
 export function warmBackendCapabilitiesCache(profileId?: UUID | null): void {

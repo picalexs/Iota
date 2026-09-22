@@ -109,6 +109,18 @@ describe("execution metadata helpers", () => {
         backend_execution: {
           resolved_backend_name: "ibm_sherbrooke",
           ibm_job_id: "job-from-result",
+          actual_execution_target: "local_classical",
+          actual_path_class: "sector_matrix_free",
+          backend_primitives_used: false,
+          requested_shots: 4096,
+          effective_shots: null,
+          requested_estimator_precision: 0.015625,
+          effective_estimator_precision: 0.0,
+          noise_summary: {
+            enabled: true,
+            source: "backend_derived",
+            model_fingerprint_sha256: "noise-hash",
+          },
           transpilation_summary: {
             optimization_level: 3,
             transpiled_depth: 42,
@@ -120,6 +132,22 @@ describe("execution metadata helpers", () => {
             used_physical_qubits: [73, 74],
           },
         },
+        matrix_element_summary: {
+          work_ledger: {
+            ledger_version: 1,
+            primitive_run_calls: 2,
+          },
+        },
+        benchmark_provenance: {
+          benchmark_eligible: false,
+          benchmark_exclusion_reason: "projected_solve_diagnostic",
+          energy: {
+            reported_energy_source: "stabilized_projected_diagnostic",
+            reported_energy_is_valid: true,
+            projected_solve_is_diagnostic: true,
+            scientific_converged: false,
+          },
+        },
       },
       created_at: "2026-05-17T12:05:00Z",
     };
@@ -127,6 +155,25 @@ describe("execution metadata helpers", () => {
     const metadata = getRunExecutionMetadata(runWithoutMetadata, [], result);
 
     expect(metadata.backendName).toBe("ibm_sherbrooke");
+    expect(metadata.actualExecutionTarget).toBe("local_classical");
+    expect(metadata.actualPathClass).toBe("sector_matrix_free");
+    expect(metadata.backendPrimitivesUsed).toBe(false);
+    expect(metadata.requestedShots).toBe(4096);
+    expect(metadata.effectiveShots).toBe(null);
+    expect(metadata.requestedEstimatorPrecision).toBe(0.015625);
+    expect(metadata.effectiveEstimatorPrecision).toBe(0.0);
+    expect(metadata.noiseSource).toBe("backend_derived");
+    expect(metadata.noiseFingerprint).toBe("noise-hash");
+    expect(metadata.workLedger).toEqual({
+      ledger_version: 1,
+      primitive_run_calls: 2,
+    });
+    expect(metadata.reportedEnergySource).toBe("stabilized_projected_diagnostic");
+    expect(metadata.reportedEnergyIsValid).toBe(true);
+    expect(metadata.projectedSolveIsDiagnostic).toBe(true);
+    expect(metadata.scientificConverged).toBe(false);
+    expect(metadata.benchmarkEligible).toBe(false);
+    expect(metadata.benchmarkExclusionReason).toBe("projected_solve_diagnostic");
     expect(metadata.ibmJobId).toBe("job-from-result");
     expect(metadata.optimizationLevel).toBe(3);
     expect(metadata.depth).toBe(42);

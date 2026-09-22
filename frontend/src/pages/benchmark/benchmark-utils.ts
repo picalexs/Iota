@@ -67,6 +67,12 @@ export interface BenchmarkSubmitResult {
 
 export type BenchmarkAccuracyFilter = "all" | AccuracyVerdict;
 export type BenchmarkAccuracySort = "default" | "lowest_error" | "highest_error";
+export type BenchmarkEligibilityReason =
+  | "not_completed"
+  | "reported_energy_invalid"
+  | "projected_solve_diagnostic"
+  | "scientific_convergence_not_established"
+  | "reference_provenance_unavailable";
 export const TERMINAL: Set<EntryStatus> = new Set(["completed", "failed", "cancelled"]);
 export const NON_EXECUTING: Set<EntryStatus> = new Set(["planned", "excluded"]);
 export const RUNNING_POLL_INTERVAL_MS = 3000;
@@ -94,7 +100,6 @@ interface BenchmarkBackendOptionsState {
 }
 
 export const DEFAULT_BENCHMARK_BACKEND_MODE: BenchmarkBackendMode = "statevector";
-export const DEFAULT_NOISE_REFERENCE_BACKEND = "ibm_brisbane";
 
 export function benchmarkEntryDisplayLabel(
   entry: Pick<BenchmarkEntry, "algorithm" | "variantLabel">,
@@ -308,6 +313,7 @@ export function normalizeStoredEntry(entry: BenchmarkEntry): BenchmarkEntry {
     advancedConfig: entry.advancedConfig ?? null,
     currentEnergy: entry.currentEnergy ?? entry.energy ?? null,
     elapsedSeconds: entry.elapsedSeconds ?? null,
+    executionMetadata: entry.executionMetadata ?? null,
     latestEventSequence: entry.latestEventSequence ?? 0,
   };
 
@@ -329,7 +335,8 @@ function normalizeStoredEntryStatus(
   entry: BenchmarkEntry,
   normalized: BenchmarkEntry,
 ): BenchmarkEntry {
-  if (entry.runId) return hasQueuedStatus(entry.status) ? { ...normalized, status: "queued" } : normalized;
+  if (entry.runId)
+    return hasQueuedStatus(entry.status) ? { ...normalized, status: "queued" } : normalized;
   const hasKnownStatus =
     entry.status === "idle" || TERMINAL.has(entry.status) || NON_EXECUTING.has(entry.status);
   return hasKnownStatus ? normalized : { ...normalized, status: "idle" };
@@ -390,6 +397,7 @@ export function buildInitialEntries(
       errorMessage: null,
       classicalRefs: null,
       elapsedSeconds: null,
+      executionMetadata: null,
       latestEventSequence: 0,
     })),
   );
@@ -459,6 +467,7 @@ export function applyEntryUpdates(
         classicalRefs,
         errorMessage,
         elapsedSeconds,
+        executionMetadata: update.value.executionMetadata,
         latestEventSequence: Math.max(existing.latestEventSequence, latestEventSequence),
       });
     }
@@ -475,6 +484,61 @@ export function effectiveRefs(entry: BenchmarkEntry): {
     return { hf: entry.classicalRefs.hf, fci: entry.classicalRefs.fci, computed: true };
   }
   return { hf: entry.preset.references.hf, fci: entry.preset.references.fci, computed: false };
+}
+
+export function getBenchmarkEligibility(entry: BenchmarkEntry): {
+  eligible: boolean;
+  reason: BenchmarkEligibilityReason | null;
+} {
+  if (entry.status !== "completed") {
+    return { eligible: false, reason: "not_completed" };
+  }
+
+  const metadata = entry.executionMetadata;
+  if (metadata?.benchmarkEligible === false) {
+    const directReason = metadata.benchmarkExclusionReason;
+    if (directReason === "projected_solve_diagnostic") {
+      return { eligible: false, reason: "projected_solve_diagnostic" };
+    }
+    if (directReason === "reported_energy_invalid") {
+      return { eligible: false, reason: "reported_energy_invalid" };
+    }
+    if (directReason === "reference_provenance_unavailable") {
+      return { eligible: false, reason: "reference_provenance_unavailable" };
+    }
+    return { eligible: false, reason: "scientific_convergence_not_established" };
+  }
+  if (metadata?.reportedEnergyIsValid === false) {
+    return { eligible: false, reason: "reported_energy_invalid" };
+  }
+  if (entry.classicalRefs === null) {
+    return { eligible: false, reason: "reference_provenance_unavailable" };
+  }
+  if (metadata?.projectedSolveIsDiagnostic === true) {
+    return { eligible: false, reason: "projected_solve_diagnostic" };
+  }
+  if (metadata?.scientificConverged === false || entry.converged === false) {
+    return { eligible: false, reason: "scientific_convergence_not_established" };
+  }
+
+  return { eligible: true, reason: null };
+}
+
+export function benchmarkEligibilityMessage(reason: BenchmarkEligibilityReason | null): string {
+  switch (reason) {
+    case "not_completed":
+      return "row is not completed";
+    case "reported_energy_invalid":
+      return "reported energy is invalid";
+    case "projected_solve_diagnostic":
+      return "projected solve is diagnostic only";
+    case "scientific_convergence_not_established":
+      return "scientific convergence was not established";
+    case "reference_provenance_unavailable":
+      return "runtime CASCI reference provenance is unavailable";
+    default:
+      return "reference or energy data is unavailable";
+  }
 }
 
 export function extractRunErrorMessage(run: RunResponse): string | null {
@@ -503,7 +567,7 @@ export function getBenchmarkStats(entries: BenchmarkEntry[], chemicalAccuracyHa:
   for (const entry of entries) {
     if (entry.status !== "completed" || entry.energy === null) continue;
     const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
-    if (entry.converged === false) {
+    if (getBenchmarkEligibility(entry).reason === "scientific_convergence_not_established") {
       notConverged += 1;
     }
     if (!assessment.isScorable) {
@@ -536,13 +600,27 @@ export function assessBenchmarkEntry(
   energy = entry.energy,
 ): AccuracyAssessment {
   const refs = effectiveRefs(entry);
-  return assessChemicalAccuracy({
+  const assessment = assessChemicalAccuracy({
     energy,
     hf: refs.hf,
     fci: refs.fci,
     thresholdHa: chemicalAccuracyHa,
     converged: entry.converged,
   });
+  if (!getBenchmarkEligibility(entry).eligible) {
+    return {
+      ...assessment,
+      verdict: "unscored",
+      errorHa: null,
+      errorMha: null,
+      absErrorHa: null,
+      absErrorMha: null,
+      withinThreshold: false,
+      correlationRecoveredPct: null,
+      isScorable: false,
+    };
+  }
+  return assessment;
 }
 
 export function sortBenchmarkRows(

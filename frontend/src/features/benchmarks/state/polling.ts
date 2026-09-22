@@ -9,6 +9,7 @@ import {
 
 import { getRun, getRunEvents, getRunResult } from "@/api/runs";
 import { runtimeSecondsFromEvents, runtimeSecondsFromRun } from "@/lib/run-runtime";
+import { getRunExecutionMetadata } from "@/lib/results/execution-metadata";
 import type { RunResultResponse } from "@/types/run";
 
 import {
@@ -38,6 +39,7 @@ type PolledEntryState = Pick<
   | "classicalRefs"
   | "errorMessage"
   | "elapsedSeconds"
+  | "executionMetadata"
   | "latestEventSequence"
 >;
 
@@ -49,6 +51,7 @@ async function syncBenchmarkEntryEvents(
   let classicalRefs: { hf: number; fci: number } | null = entry.classicalRefs;
   let latestEventSequence = entry.latestEventSequence ?? 0;
   let elapsedSeconds = runtimeSecondsFromRun(run) ?? entry.elapsedSeconds;
+  let executionMetadata = entry.executionMetadata;
 
   try {
     const events = await getRunEvents(entry.runId, latestEventSequence);
@@ -57,6 +60,7 @@ async function syncBenchmarkEntryEvents(
     classicalRefs = extractClassicalRefsFromEvents(events.events) ?? classicalRefs;
     elapsedSeconds =
       runtimeSecondsFromEvents(run, events.events) ?? elapsedSeconds ?? entry.elapsedSeconds;
+    executionMetadata = getRunExecutionMetadata(run, events.events);
   } catch {
     // Progress events can lag or fail independently of run status polling.
   }
@@ -66,6 +70,7 @@ async function syncBenchmarkEntryEvents(
     classicalRefs,
     latestEventSequence,
     elapsedSeconds,
+    executionMetadata,
   };
 }
 
@@ -88,6 +93,7 @@ async function syncCompletedBenchmarkEntryResult(
     currentEnergy: result.energy,
     converged: result.converged,
     classicalRefs: extractClassicalRefs(result.algorithm_metrics) ?? nextEntry.classicalRefs,
+    executionMetadata: getRunExecutionMetadata(run, [], result),
   };
 
   if (resultEntry.classicalRefs !== null) return resultEntry;
@@ -100,6 +106,7 @@ async function syncCompletedBenchmarkEntryResult(
       classicalRefs: eventState.classicalRefs,
       latestEventSequence: eventState.latestEventSequence,
       elapsedSeconds: eventState.elapsedSeconds,
+      executionMetadata: eventState.executionMetadata,
     };
   } catch {
     // Progress events can fail after the terminal result is available.
@@ -119,14 +126,16 @@ export async function buildBenchmarkEntryUpdate(
         classicalRefs: entry.classicalRefs,
         latestEventSequence: entry.latestEventSequence,
         elapsedSeconds: runtimeSecondsFromRun(run) ?? entry.elapsedSeconds,
+        executionMetadata: entry.executionMetadata,
       };
-  let nextEntry = {
+  let nextEntry: PolledEntryState = {
     energy: entry.energy,
     currentEnergy: eventState.currentEnergy,
     converged: entry.converged,
     classicalRefs: eventState.classicalRefs,
     errorMessage: status === "cancelled" ? entry.errorMessage : null,
     elapsedSeconds: eventState.elapsedSeconds,
+    executionMetadata: eventState.executionMetadata,
     latestEventSequence: eventState.latestEventSequence,
   };
 

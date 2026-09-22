@@ -8,7 +8,6 @@ import type {
 
 export const POLICY_LEAST_ERROR_VALUE = "policy:least_error";
 export const POLICY_LEAST_BUSY_VALUE = "policy:least_busy";
-export const DEFAULT_NOISE_REFERENCE_BACKEND = "ibm_brisbane";
 export const DEFAULT_TOPOLOGY_COLOR = "#6f8fdc";
 
 type OptionalBackendDevice = BackendDeviceSummary | null | undefined;
@@ -131,39 +130,13 @@ export function getNoiseReferenceDevice(
   devices: BackendDeviceSummary[],
 ): BackendDeviceSummary | null {
   if (noiseProfile?.source !== "backend_derived") return null;
-  return (
-    devices.find((device) => device.name === noiseProfile.reference_backend) ?? {
-      name: noiseProfile.reference_backend,
-      simulator: false,
-      operational: true,
-      pending_jobs: null,
-      num_qubits: null,
-      error_rate: null,
-    }
-  );
+  return devices.find((device) => device.name === noiseProfile.reference_backend) ?? null;
 }
 
 export function buildNoiseReferenceOptions(
   devices: BackendDeviceSummary[],
-  noiseProfile: NoiseProfile | null,
+  _noiseProfile: NoiseProfile | null,
 ): BackendDeviceSummary[] {
-  if (
-    noiseProfile?.source === "backend_derived" &&
-    noiseProfile.reference_backend.trim().length > 0 &&
-    !devices.some((device) => device.name === noiseProfile.reference_backend)
-  ) {
-    return [
-      {
-        name: noiseProfile.reference_backend,
-        simulator: false,
-        operational: true,
-        pending_jobs: null,
-        num_qubits: null,
-        error_rate: null,
-      },
-      ...devices,
-    ];
-  }
   return devices;
 }
 
@@ -232,7 +205,7 @@ export function resolveNoiseReference(
   noiseReferenceDevices: BackendDeviceSummary[],
 ): string {
   if (target === "aer_simulator") {
-    return noiseReferenceDevices[0]?.name ?? DEFAULT_NOISE_REFERENCE_BACKEND;
+    return noiseReferenceDevices[0]?.name ?? "";
   }
 
   return (
@@ -240,7 +213,7 @@ export function resolveNoiseReference(
     capability?.default_backend ||
     capability?.backends?.[0]?.name ||
     target ||
-    DEFAULT_NOISE_REFERENCE_BACKEND
+    ""
   );
 }
 

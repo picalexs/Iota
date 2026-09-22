@@ -1,4 +1,4 @@
-import { type KeyboardEvent } from "react";
+import { type KeyboardEvent, type MouseEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2, Clock, Loader2, Pause, XCircle } from "lucide-react";
 import {
@@ -15,7 +15,12 @@ import { formatDuration } from "@/lib/format-duration";
 import { isTimedOutFailureMessage } from "@/lib/run-failure";
 import { cn } from "@/lib/utils";
 import type { BenchmarkEntry } from "./benchmark-utils";
-import { assessBenchmarkEntry } from "./benchmark-utils";
+import {
+  assessBenchmarkEntry,
+  benchmarkEligibilityMessage,
+  getBenchmarkEligibility,
+} from "./benchmark-utils";
+import { BenchmarkMoleculeActions } from "./benchmark-molecule-actions";
 import {
   BenchmarkResultRowActions,
   type BenchmarkResultsRowAction,
@@ -29,6 +34,11 @@ interface BenchmarkResultsTableProps {
   chemicalAccuracyHa: number;
   pendingAction?: BenchmarkResultsRowAction | null;
   onRunAction?: (entry: BenchmarkEntry, action: BenchmarkResultsRowAction) => void | Promise<void>;
+  onMoleculeAction?: (
+    entries: readonly BenchmarkEntry[],
+    action: BenchmarkResultsRowAction,
+  ) => void | Promise<void>;
+  getMoleculeActionEntries?: (presetKey: string) => readonly BenchmarkEntry[];
   onBeforeOpenRun?: () => void;
 }
 
@@ -41,17 +51,19 @@ function StatusIndicator({
   iconClassName,
   ariaLabel = label,
   spin = false,
+  showLabel = true,
 }: {
   icon: typeof CheckCircle2;
   label: string;
   iconClassName: string;
   ariaLabel?: string;
   spin?: boolean;
+  showLabel?: boolean;
 }) {
   return (
     <div aria-label={ariaLabel} className="inline-flex items-center gap-1.5">
       <Icon className={cn("h-4 w-4", iconClassName, spin && "animate-spin")} />
-      <span className="text-xs text-muted-foreground">{label}</span>
+      {showLabel ? <span className="text-xs text-muted-foreground">{label}</span> : null}
     </div>
   );
 }
@@ -133,6 +145,50 @@ function RuntimeCell({ entry }: { entry: BenchmarkEntry }) {
   );
 }
 
+function executionPathLabel(entry: BenchmarkEntry): string {
+  const metadata = entry.executionMetadata;
+  const pathLabels: Record<string, string> = {
+    aer_branch_estimator: "Aer branch estimator",
+    aer_pauli_lie_trotter: "Aer statevector evolution",
+    aer_primitive: "Aer primitive",
+    aer_statevector_evolution: "Aer statevector evolution",
+    dense_classical: "Local dense classical",
+    sector_matrix_free: "Local matrix-free",
+    statevector_exact: "Statevector exact",
+  };
+  const pathLabel = metadata?.actualPathClass
+    ? pathLabels[metadata.actualPathClass]
+    : undefined;
+  if (pathLabel) {
+    return pathLabel;
+  }
+  switch (metadata?.actualExecutionTarget) {
+    case "aer_simulator":
+      return "Aer simulator";
+    case "ibm_runtime":
+      return "IBM Runtime";
+    case "local_classical":
+      return "Local classical";
+    case "statevector":
+      return "Statevector exact";
+    default:
+      return "Unknown";
+  }
+}
+
+function ExecutionPathCell({ entry }: { entry: BenchmarkEntry }) {
+  const label = executionPathLabel(entry);
+  return (
+    <span
+      className="text-xs text-muted-foreground"
+      title={`Reported execution path: ${label}`}
+      aria-label={`Execution path: ${label}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function ChemicalAccuracyCell({
   entry,
   chemicalAccuracyHa,
@@ -143,20 +199,34 @@ function ChemicalAccuracyCell({
   if (entry.status === "failed") {
     return <span className="text-xs text-muted-foreground">-</span>;
   }
+  if (entry.status === "cancelled") {
+    return (
+      <StatusIndicator
+        icon={AlertCircle}
+        label=""
+        showLabel={false}
+        ariaLabel="Chemical accuracy unavailable: benchmark row cancelled"
+        iconClassName="text-muted-foreground"
+      />
+    );
+  }
   if (entry.status !== "completed") {
     return <StatusIndicator icon={Clock} label="Pending" iconClassName="text-muted-foreground" />;
   }
   const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
   if (!assessment.isScorable) {
+    const eligibility = getBenchmarkEligibility(entry);
+    const message = benchmarkEligibilityMessage(eligibility.reason);
     return (
       <div className="flex items-center gap-3">
         <StatusIndicator
           icon={AlertCircle}
-          label="Unknown"
+          label=""
+          showLabel={false}
           iconClassName="text-muted-foreground"
-          ariaLabel="Chemical accuracy unknown"
+          ariaLabel={`Chemical accuracy unavailable: ${message}`}
         />
-        <span className="text-[10px] text-muted-foreground">No FCI/Exact reference</span>
+        <span className="text-xs text-muted-foreground">-</span>
       </div>
     );
   }
@@ -165,14 +235,16 @@ function ChemicalAccuracyCell({
       {assessment.verdict === "accurate" ? (
         <StatusIndicator
           icon={CheckCircle2}
-          label="Yes"
+          label=""
+          showLabel={false}
           iconClassName="text-success"
           ariaLabel="Chemically accurate"
         />
       ) : (
         <StatusIndicator
           icon={XCircle}
-          label="No"
+          label=""
+          showLabel={false}
           iconClassName="text-destructive"
           ariaLabel="Not chemically accurate"
         />
@@ -207,12 +279,11 @@ function completedAccuracyState(
 }
 
 function getDisplayReferences({ preset, rows }: BenchmarkGroupedRows) {
-  return (
-    rows.find((entry) => entry.classicalRefs)?.classicalRefs ?? {
-      hf: preset.references.hf,
-      fci: preset.references.fci,
-    }
-  );
+  const runtimeReferences = rows.find((entry) => entry.classicalRefs)?.classicalRefs;
+  if (runtimeReferences) {
+    return { ...runtimeReferences, label: "CASCI active-space" };
+  }
+  return { ...preset.references, label: "Preset reference" };
 }
 
 function runRowClassName({
@@ -233,6 +304,13 @@ function runRowClassName({
     accuracyState === "red" && "bg-red-500/10",
     rowClickable &&
       "cursor-pointer transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none",
+  );
+}
+
+function isRowInteractiveTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    target.closest("button, a, [role='dialog'], [data-radix-popper-content-wrapper]") !== null
   );
 }
 
@@ -257,7 +335,13 @@ function BenchmarkResultRow({
     onOpenRun(runId);
   };
 
+  const handleRowClickEvent = (event: MouseEvent<HTMLTableRowElement>) => {
+    if (isRowInteractiveTarget(event.target)) return;
+    handleRowClick();
+  };
+
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
+    if (isRowInteractiveTarget(event.target)) return;
     if (!runId) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -269,7 +353,7 @@ function BenchmarkResultRow({
       key={entry.id}
       className={runRowClassName({ entry, chemicalAccuracyHa, rowClickable })}
       tabIndex={rowClickable ? 0 : undefined}
-      onClick={handleRowClick}
+      onClick={handleRowClickEvent}
       onKeyDown={handleRowKeyDown}
     >
       <TableCell>
@@ -295,6 +379,9 @@ function BenchmarkResultRow({
       </TableCell>
       <TableCell>
         <RuntimeCell entry={entry} />
+      </TableCell>
+      <TableCell>
+        <ExecutionPathCell entry={entry} />
       </TableCell>
       <TableCell>
         <ChemicalAccuracyCell entry={entry} chemicalAccuracyHa={chemicalAccuracyHa} />
@@ -331,15 +418,20 @@ function BenchmarkResultRow({
 function BenchmarkResultGroup({
   preset,
   rows,
-  selectedBasis,
   chemicalAccuracyHa,
   pendingAction = null,
   onRunAction,
+  onMoleculeAction,
+  getMoleculeActionEntries,
   onOpenRun,
 }: BenchmarkGroupedRows &
   Pick<
     BenchmarkResultsTableProps,
-    "selectedBasis" | "chemicalAccuracyHa" | "pendingAction" | "onRunAction"
+    | "chemicalAccuracyHa"
+    | "pendingAction"
+    | "onRunAction"
+    | "onMoleculeAction"
+    | "getMoleculeActionEntries"
   > & {
     onOpenRun: OpenRunHandler;
   }) {
@@ -355,22 +447,22 @@ function BenchmarkResultGroup({
           >
             {preset.formula}
           </span>
-          <span
-            title={preset.name}
-            className="max-w-[16rem] shrink-0 truncate text-sm text-muted-foreground"
-          >
-            {preset.name}
-          </span>
-          <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-            {selectedBasis}
-          </span>
         </div>
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-1 text-xs text-muted-foreground md:shrink-0 md:justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground md:shrink-0">
           {displayRefs.hf !== 0 && <span>HF: {displayRefs.hf.toFixed(5)} Ha</span>}
-          {displayRefs.fci !== null && <span>Ref: {displayRefs.fci.toFixed(5)} Ha</span>}
-          {displayRefs.fci !== null && displayRefs.hf !== 0 && (
-            <span>Corr: {((displayRefs.fci - displayRefs.hf) * 1000).toFixed(1)} mHa</span>
+          {displayRefs.fci !== null && (
+            <span>
+              {displayRefs.label}: {displayRefs.fci.toFixed(5)} Ha
+            </span>
           )}
+          {onMoleculeAction ? (
+            <BenchmarkMoleculeActions
+              entries={getMoleculeActionEntries?.(preset.key) ?? rows}
+              moleculeLabel={preset.formula || preset.name}
+              pendingAction={pendingAction}
+              onAction={onMoleculeAction}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -381,6 +473,7 @@ function BenchmarkResultGroup({
             <TableHead className="w-28">Status</TableHead>
             <TableHead>Energy (Ha)</TableHead>
             <TableHead className="w-28">Runtime</TableHead>
+            <TableHead className="w-36">Execution path</TableHead>
             <TableHead className="w-48">Chemical accurate</TableHead>
             <TableHead className="w-16">Run</TableHead>
             <TableHead className="w-12 text-right">Actions</TableHead>
@@ -405,10 +498,11 @@ function BenchmarkResultGroup({
 
 export function BenchmarkResultsTable({
   grouped,
-  selectedBasis,
   chemicalAccuracyHa,
   pendingAction = null,
   onRunAction,
+  onMoleculeAction,
+  getMoleculeActionEntries,
   onBeforeOpenRun,
 }: BenchmarkResultsTableProps) {
   const navigate = useNavigate();
@@ -432,10 +526,11 @@ export function BenchmarkResultsTable({
           <BenchmarkResultGroup
             key={group.preset.key}
             {...group}
-            selectedBasis={selectedBasis}
             chemicalAccuracyHa={chemicalAccuracyHa}
             pendingAction={pendingAction}
             onRunAction={onRunAction}
+            onMoleculeAction={onMoleculeAction}
+            getMoleculeActionEntries={getMoleculeActionEntries}
             onOpenRun={openRun}
           />
         ),

@@ -8,7 +8,8 @@ from qiskit.circuit.library import XXPlusYYGate
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters import base as adapter_base
-from worker.adapters.aer_adapter import AerAdapter, _load_fake_backend
+from worker.adapters.aer_adapter import AerAdapter
+from worker.adapters.aer_noise import AerNoiseConfiguration
 from worker.adapters.base import BackendAdapter, BackendExecutionContext
 from worker.adapters.ibm_adapter import IBMAdapter, _RuntimeTranspiler
 from worker.adapters.result_adapter import normalize_result
@@ -238,11 +239,29 @@ def test_aer_estimator_records_and_applies_precision_without_sampler_option_leak
         }
     ]
     assert metadata["requested_shots"] == 1024
+    assert metadata["shots"] == 512
     assert metadata["effective_shots"] == 512
     assert metadata["requested_estimator_precision"] == 0.25
     assert metadata["effective_estimator_precision"] == 0.125
     assert metadata["measurement_mode"] == "precision_sampled"
     assert metadata["uncertainty_policy"] == "aer_estimator_default_precision"
+
+
+def test_aer_exact_estimator_metadata_does_not_claim_configured_shots() -> None:
+    adapter = AerAdapter()
+    context = BackendExecutionContext(
+        backend_target="aer_simulator",
+        shots=256,
+        estimator_precision=0.0,
+    )
+
+    adapter.create_estimator(context)
+    metadata = adapter.execution_metadata(context)
+
+    assert metadata["measurement_mode"] == "exact"
+    assert metadata["requested_shots"] == 256
+    assert metadata["shots"] is None
+    assert metadata["effective_shots"] is None
 
 
 @pytest.mark.parametrize(
@@ -264,169 +283,6 @@ def test_aer_estimator_returns_declared_standard_error(precision: float, expecte
     assert float(result.data.stds) == expected_std
 
 
-def test_aer_backend_derived_noise_uses_explicit_profile_credentials(monkeypatch) -> None:
-    class FakeNoiseModel:
-        basis_gates = ["rz", "sx", "x", "cx"]
-
-        @classmethod
-        def from_backend(cls, backend):
-            assert backend == "resolved-backend"
-            return cls()
-
-    monkeypatch.setattr(
-        "worker.adapters.aer_adapter._load_fake_backend",
-        lambda name, options: "resolved-backend",
-    )
-    monkeypatch.setattr("qiskit_aer.noise.NoiseModel", FakeNoiseModel)
-
-    adapter = AerAdapter()
-    context = BackendExecutionContext(
-        backend_target="aer_simulator",
-        backend_options={
-            "method": "automatic",
-            "shots": 256,
-            "token": "profile-token",
-            "instance": "profile-instance",
-            "channel": "ibm_quantum_platform",
-        },
-        noise_profile={
-            "source": "backend_derived",
-            "reference_backend": "ibm_brisbane",
-        },
-        shots=256,
-        simulator_method="automatic",
-    )
-
-    primitive_options, metadata = adapter._build_primitive_options(context)
-
-    assert primitive_options["backend_options"]["noise_model"].basis_gates == [
-        "rz",
-        "sx",
-        "x",
-        "cx",
-    ]
-    assert metadata["noise_summary"] == {
-        "enabled": True,
-        "source": "backend_derived",
-        "reference_backend": "ibm_brisbane",
-        "basis_gates": ["rz", "sx", "x", "cx"],
-    }
-
-
-def test_aer_backend_derived_noise_labels_default_reference_fallback(monkeypatch) -> None:
-    class FakeNoiseModel:
-        basis_gates = ["rz"]
-
-        @classmethod
-        def from_backend(cls, _backend):
-            return cls()
-
-    monkeypatch.setattr(
-        "worker.adapters.aer_adapter._load_fake_backend",
-        lambda name, _options: name,
-    )
-    monkeypatch.setattr("qiskit_aer.noise.NoiseModel", FakeNoiseModel)
-
-    context = BackendExecutionContext(
-        backend_target="aer_simulator",
-        noise_profile={
-            "source": "backend_derived",
-            "reference_backend": "aer_simulator",
-        },
-    )
-
-    _, metadata = AerAdapter()._build_primitive_options(context)
-
-    assert metadata["noise_summary"]["reference_backend"] == "ibm_brisbane"
-    assert metadata["noise_summary"]["requested_reference_backend"] == "aer_simulator"
-    assert metadata["noise_summary"]["fallback_reason"] == (
-        "aer_simulator_noise_reference_replaced_with_default_backend_profile"
-    )
-
-
-def test_load_fake_backend_prefers_live_runtime_for_unsupported_ibm_name(monkeypatch) -> None:
-    runtime_calls: list[tuple[str, dict[str, object]]] = []
-
-    def runtime_lookup(backend_name: str, backend_options: dict[str, object]) -> str:
-        runtime_calls.append((backend_name, backend_options))
-        return "runtime-backend"
-
-    monkeypatch.setattr("worker.adapters.aer_adapter._load_runtime_backend", runtime_lookup)
-
-    backend = _load_fake_backend("ibm_pittsburgh", {})
-
-    assert backend == "runtime-backend"
-    assert runtime_calls == [("ibm_pittsburgh", {})]
-
-
-def test_load_fake_backend_falls_back_to_alias_when_runtime_unavailable(monkeypatch) -> None:
-    def unavailable_runtime(backend_name: str, backend_options: dict[str, object]):
-        raise BackendError("no credentials")
-
-    monkeypatch.setattr("worker.adapters.aer_adapter._load_runtime_backend", unavailable_runtime)
-
-    backend = _load_fake_backend("ibm_pittsburgh", {})
-
-    assert backend.__class__.__name__ == "FakeFez"
-
-
-def test_load_fake_backend_falls_back_to_nighthawk_on_provider_error(monkeypatch) -> None:
-    def unavailable_runtime(_backend_name: str, _backend_options: dict[str, object]):
-        raise RuntimeError("IAM DNS is unavailable")
-
-    monkeypatch.setattr("worker.adapters.aer_adapter._load_runtime_backend", unavailable_runtime)
-
-    backend = _load_fake_backend("ibm_phoenix", {})
-
-    assert backend.__class__.__name__ == "FakeNighthawk"
-
-
-def test_aer_backend_derived_phoenix_noise_labels_packaged_fallback(monkeypatch) -> None:
-    class FakeNighthawk:
-        pass
-
-    class FakeNoiseModel:
-        basis_gates = ["rz", "sx", "x", "cx"]
-
-        @classmethod
-        def from_backend(cls, backend):
-            assert backend.__class__.__name__ == "FakeNighthawk"
-            return cls()
-
-    monkeypatch.setattr(
-        "worker.adapters.aer_adapter._load_fake_backend",
-        lambda _name, _options: FakeNighthawk(),
-    )
-    monkeypatch.setattr("qiskit_aer.noise.NoiseModel", FakeNoiseModel)
-
-    context = BackendExecutionContext(
-        backend_target="aer_simulator",
-        noise_profile={
-            "source": "backend_derived",
-            "reference_backend": "ibm_phoenix",
-        },
-    )
-
-    _, metadata = AerAdapter()._build_primitive_options(context)
-
-    assert metadata["noise_summary"]["reference_backend"] == "ibm_phoenix"
-    assert metadata["noise_summary"]["resolved_backend_name"] == "fake_nighthawk"
-    assert metadata["noise_summary"]["fallback_reason"] == (
-        "live_backend_unavailable_packaged_fake_nighthawk"
-    )
-
-
-def test_load_fake_backend_uses_exact_packaged_backend_without_runtime(monkeypatch) -> None:
-    def fail_runtime(backend_name: str, backend_options: dict[str, object]):
-        pytest.fail("exact packaged fake backend must not require a runtime lookup")
-
-    monkeypatch.setattr("worker.adapters.aer_adapter._load_runtime_backend", fail_runtime)
-
-    backend = _load_fake_backend("ibm_brisbane", {})
-
-    assert backend.__class__.__name__ == "FakeBrisbane"
-
-
 def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_builds(
     monkeypatch,
 ) -> None:
@@ -444,13 +300,19 @@ def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_b
             del default_shots, seed
             sampler_options.append(options)
 
-    def fake_build_noise_model(noise_profile, backend_options):
+    def fake_resolve_noise_profile(noise_profile, backend_options):
         build_noise_calls.append((noise_profile, backend_options))
-        return noise_model, {"enabled": True, "source": "custom_preset"}
+        return AerNoiseConfiguration(
+            noise_model=noise_model,
+            summary={"enabled": True, "source": "custom_preset"},
+        )
 
     monkeypatch.setattr("qiskit_aer.primitives.EstimatorV2", FakeEstimatorV2)
     monkeypatch.setattr(SAMPLER_V2_PATCH_PATH, FakeSamplerV2)
-    monkeypatch.setattr("worker.adapters.aer_adapter._build_noise_model", fake_build_noise_model)
+    monkeypatch.setattr(
+        "worker.adapters.aer_adapter.resolve_aer_noise_profile",
+        fake_resolve_noise_profile,
+    )
 
     adapter = AerAdapter()
     context = BackendExecutionContext(
@@ -484,6 +346,8 @@ def test_aer_adapter_reuses_cached_noise_details_across_metadata_and_primitive_b
     assert second_metadata["noise_summary"] == {"enabled": True, "source": "custom_preset"}
     assert estimator_options[0]["backend_options"]["noise_model"] is noise_model
     assert sampler_options[0]["backend_options"]["noise_model"] is noise_model
+    assert estimator_options[0]["backend_options"]["method"] == "automatic"
+    assert sampler_options[0]["backend_options"]["method"] == "automatic"
 
 
 def test_ibm_adapter_raises_without_credentials(monkeypatch) -> None:
@@ -800,12 +664,13 @@ def test_ibm_adapter_uses_estimator_precision_only_for_estimator() -> None:
     )
 
     adapter.create_estimator(context)
-    adapter.create_sampler(context)
+    sampler = adapter.create_sampler(context)
 
     assert estimator_calls == [
         {"mode": backend, "options": {"default_precision": 0.125}}
     ]
     assert sampler_calls == [{"mode": backend, "options": {"default_shots": 512}}]
+    assert sampler.allow_sampler_submission_retries is False
 
 
 def test_ibm_adapter_records_named_backend_mismatch_as_fallback() -> None:
@@ -968,6 +833,34 @@ def test_ibm_adapter_execution_metadata_resolves_backend_name_before_primitive_c
     assert metadata["resolved_backend_name"] == "ibm_brisbane"
 
 
+def test_ibm_precision_estimator_metadata_does_not_claim_configured_shots() -> None:
+    backend = SimpleNamespace(name="ibm_brisbane", simulator=False)
+    service = SimpleNamespace(backend=lambda name: backend)
+    adapter = IBMAdapter(
+        service_factory=lambda **_: service,
+        estimator_factory=lambda **_: SimpleNamespace(run=lambda *args, **kwargs: object()),
+    )
+    context = BackendExecutionContext(
+        backend_target="ibm_runtime",
+        backend_options={
+            "backend_name": "ibm_brisbane",
+            "token": "fake-token",
+            "instance": "fake-instance",
+        },
+        shots=512,
+        estimator_precision=0.25,
+    )
+
+    adapter.create_estimator(context)
+    metadata = adapter.execution_metadata(context)
+
+    assert metadata["measurement_mode"] == "precision_sampled"
+    assert metadata["requested_shots"] == 512
+    assert metadata["effective_estimator_precision"] == 0.25
+    assert metadata["shots"] is None
+    assert metadata["effective_shots"] is None
+
+
 def test_ibm_adapter_uses_least_error_selection_policy_for_resolution() -> None:
     quiet_backend = SimpleNamespace(
         name="ibm_miami",
@@ -1120,6 +1013,50 @@ def test_normalize_result_for_vqe_dataclass() -> None:
     assert convergence["convergence_failure_reason"] == "energy_delta_threshold_unavailable"
 
 
+def test_vqe_energy_policy_describes_independent_noisy_reevaluation() -> None:
+    normalized = normalize_result(
+        VQEResult(
+            algorithm="vqe",
+            primary_energy=-1.2,
+            primary_iterations=1,
+            converged=False,
+            optimal_parameters=[],
+            convergence_trace=[],
+            optimizer_diagnostics={
+                "reported_energy_source": "independent_final_reevaluation",
+                "independent_final_energy": -1.2,
+                "reported_energy": -1.2,
+            },
+        )
+    )
+
+    policy = normalized["energy_policy"]
+    assert policy["primary_energy_source"] == "independent_final_reevaluation"
+    assert "independent energy reevaluation" in policy["selection_rule"]
+    assert "optimizer_diagnostics.independent_final_energy" in policy["candidate_energy_fields"]
+
+
+def test_vqe_energy_policy_describes_parameterless_sampled_observation() -> None:
+    normalized = normalize_result(
+        VQEResult(
+            algorithm="vqe",
+            primary_energy=-0.92,
+            primary_iterations=1,
+            converged=True,
+            optimal_parameters=[],
+            convergence_trace=[-0.92],
+            optimizer_diagnostics={
+                "reported_energy_source": "final_noisy_objective_observation",
+                "reported_energy_standard_error": 0.04,
+            },
+        )
+    )
+
+    policy = normalized["energy_policy"]
+    assert policy["primary_energy_source"] == "final_noisy_objective_observation"
+    assert "sole sampled objective evaluation" in policy["selection_rule"]
+
+
 def test_normalize_result_detects_scipy_function_evaluation_cap() -> None:
     normalized = normalize_result(
         VQEResult(
@@ -1144,6 +1081,33 @@ def test_normalize_result_detects_scipy_function_evaluation_cap() -> None:
     assert convergence["budget_exhausted"] is True
     assert convergence["scientific_converged"] is False
     assert convergence["convergence_failure_reason"] == "budget_exhausted"
+
+
+def test_vqe_normalization_does_not_overrule_optimizer_failure() -> None:
+    normalized = normalize_result(
+        VQEResult(
+            algorithm="vqe",
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=False,
+            optimal_parameters=[0.2],
+            convergence_trace=[-1.0, -1.0],
+            optimizer_diagnostics={
+                "termination_reason": "optimizer_failure",
+                "optimizer_success": False,
+                "success": False,
+                "numerical_stability": True,
+                "final_delta_energy": 0.0,
+                "convergence_threshold": 1e-8,
+            },
+        )
+    )
+
+    convergence = normalized["algorithm_metrics"]["convergence"]
+
+    assert convergence["optimizer_converged"] is False
+    assert convergence["scientific_converged"] is False
+    assert convergence["convergence_failure_reason"] == "optimizer_reported_failure"
 
 
 def test_normalize_result_preserves_zero_primary_energy() -> None:
@@ -1314,7 +1278,7 @@ def test_normalize_result_accepts_stable_branch_projected_spectrum(algorithm: st
                 "dropped_rank": 0,
             },
         )
-        source = "lowest_krylov_ritz_value"
+        source = "projected_branch_diagnostic"
     else:
         result = QFDResult(
             algorithm=algorithm,
@@ -1331,12 +1295,13 @@ def test_normalize_result_accepts_stable_branch_projected_spectrum(algorithm: st
                 "dropped_rank": 0,
             },
         )
-        source = "lowest_filter_eigenvalue"
+        source = "projected_branch_diagnostic"
 
     normalized = normalize_result(result)
 
     assert normalized["reported_energy"] == pytest.approx(result.primary_energy)
     assert normalized["reported_energy_source"] == source
+    assert normalized["projected_solve_is_diagnostic"] is True
 
 
 def test_normalize_result_does_not_infer_projected_convergence_without_residual() -> None:
@@ -1360,6 +1325,76 @@ def test_normalize_result_does_not_infer_projected_convergence_without_residual(
     assert convergence["projected_system_stable"] is True
     assert convergence["scientific_converged"] is None
     assert convergence["convergence_failure_reason"] == "projected_residual_unavailable"
+
+
+@pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
+def test_normalize_result_does_not_infer_scientific_convergence_from_one_projected_solve(
+    algorithm: str,
+) -> None:
+    diagnostics = {
+        "stability_state": "stable",
+        "overlap_condition": 1.0,
+        "overlap_min_eigenvalue": 1.0,
+        "relative_ritz_residual": 1e-12,
+        "residual_convergence_threshold": 1e-8,
+    }
+    if algorithm == "kqd":
+        result = KQDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            ritz_values=[-1.0],
+            krylov_rank=2,
+            orthogonality_metrics=diagnostics,
+            stability_summary=diagnostics,
+        )
+    else:
+        result = QFDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            filter_eigenvalues=[-1.0],
+            conditioning_summary=diagnostics,
+            stability_summary=diagnostics,
+        )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["numerical_stable"] is True
+    assert convergence["projected_solver_converged"] is True
+    assert convergence["scientific_converged"] is None
+    assert convergence["convergence_failure_reason"] == (
+        "scientific_completeness_evidence_unavailable"
+    )
+
+
+def test_normalize_result_keeps_qse_scientific_status_indeterminate_without_hierarchy_evidence() -> None:
+    result = QSEResult(
+        algorithm="qse",
+        primary_energy=-1.0,
+        primary_iterations=2,
+        converged=True,
+        eigenvalues=[-1.0],
+        overlap_condition=1.0,
+        reference_state_energy=-0.9,
+        relative_residual=1e-12,
+        convergence_threshold=1e-8,
+        conditioning_summary={
+            "stability_state": "stable",
+            "overlap_min_eigenvalue": 1.0,
+        },
+    )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["numerical_stable"] is True
+    assert convergence["projected_solver_converged"] is True
+    assert convergence["scientific_converged"] is None
+    assert convergence["convergence_failure_reason"] == (
+        "scientific_completeness_evidence_unavailable"
+    )
 
 
 def test_normalize_result_rejects_unstable_projected_convergence() -> None:
@@ -1389,6 +1424,71 @@ def test_normalize_result_rejects_unstable_projected_convergence() -> None:
         "projected_overlap_condition_and_generalized_residual"
     )
     assert convergence["convergence_failure_reason"] == "projected_system_unstable"
+
+
+@pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
+def test_normalize_result_does_not_infer_scientific_convergence_from_branch_gevp(
+    algorithm: str,
+) -> None:
+    stable_diagnostics = {
+        "stability_state": "stable",
+        "overlap_condition": 1.0,
+        "overlap_min_eigenvalue": 1.0,
+        "relative_ritz_residual": 1e-15,
+        "residual_convergence_threshold": 1e-8,
+    }
+    if algorithm == "kqd":
+        result = KQDResult(
+            algorithm=algorithm,
+            primary_energy=-0.5,
+            primary_iterations=2,
+            converged=False,
+            ritz_values=[-0.5],
+            krylov_rank=2,
+            orthogonality_metrics=stable_diagnostics,
+            matrix_element_summary={
+                "matrix_element_strategy": "branch_estimator",
+                "projected_solver_converged": True,
+            },
+        )
+    else:
+        result = QFDResult(
+            algorithm=algorithm,
+            primary_energy=-0.5,
+            primary_iterations=2,
+            converged=False,
+            filter_eigenvalues=[-0.5],
+            conditioning_summary=stable_diagnostics,
+            matrix_element_summary={
+                "matrix_element_strategy": "branch_estimator",
+                "projected_solver_converged": True,
+            },
+            stability_summary=stable_diagnostics,
+        )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["scientific_converged"] is None
+    assert convergence["projected_solver_converged"] is True
+    assert convergence["convergence_failure_reason"] == "full_space_residual_unavailable"
+
+
+def test_normalize_result_rejects_invalid_local_qfd_energy() -> None:
+    normalized = normalize_result(
+        QFDResult(
+            algorithm="qfd",
+            primary_energy=0.0,
+            primary_iterations=3,
+            converged=False,
+            filter_eigenvalues=[0.0],
+            conditioning_summary={"stability_state": "invalid"},
+            matrix_element_summary={"matrix_element_strategy": "dense_classical"},
+            stability_summary={"stability_state": "invalid", "retained_rank": 0},
+        )
+    )
+
+    assert normalized["reported_energy"] is None
+    assert normalized["reported_energy_source"] == "unavailable_unstable_projected_solve"
 
 
 def test_normalize_result_rejects_scientific_convergence_with_invalid_reference() -> None:
@@ -1443,14 +1543,25 @@ def test_normalize_result_for_qse_dataclass() -> None:
 
 
 @pytest.mark.parametrize(
-    ("selected_solution", "expected_provenance"),
+    ("selected_solution", "diagnostics", "expected_provenance"),
     [
-        ("sqd_core", "selected_sqd_core_backend_sampler"),
-        ("krylov_extension", "selected_krylov_extension_classical_exact"),
+        ("sqd_core", {}, "selected_sqd_core_backend_sampler"),
+        ("krylov_extension", {}, "selected_krylov_extension_classical_exact"),
+        (
+            "skqd_sample_union",
+            {"sampling_source": "sampler_krylov_circuits", "backend_target": "ibm_runtime"},
+            "selected_skqd_sample_union_sampler",
+        ),
+        (
+            "skqd_sample_union",
+            {"sampling_source": "exact_statevector_oracle"},
+            "selected_skqd_sample_union_local_exact",
+        ),
     ],
 )
 def test_normalize_result_describes_skqd_solution_provenance(
     selected_solution: str,
+    diagnostics: dict[str, object],
     expected_provenance: str,
 ) -> None:
     result = SKQDResult(
@@ -1459,7 +1570,7 @@ def test_normalize_result_describes_skqd_solution_provenance(
         primary_iterations=5,
         converged=True,
         sqd_core={"primary_energy": -0.7},
-        krylov_extension_diagnostics={"selected_solution": selected_solution},
+        krylov_extension_diagnostics={"selected_solution": selected_solution, **diagnostics},
     )
 
     normalized = normalize_result(result)
@@ -1492,6 +1603,31 @@ def test_normalize_result_for_skqd_dataclass() -> None:
         -0.82,
         -0.81,
     ]
+
+
+def test_normalize_result_promotes_skqd_work_ledger() -> None:
+    result = SKQDResult(
+        algorithm="skqd",
+        primary_energy=-0.81,
+        primary_iterations=2,
+        converged=False,
+        sqd_core={"status": "not_run"},
+        krylov_extension_diagnostics={
+            "work_ledger": {
+                "ledger_version": 1,
+                "sampler_run_attempts": 2,
+                "sampler_returned_raw_sample_rows": 16,
+            }
+        },
+    )
+
+    normalized = normalize_result(result)
+
+    assert normalized["algorithm_metrics"]["work_ledger"] == {
+        "ledger_version": 1,
+        "sampler_run_attempts": 2,
+        "sampler_returned_raw_sample_rows": 16,
+    }
 
 
 @pytest.mark.parametrize(
@@ -1553,23 +1689,45 @@ def test_normalize_result_classifies_skqd_selected_solution_convergence(
         assert convergence["convergence_value"] == diagnostics.get("relative_residual")
 
 
-def test_normalize_result_classifies_skqd_sample_union_convergence() -> None:
+@pytest.mark.parametrize(
+    (
+        "complete_selected_ci_solve",
+        "full_sector_recovered",
+        "verdict_converged",
+        "result_converged",
+        "expected_converged",
+        "expected_failure_reason",
+    ),
+    [
+        (True, False, True, True, False, "full_sector_recovery_not_established"),
+        (False, True, True, True, False, "complete_selected_ci_solve_not_established"),
+        (True, True, False, False, True, None),
+    ],
+)
+def test_normalize_result_derives_skqd_sample_union_convergence_from_requirements(
+    complete_selected_ci_solve: bool,
+    full_sector_recovered: bool,
+    verdict_converged: bool,
+    result_converged: bool,
+    expected_converged: bool,
+    expected_failure_reason: str | None,
+) -> None:
     result = SKQDResult(
         algorithm="skqd",
         primary_energy=-1.137,
         primary_iterations=4,
-        converged=True,
+        converged=result_converged,
         sqd_core={"converged": None},
         krylov_extension_diagnostics={
             "selected_solution": "skqd_sample_union",
             "convergence_status": "subspace_saturated",
             "convergence_verdict": {
-                "converged": True,
+                "converged": verdict_converged,
                 "convergence_status": "subspace_saturated",
                 "subspace_saturated": True,
-                "complete_selected_ci_solve": True,
-                "full_sector_recovered": False,
-                "selected_ci_fraction": 0.75,
+                "complete_selected_ci_solve": complete_selected_ci_solve,
+                "full_sector_recovered": full_sector_recovered,
+                "selected_ci_fraction": 1.0 if full_sector_recovered else 0.75,
                 "final_prefix_growth_delta": 0,
                 "convergence_criterion": (
                     "krylov_subspace_saturation_and_complete_selected_ci_solve"
@@ -1578,14 +1736,16 @@ def test_normalize_result_classifies_skqd_sample_union_convergence() -> None:
         },
     )
 
-    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+    normalized = normalize_result(result)
+    convergence = normalized["algorithm_metrics"]["convergence"]
 
-    assert convergence["scientific_converged"] is True
+    assert normalized["converged"] is expected_converged
+    assert convergence["scientific_converged"] is expected_converged
     assert convergence["convergence_criterion"] == (
-        "krylov_subspace_saturation_and_complete_selected_ci_solve"
+        "full_ci_sector_recovery_and_complete_selected_ci_solve"
     )
     assert convergence["convergence_value"]["subspace_saturated"] is True
-    assert convergence["convergence_failure_reason"] is None
+    assert convergence.get("convergence_failure_reason") == expected_failure_reason
 
 
 def test_normalize_result_reports_skqd_sample_union_not_converged() -> None:
@@ -1613,7 +1773,7 @@ def test_normalize_result_reports_skqd_sample_union_not_converged() -> None:
     convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
 
     assert convergence["scientific_converged"] is False
-    assert convergence["convergence_failure_reason"] == "sampling_convergence_not_established"
+    assert convergence["convergence_failure_reason"] == "full_sector_recovery_not_established"
 
 
 def test_normalize_result_classical_references_propagated() -> None:
@@ -1867,6 +2027,25 @@ def test_normalize_result_describes_sqd_best_observed_energy_policy() -> None:
     assert (
         "sci_result_package.final_energy" in normalized["energy_policy"]["candidate_energy_fields"]
     )
+
+
+def test_normalize_result_does_not_persist_internal_sqd_coefficients() -> None:
+    result = SQDResult(
+        algorithm="sqd",
+        primary_energy=-1.2,
+        primary_iterations=1,
+        converged=True,
+        sci_energies=[-1.2],
+        configuration_recovery_trace=[],
+        spin_diagnostics={},
+        best_sci_state=object(),
+    )
+
+    normalized = normalize_result(result)
+
+    assert "best_sci_state" not in normalized
+    assert "best_sci_state" not in normalized["raw_result"]
+    assert "best_sci_state" not in normalized["algorithm_metrics"]
 
 
 def test_normalize_result_classical_references_absent_when_no_metadata() -> None:

@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MoleculePreset } from "@/lib/benchmark-presets";
 import { createMolecule, fetchMolecules, getMolecule } from "@/api/molecules";
-import { acquireMolecule, MoleculeAcquisitionError } from "./molecule-acquisition";
+import {
+  acquireMolecule,
+  clearMoleculeAcquisitionCache,
+  MoleculeAcquisitionError,
+} from "./molecule-acquisition";
 
 vi.mock("@/api/molecules", () => ({
   createMolecule: vi.fn(),
@@ -32,6 +36,7 @@ describe("molecule acquisition adapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    clearMoleculeAcquisitionCache();
   });
 
   it("reports a valid custom molecule cache hit", async () => {
@@ -114,5 +119,48 @@ describe("molecule acquisition adapter", () => {
         (attempt) => attempt.kind === "invalid_response",
       ),
     ).toBe(true);
+  });
+
+  it("shares one acquisition for concurrent requests for the same preset", async () => {
+    vi.mocked(fetchMolecules).mockResolvedValue({ items: [], total: 0 } as never);
+    vi.mocked(createMolecule).mockResolvedValue({ id: "created-id" } as never);
+
+    const results = await Promise.all([acquireMolecule(preset), acquireMolecule(preset)]);
+
+    expect(results[0]).toEqual(results[1]);
+    expect(fetchMolecules).toHaveBeenCalledTimes(2);
+    expect(createMolecule).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses a completed acquisition without repeating service calls", async () => {
+    vi.mocked(fetchMolecules).mockResolvedValue({ items: [], total: 0 } as never);
+    vi.mocked(createMolecule).mockResolvedValue({ id: "created-id" } as never);
+
+    await acquireMolecule(preset);
+    await acquireMolecule(preset);
+
+    expect(fetchMolecules).toHaveBeenCalledTimes(2);
+    expect(createMolecule).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retain a failed acquisition promise", async () => {
+    vi.mocked(fetchMolecules).mockResolvedValue({ items: [], total: 0 } as never);
+    vi.mocked(createMolecule)
+      .mockRejectedValueOnce(
+        Object.assign(new Error("API unavailable"), {
+          code: "NETWORK_ERROR",
+          name: "ApiError",
+          status: 503,
+        }),
+      )
+      .mockResolvedValueOnce({ id: "created-id" } as never);
+
+    await expect(acquireMolecule(preset)).rejects.toBeInstanceOf(MoleculeAcquisitionError);
+    await expect(acquireMolecule(preset)).resolves.toMatchObject({
+      kind: "created",
+      moleculeId: "created-id",
+    });
+
+    expect(createMolecule).toHaveBeenCalledTimes(2);
   });
 });

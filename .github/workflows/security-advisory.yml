@@ -2,9 +2,9 @@ name: Security advisory
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
   pull_request:
-    branches: [main]
+    branches: [develop, main]
   schedule:
     - cron: "0 2 * * 0"
   workflow_dispatch:
@@ -18,66 +18,70 @@ jobs:
     name: Dependency review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Review dependencies
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
-        continue-on-error: true
         with:
-          warn-only: true
+          warn-only: false
+          fail-on-severity: high
           config-file: .github/dependency-review-config.yml
 
   pip-audit:
     name: Python dependency audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
         requirements:
-          - backend/requirements.lock
-          - worker/requirements.lock
+          - backend/requirements.txt
+          - worker/requirements.txt
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: requirements-security.lock
+          cache-dependency-path: requirements-security.txt
       - name: Install security tools
-        run: python -m pip install -r requirements-security.lock
+        run: python -m pip install -r requirements-security.txt
       - name: Run pip-audit
         run: pip-audit -r ${{ matrix.requirements }} --desc
 
   bandit:
     name: Python security lint
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: requirements-security.lock
+          cache-dependency-path: requirements-security.txt
       - name: Install security tools
-        run: python -m pip install -r requirements-security.lock
+        run: python -m pip install -r requirements-security.txt
       - name: Run Bandit
-        run: bandit -r backend/app worker shared
+        run: bandit -r backend/app worker shared -x worker/tests -ll -ii
 
   npm-audit:
     name: Frontend dependency audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:

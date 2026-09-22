@@ -8,8 +8,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from worker.chemistry import sqd_solver
-from worker.chemistry.sqd_solver import (
+from worker.adapters.result_adapter import normalize_result
+from worker.chemistry.algorithms.sqd import sampling_execution as sqd_sampling_execution
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
+from worker.chemistry.algorithms.sqd.workflow import (
     _aggregate_bitstring_frequencies,
     _build_hf_reference_circuit,
     _build_sqd_circuit_artifacts,
@@ -17,6 +19,7 @@ from worker.chemistry.sqd_solver import (
     _selected_ci_strings_from_bitstrings,
     _serialize_circuit_preview,
 )
+from worker.jobs.control_state import RunCancelled, RunPaused
 
 CONFIGURATION_RECOVERY_MODULE = "qiskit_addon_sqd.configuration_recovery"
 FERMION_MODULE = "qiskit_addon_sqd.fermion"
@@ -107,6 +110,18 @@ def test_build_sqd_circuit_artifacts_downsamples_rich_previews() -> None:
     assert artifacts[1]["downsampling"]["policy"] == policy["name"]
     assert artifacts[2]["preview"]["diagram_svg"]
     assert artifacts[2]["representative"] is True
+
+
+def test_build_sqd_circuit_artifacts_marks_reused_measurement_representative() -> None:
+    circuit = _build_hf_reference_circuit(4, num_elec_a=1, num_elec_b=1)
+
+    artifacts, policy = _build_sqd_circuit_artifacts([(1, circuit)], total_iterations=3)
+
+    assert len(artifacts) == 1
+    assert artifacts[0]["iteration"] == 1
+    assert artifacts[0]["representative"] is True
+    assert policy["stored_iterations"] == [1]
+    assert policy["dropped_iterations"] == [2, 3]
 
 
 def test_build_sqd_circuit_artifacts_windows_large_iteration_sets() -> None:
@@ -251,22 +266,56 @@ def test_sample_bitstring_matrix_uses_supplied_circuit_factory() -> None:
     assert any(instruction.operation.name == "measure" for instruction in circuit.data)
 
 
-def test_sample_bitstring_matrix_propagates_run_cancellation_without_retry() -> None:
-    class _RunCancelled(RuntimeError):
-        pass
+@pytest.mark.parametrize("measurement_map", [((0, 0),), ((0, 0), (1, 1), (2, 3), (3, 2))])
+def test_sample_bitstring_matrix_rejects_incomplete_or_remapped_measurements(
+    measurement_map: tuple[tuple[int, int], ...],
+) -> None:
+    from qiskit import QuantumCircuit
 
-    class _CancellingSampler:
+    class _Sampler:
+        calls = 0
+
+        def run(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            raise AssertionError("invalid measurement circuits must fail before submission")
+
+    def factory(*, num_bits: int, num_elec_a: int, num_elec_b: int, rng: object) -> QuantumCircuit:
+        del num_elec_a, num_elec_b, rng
+        circuit = QuantumCircuit(num_bits, num_bits)
+        circuit.x(3)
+        for qubit, clbit in measurement_map:
+            circuit.measure(qubit, clbit)
+        return circuit
+
+    sampler = _Sampler()
+    with pytest.raises(ValueError, match="measure every qubit|map each qubit"):
+        _sample_bitstring_matrix(
+            sampler,
+            num_bits=4,
+            total_samples=8,
+            num_elec_a=1,
+            num_elec_b=1,
+            sampling_circuit_factory=factory,
+        )
+
+    assert sampler.calls == 0
+
+
+@pytest.mark.parametrize("control_exception", [RunCancelled, RunPaused])
+def test_sample_bitstring_matrix_propagates_run_control_without_retry(control_exception) -> None:
+    class _ControllingSampler:
         def __init__(self) -> None:
             self.calls = 0
 
         def run(self, *args, **kwargs):
             del args, kwargs
             self.calls += 1
-            raise _RunCancelled("cancelled during sampler submission")
+            raise control_exception("run stopped during sampler submission")
 
-    sampler = _CancellingSampler()
+    sampler = _ControllingSampler()
 
-    with pytest.raises(_RunCancelled, match="cancelled during sampler submission"):
+    with pytest.raises(control_exception, match="run stopped during sampler submission"):
         _sample_bitstring_matrix(
             sampler,
             num_bits=4,
@@ -276,6 +325,171 @@ def test_sample_bitstring_matrix_propagates_run_cancellation_without_retry() -> 
         )
 
     assert sampler.calls == 1
+
+
+def test_sample_bitstring_matrix_records_retry_work(monkeypatch) -> None:
+    class _Sampler:
+        def __init__(self) -> None:
+            self.shots: list[int] = []
+
+        def run(self, *args, **kwargs):
+            del args
+            self.shots.append(kwargs["shots"])
+            if len(self.shots) == 1:
+                raise RuntimeError("transient sampler failure")
+            return SimpleNamespace(result=lambda: object())
+
+    monkeypatch.setattr(
+        sqd_sampling_execution,
+        "extract_sampler_bitstrings",
+        lambda _result: ["0000", "0000"],
+    )
+    sampler = _Sampler()
+    ledger: dict[str, int] = {}
+
+    matrix = _sample_bitstring_matrix(
+        sampler,
+        num_bits=4,
+        total_samples=8,
+        num_elec_a=0,
+        num_elec_b=0,
+        work_ledger=ledger,
+    )
+
+    assert matrix.shape == (2, 4)
+    assert sampler.shots == [8, 16]
+    assert ledger == {
+        "sampler_run_attempts": 2,
+        "sampler_successful_runs": 1,
+        "sampler_retry_count": 1,
+        "sampler_requested_shots_total": 24,
+        "sampler_returned_raw_sample_rows": 2,
+    }
+
+
+def test_sample_bitstring_matrix_can_retry_without_increasing_requested_shots(
+    monkeypatch,
+) -> None:
+    class _Sampler:
+        def __init__(self) -> None:
+            self.shots: list[int] = []
+
+        def run(self, *args, **kwargs):
+            del args
+            self.shots.append(kwargs["shots"])
+            if len(self.shots) == 1:
+                raise RuntimeError("transient sampler failure")
+            return SimpleNamespace(result=lambda: object())
+
+    monkeypatch.setattr(
+        sqd_sampling_execution,
+        "extract_sampler_bitstrings",
+        lambda _result: ["0000"] * 8,
+    )
+    sampler = _Sampler()
+    ledger: dict[str, int] = {}
+
+    matrix = _sample_bitstring_matrix(
+        sampler,
+        num_bits=4,
+        total_samples=8,
+        work_ledger=ledger,
+        retry_with_increased_shots=False,
+    )
+
+    assert matrix.shape == (8, 4)
+    assert sampler.shots == [8, 8]
+    assert ledger["sampler_retry_count"] == 1
+    assert ledger["sampler_requested_shots_total"] == 16
+
+
+def test_sample_bitstring_matrix_does_not_retry_runtime_result_failure() -> None:
+    class _RuntimeJob:
+        def result(self):
+            raise TimeoutError("runtime result timed out")
+
+    class _RuntimeSampler:
+        allow_sampler_submission_retries = False
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            return _RuntimeJob()
+
+    sampler = _RuntimeSampler()
+    ledger: dict[str, int] = {}
+
+    with pytest.raises(TimeoutError, match="runtime result timed out"):
+        _sample_bitstring_matrix(
+            sampler,
+            num_bits=4,
+            total_samples=8,
+            work_ledger=ledger,
+        )
+
+    assert sampler.calls == 1
+    assert ledger["sampler_run_attempts"] == 1
+    assert ledger["sampler_retry_count"] == 0
+    assert ledger["sampler_requested_shots_total"] == 8
+    assert ledger.get("sampler_successful_runs", 0) == 0
+    assert ledger.get("sampler_returned_raw_sample_rows", 0) == 0
+
+
+def test_sample_bitstring_matrix_does_not_resubmit_unreadable_job_result(monkeypatch) -> None:
+    class _Job:
+        def result(self):
+            return object()
+
+    class _Sampler:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            return _Job()
+
+    monkeypatch.setattr(sqd_sampling_execution, "extract_sampler_bitstrings", lambda _: None)
+    sampler = _Sampler()
+
+    with pytest.raises(RuntimeError, match="returned no measurement bitstrings"):
+        _sample_bitstring_matrix(sampler, num_bits=4, total_samples=8)
+
+    assert sampler.calls == 1
+
+
+def test_sample_bitstring_matrix_does_not_retry_runtime_submission_failure() -> None:
+    class _RuntimeSampler:
+        allow_sampler_submission_retries = False
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            raise TimeoutError("runtime submission outcome is unknown")
+
+    sampler = _RuntimeSampler()
+    ledger: dict[str, int] = {}
+
+    with pytest.raises(TimeoutError, match="runtime submission outcome is unknown"):
+        _sample_bitstring_matrix(
+            sampler,
+            num_bits=4,
+            total_samples=8,
+            work_ledger=ledger,
+        )
+
+    assert sampler.calls == 1
+    assert ledger["sampler_run_attempts"] == 1
+    assert ledger["sampler_retry_count"] == 0
+    assert ledger["sampler_requested_shots_total"] == 8
+    assert ledger.get("sampler_successful_runs", 0) == 0
+    assert ledger.get("sampler_returned_raw_sample_rows", 0) == 0
 
 
 def test_open_shell_selected_ci_strings_preserve_alpha_on_right_half() -> None:
@@ -398,6 +612,8 @@ def test_run_sqd_does_not_converge_on_single_selected_configuration(monkeypatch)
     )
     assert result.sci_result_package["min_selected_configurations"] == 2
     assert result.sci_result_package["sampling_source"] == "provided_circuit"
+    assert result.sci_result_package["work_ledger"]["recovery_iterations"] == 2
+    assert result.sci_result_package["work_ledger"]["selected_ci_batch_solves"] == 2
     assert (
         result.sci_result_package["reference_descriptor"]["preparation_path"]
         == "provided_sampling_circuit"
@@ -414,6 +630,8 @@ def test_run_sqd_reports_best_observed_energy_not_last_iteration(monkeypatch) ->
 
     sampled = np.array([[False, True, False, True]], dtype=bool)
     energies = iter([-1.0, -1.2, -1.1])
+    selected_states = [SimpleNamespace(state_index=index) for index in range(3)]
+    states = iter(selected_states)
 
     monkeypatch.setattr(
         sqd_solver,
@@ -435,7 +653,7 @@ def test_run_sqd_reports_best_observed_energy_not_last_iteration(monkeypatch) ->
         del args, kwargs
         energy = next(energies)
         occupancies = (np.array([0.9, 0.1]), np.array([0.8, 0.2]))
-        return energy, None, occupancies, 0.0
+        return energy, next(states), occupancies, 0.0
 
     monkeypatch.setattr(fermion, "solve_fermion", fake_solve_fermion)
 
@@ -469,6 +687,7 @@ def test_run_sqd_reports_best_observed_energy_not_last_iteration(monkeypatch) ->
     assert result.sci_result_package["best_iteration"] == 2
     assert result.sci_result_package["reported_energy_source"] == "best_observed_sqd_iteration"
     assert result.configuration_recovery_trace[-1]["best_iteration"] == 2
+    assert result.best_sci_state is selected_states[1]
 
 
 def test_run_sqd_passes_invalid_frequency_probabilities_to_recovery(monkeypatch) -> None:
@@ -539,28 +758,31 @@ def test_run_sqd_solves_raw_sector_before_recovering_invalid_rows_and_persists_s
     valid = np.array([False, True, False, True], dtype=bool)
     invalid = np.array([True, True, False, True], dtype=bool)
     recovered = np.array([True, False, False, True], dtype=bool)
-    samples = iter(
-        [
-            np.asarray([valid, valid, valid, invalid], dtype=bool),
-            np.asarray([valid, invalid, invalid, invalid], dtype=bool),
-        ]
-    )
+    samples = np.asarray([valid, valid, valid, invalid], dtype=bool)
+    sample_calls = 0
     events: list[str] = []
     recovery_inputs: list[np.ndarray] = []
     solved_strings: list[tuple[list[int], list[int]]] = []
     occupancies = (np.array([0.8, 0.2]), np.array([0.7, 0.3]))
 
-    monkeypatch.setattr(
-        sqd_solver,
-        "_sample_bitstring_matrix",
-        lambda *args, **kwargs: next(samples),
-    )
+    def fake_sample(*args, **kwargs):
+        nonlocal sample_calls
+        del args
+        sample_calls += 1
+        ledger = kwargs["work_ledger"]
+        ledger["sampler_run_attempts"] += 1
+        ledger["sampler_successful_runs"] += 1
+        ledger["sampler_requested_shots_total"] += kwargs["total_samples"]
+        ledger["sampler_returned_raw_sample_rows"] += int(samples.shape[0])
+        return samples
+
+    monkeypatch.setattr(sqd_solver, "_sample_bitstring_matrix", fake_sample)
 
     def fake_recover(bitstrings, probabilities, **kwargs):
         del kwargs
         events.append("recover")
         recovery_inputs.append(np.asarray(bitstrings, dtype=bool).copy())
-        assert np.asarray(probabilities, dtype=float) == pytest.approx([0.75])
+        assert np.asarray(probabilities, dtype=float) == pytest.approx([0.25])
         return np.asarray([recovered], dtype=bool), np.asarray([1.0])
 
     monkeypatch.setattr(configuration_recovery, "recover_configurations", fake_recover)
@@ -611,6 +833,7 @@ def test_run_sqd_solves_raw_sector_before_recovering_invalid_rows_and_persists_s
     assert events == ["solve", "recover", "solve"]
     assert len(recovery_inputs) == 1
     np.testing.assert_array_equal(recovery_inputs[0], np.asarray([invalid], dtype=bool))
+    assert sample_calls == 1
     assert solved_strings[0] == ([1], [1])
     assert solved_strings[1] == ([1, 2], [1, 2])
 
@@ -632,6 +855,9 @@ def test_run_sqd_solves_raw_sector_before_recovering_invalid_rows_and_persists_s
     assert result.sci_result_package["final_sampling_stages"]["recovered"]
     assert result.sci_result_package["best_sampling_stages"]["raw"]
     assert len(result.sci_result_package["occupation_history"]) == 2
+    assert result.sci_result_package["work_ledger"]["sampler_run_attempts"] == 1
+    assert result.sci_result_package["work_ledger"]["sampler_requested_shots_total"] == 4
+    assert first["raw_bitstring_distribution"] == second["raw_bitstring_distribution"]
 
 
 def test_run_sqd_requires_raw_valid_sector_for_first_solve(monkeypatch) -> None:
@@ -733,10 +959,6 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
         ],
         dtype=bool,
     )
-    recovered_batches = [
-        np.array([[False, True, False, True]], dtype=bool),
-        np.array([[True, False, True, False]], dtype=bool),
-    ]
     batch_occupancies = iter(
         [
             (np.array([0.9, 0.1]), np.array([0.85, 0.15])),
@@ -744,12 +966,26 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
         ]
     )
     batch_energies = iter([-1.2, -0.8])
+    selected_states = [SimpleNamespace(batch_index=index) for index in range(2)]
+    states = iter(selected_states)
+    effective_batch_sizes: list[int] = []
 
     monkeypatch.setattr(
         sqd_solver,
         "_sample_bitstring_matrix",
         lambda *args, **kwargs: sampled,
     )
+
+    def fake_subsample(
+        selected_bits,
+        _selected_probs,
+        samples_per_batch,
+        num_batches,
+        rand_seed,
+    ):
+        del rand_seed
+        effective_batch_sizes.append(samples_per_batch)
+        return [selected_bits[:samples_per_batch].copy() for _ in range(num_batches)]
 
     def fake_import_deps():
         return sqd_solver._SQDDependencies(
@@ -763,13 +999,11 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
             ),
             solve_fermion=lambda *args, **kwargs: (
                 next(batch_energies),
-                None,
+                next(states),
                 next(batch_occupancies),
                 0.0,
             ),
-            subsample=lambda selected_bits, selected_probs, samples_per_batch, num_batches, rand_seed: (
-                recovered_batches
-            ),
+            subsample=fake_subsample,
         )
 
     monkeypatch.setattr(sqd_solver, "_import_sqd_dependencies", fake_import_deps)
@@ -789,7 +1023,7 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
         config={
             "algorithm": "sqd",
             "max_iterations": 1,
-            "samples_per_batch": 2,
+            "samples_per_batch": 8,
             "num_batches": 2,
             "min_selected_configurations": 1,
             "max_dim": 1,
@@ -806,7 +1040,35 @@ def test_run_sqd_uses_average_batch_occupancies_and_best_energy(monkeypatch) -> 
     assert result.sci_result_package["selected_ci"]["exact_sector_solve"] is False
     assert result.sci_result_package["selected_ci"]["selected_ci_regime"] == "partial_sector"
     assert result.sci_result_package["selected_ci"]["selected_determinant_count"] == 1
+    assert (
+        result.sci_result_package["selected_ci"]["solver_convergence_status"]
+        == "not_reported_by_qiskit_addon"
+    )
+    assert result.sci_result_package["selected_ci"]["solver_options"]["max_cycle"] == 50
+    assert result.sci_result_package["selected_ci"]["batch_energy_min"] == pytest.approx(-1.2)
+    assert result.sci_result_package["selected_ci"]["batch_energy_max"] == pytest.approx(-0.8)
+    assert result.sci_result_package["selected_ci"]["batch_energy_spread"] == pytest.approx(0.4)
+    assert result.sci_result_package["selected_ci"]["occupancy_spread_estimator"] == (
+        "per_orbital_standard_deviation_over_batches"
+    )
+    assert result.sci_result_package["selected_ci"]["batch_occupancy_std_alpha"] == pytest.approx(
+        [0.4, 0.4]
+    )
+    assert result.sci_result_package["selected_ci"]["batch_occupancy_std_beta"] == pytest.approx(
+        [0.325, 0.325]
+    )
+    assert result.sci_result_package["convergence_mode"] == "self_consistent_recovery"
+    assert result.sci_result_package["convergence_energy_estimator"] == "best_batch_energy"
     assert result.configuration_recovery_trace[-1]["selected_ci_dimension"] == 1
+    assert result.best_sci_state is selected_states[0]
+    assert effective_batch_sizes == [2]
+    trace = result.configuration_recovery_trace[-1]
+    assert trace["requested_samples_per_batch"] == 8
+    assert trace["effective_samples_per_batch"] == 2
+    serialized_trace = normalize_result(result)["algorithm_metrics"][
+        "configuration_recovery_trace"
+    ][-1]
+    assert serialized_trace["effective_samples_per_batch"] == 2
 
 
 def test_run_sqd_carries_over_high_weight_ci_strings(monkeypatch) -> None:

@@ -102,6 +102,8 @@ export function BenchmarkExecutionSettings({
   selectedBackendName,
   onBackendNameChange,
   ibmBackends,
+  backendCapabilitiesLoading,
+  backendCapabilitiesRefreshing,
   chemicalAccuracyHa,
   chemicalAccuracyTargetOptions = getChemicalAccuracyTargetOptions(undefined),
   onChemicalAccuracyChange,
@@ -121,6 +123,8 @@ export function BenchmarkExecutionSettings({
   selectedBackendName: string | null;
   onBackendNameChange: (backendName: string) => void;
   ibmBackends: readonly BackendDeviceSummary[];
+  backendCapabilitiesLoading: boolean;
+  backendCapabilitiesRefreshing: boolean;
   chemicalAccuracyHa: number;
   chemicalAccuracyTargetOptions?: readonly ChemicalAccuracyTargetOption[];
   onChemicalAccuracyChange: (thresholdHa: number) => void;
@@ -193,6 +197,8 @@ export function BenchmarkExecutionSettings({
           </Label>
           <BenchmarkBackendPicker
             devices={ibmBackends}
+            loading={backendCapabilitiesLoading}
+            refreshing={backendCapabilitiesRefreshing}
             selectedBackendName={selectedBackendName}
             placeholder={
               selectedBackendMode === "aer_simulator_backend_noise"

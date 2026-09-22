@@ -74,6 +74,8 @@ def test_emit_qfd_completion_writes_canonical_event() -> None:
             "relative_residual": 0.002,
             "residual_tolerance": 0.01,
             "termination_reason": "converged",
+            "projected_solver_converged": True,
+            "scientific_converged": None,
             "matrix_element_strategy": "dense",
             "wall_seconds": 1.2346,
         }

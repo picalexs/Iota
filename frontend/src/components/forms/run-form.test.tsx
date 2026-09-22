@@ -27,8 +27,8 @@ describe("RunForm shell", () => {
     vi.mocked(api.fetchRunConfigMetadata).mockReturnValue(
       neverSettles<Awaited<ReturnType<typeof api.fetchRunConfigMetadata>>>(),
     );
-    vi.mocked(api.forceRefreshBackendCapabilities).mockReturnValue(
-      neverSettles<Awaited<ReturnType<typeof api.forceRefreshBackendCapabilities>>>(),
+    vi.mocked(api.fetchBackendCapabilities).mockReturnValue(
+      neverSettles<Awaited<ReturnType<typeof api.fetchBackendCapabilities>>>(),
     );
     renderRunForm();
     expect(screen.getByText("Create Simulation Run")).toBeInTheDocument();
@@ -142,11 +142,31 @@ describe("RunForm shell", () => {
 
     await user.click(noiseToggle);
     expect(
-      screen.getByText(/the run stays local on aer while the noise model mirrors/i),
+      screen.getByText(
+        /the run stays local on aer while the noise model uses a live calibration snapshot/i,
+      ),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /manual/i }));
     expect(await screen.findByRole("combobox", { name: /noise source/i })).toBeInTheDocument();
+  });
+
+  it("shows IBM reference loading state instead of an empty input in a new run", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.fetchBackendCapabilities).mockReturnValue(
+      neverSettles<Awaited<ReturnType<typeof api.fetchBackendCapabilities>>>(),
+    );
+    renderRunForm();
+    await screen.findByText("Create Simulation Run");
+
+    await user.click(getButtonById("backend-option-aer_simulator"));
+    await user.click(screen.getByRole("checkbox", { name: /noise model/i }));
+
+    expect(screen.getByText("Loading IBM reference backends…")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /IBM noise reference/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /refresh noise reference backends/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows IBM credential state from the backend capability API", async () => {

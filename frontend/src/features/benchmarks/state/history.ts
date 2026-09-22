@@ -11,6 +11,7 @@ export type BenchmarkRunHistoryStatus =
   | "running"
   | "paused"
   | "finished"
+  | "partial"
   | "failed"
   | "cancelled"
   | "planned"
@@ -31,6 +32,7 @@ export const BENCHMARK_HISTORY_STATUS_LABELS: Record<BenchmarkRunHistoryStatus, 
   running: "Running",
   paused: "Paused",
   finished: "Completed",
+  partial: "Partial",
   failed: "Failed",
   cancelled: "Cancelled",
   planned: "Planned",
@@ -64,6 +66,12 @@ export function getSavedBenchmarkStatus(run: SavedBenchmarkRun): BenchmarkRunHis
   }
   if (summary.paused > 0) {
     return "paused";
+  }
+  const terminalKinds = [summary.done > 0, summary.failed > 0, summary.cancelled > 0].filter(
+    Boolean,
+  ).length;
+  if (terminalKinds > 1) {
+    return "partial";
   }
   if (summary.total > 0 && summary.done > 0) {
     return "finished";
@@ -150,11 +158,12 @@ const STATUS_SORT_RANK: Record<BenchmarkRunHistoryStatus, number> = {
   running: 0,
   paused: 1,
   finished: 2,
-  failed: 3,
-  cancelled: 4,
-  planned: 5,
-  excluded: 6,
-  draft: 7,
+  partial: 3,
+  failed: 4,
+  cancelled: 5,
+  planned: 6,
+  excluded: 7,
+  draft: 8,
 };
 
 export function sortSavedBenchmarkRuns(

@@ -8,8 +8,8 @@ from worker.chemistry.algorithms.qse.excitations import (
     fermionic_excitation_specs,
     same_spin_count,
 )
+from worker.chemistry.algorithms.qse.workflow import _build_excitation_basis, run_qse
 from worker.chemistry.eigensolver import solve_exact_generalized_eigensystem
-from worker.chemistry.qse_solver import _build_excitation_basis, run_qse
 
 
 class _DenseHamiltonian:

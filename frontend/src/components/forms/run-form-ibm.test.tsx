@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import {
   api,
+  getAlgorithmButton,
   getButtonById,
   notifyIbmCredentialProfilesChanged,
   renderRunForm,
@@ -15,6 +16,65 @@ import type { BackendCapabilitiesResponse } from "./run-form.test-support";
 beforeEach(resetRunFormTestState);
 
 describe("RunForm IBM capability refresh", () => {
+  it("uses Trotter evolution for guided KQD after IBM is selected", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getBackendCapabilitiesCached).mockReturnValue({
+      backends: [
+        { target: "statevector", enabled: true, available: true, supports_noise_profile: false },
+        {
+          target: "aer_simulator",
+          enabled: true,
+          available: true,
+          supports_noise_profile: true,
+          default_backend: "aer_simulator",
+          backends: [
+            {
+              name: "aer_simulator",
+              simulator: true,
+              operational: true,
+              pending_jobs: 0,
+              num_qubits: null,
+              error_rate: 0,
+            },
+          ],
+        },
+        {
+          target: "ibm_runtime",
+          enabled: true,
+          available: true,
+          credential_configured: true,
+          credentials_usable: true,
+          supports_noise_profile: false,
+          default_backend: "ibm_brisbane",
+          backends: [
+            {
+              name: "ibm_brisbane",
+              simulator: false,
+              operational: true,
+              pending_jobs: 1,
+              num_qubits: 127,
+              error_rate: 0.0012,
+            },
+          ],
+        },
+      ],
+    });
+
+    renderRunForm();
+    await screen.findByText("Create Simulation Run");
+
+    const moleculeSelect = screen.getByRole("combobox", { name: /molecule/i });
+    await user.click(moleculeSelect);
+    await user.click(screen.getByRole("option", { name: /H2.*sto-3g/i }));
+    await user.click(getAlgorithmButton("kqd"));
+    await user.click(screen.getByRole("button", { name: /manual/i }));
+    await user.click(getButtonById("backend-option-ibm_runtime"));
+
+    expect(await screen.findByRole("combobox", { name: /evolution method/i })).toHaveTextContent(
+      "trotter",
+    );
+  });
+
   it("uses cached IBM hardware without waiting for an extra form-side validation call", async () => {
     const user = userEvent.setup();
     vi.mocked(api.getBackendCapabilitiesCached).mockReturnValue({
@@ -210,7 +270,7 @@ describe("RunForm IBM capability refresh", () => {
       resolveRefresh = resolve;
     });
     vi.mocked(api.getBackendCapabilitiesCached).mockReturnValue(null);
-    vi.mocked(api.forceRefreshBackendCapabilities).mockReturnValueOnce(refreshPromise);
+    vi.mocked(api.fetchBackendCapabilities).mockReturnValueOnce(refreshPromise);
 
     renderRunForm();
     await screen.findByText("Create Simulation Run");
@@ -273,9 +333,7 @@ describe("RunForm IBM capability refresh", () => {
     await waitFor(() => {
       expect(getButtonById("backend-option-ibm_runtime")).toBeEnabled();
     });
-    expect(getButtonById("backend-option-ibm_runtime")).toHaveTextContent(
-      /1 ibm hardware backend ready/i,
-    );
+    expect(getButtonById("backend-option-ibm_runtime")).toHaveTextContent(/loaded 1 ibm backend/i);
   });
 
   it("refreshes IBM backend choices when the active profile changes while IBM is open", async () => {
@@ -499,7 +557,7 @@ describe("RunForm IBM capability refresh", () => {
     });
 
     expect(getButtonById("backend-option-ibm_runtime")).toHaveTextContent(
-      /refreshing 1 ibm hardware backend/i,
+      /refreshing ibm runtime backends \(1 loaded\)/i,
     );
   });
 });

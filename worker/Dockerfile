@@ -24,9 +24,9 @@ RUN curl -sSfL https://sh.rustup.rs -o /tmp/rustup-init.sh \
 	&& sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain stable \
 	&& rm -f /tmp/rustup-init.sh
 
-COPY worker/requirements.lock .
+COPY worker/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-	python -m pip wheel --wheel-dir /wheels -r requirements.lock
+	python -m pip wheel --wheel-dir /wheels -r requirements.txt
 
 FROM python:3.12-slim AS runtime
 
@@ -46,10 +46,10 @@ RUN apt-get update \
 		libopenblas0-pthread \
 	&& rm -rf /var/lib/apt/lists/*
 
-COPY worker/requirements.lock .
+COPY worker/requirements.txt .
 COPY shared /app/shared
 COPY --from=builder /wheels /wheels
-RUN python -m pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.lock \
+RUN python -m pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
 	&& rm -rf /wheels
 
 COPY worker/. /app/worker

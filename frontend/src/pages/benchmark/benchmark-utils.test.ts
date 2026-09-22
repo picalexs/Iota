@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchMolecules, createMolecule, getMolecule, updateMolecule } from "@/api/molecules";
 import { createRun } from "@/api/runs";
 import type { MoleculePreset } from "@/lib/benchmark-presets";
+import type { RunExecutionMetadata } from "@/lib/results/execution-metadata";
 import type { BackendCapability, RunResponse } from "@/types/run";
 import {
   acquireMoleculeId,
@@ -10,9 +11,11 @@ import {
   filterBenchmarkRows,
   getBenchmarkBackendOptions,
   getBenchmarkAlgorithmBlockers,
+  getBenchmarkEligibility,
   getBenchmarkIbmBackends,
   getBenchmarkMoleculeBlocker,
   getBenchmarkStats,
+  assessBenchmarkEntry,
   normalizeStoredEntry,
   QUEUED_POLL_INTERVAL_MS,
   RUNNING_POLL_INTERVAL_MS,
@@ -72,9 +75,34 @@ function makeEntry(overrides: Partial<BenchmarkEntry>): BenchmarkEntry {
     currentEnergy: -1.1372,
     converged: true,
     errorMessage: null,
-    classicalRefs: null,
+    classicalRefs: { hf: -1.116, fci: -1.137 },
     elapsedSeconds: null,
     latestEventSequence: 0,
+    ...overrides,
+  };
+}
+
+function makeExecutionMetadata(overrides: Partial<RunExecutionMetadata> = {}): RunExecutionMetadata {
+  return {
+    backendName: null,
+    selectionPolicy: null,
+    shots: null,
+    optimizationLevel: null,
+    aerMethod: null,
+    simulatorMethod: null,
+    primitiveFamily: null,
+    qubits: null,
+    depth: null,
+    twoQubitDepth: null,
+    seedSimulator: null,
+    seedTranspiler: null,
+    ibmJobId: null,
+    ibmStatus: null,
+    ibmQueuePosition: null,
+    ibmPubCount: null,
+    ibmTiming: null,
+    transpilationLayout: [],
+    usedPhysicalQubits: [],
     ...overrides,
   };
 }
@@ -325,16 +353,60 @@ describe("benchmark molecule utilities", () => {
         algorithm: "kqd",
         preset: { ...preset, key: "custom", references: { hf: 0, fci: null, source: "test" } },
         energy: -1.12,
+        classicalRefs: null,
       }),
       makeEntry({ id: "not-converged", algorithm: "sqd", energy: -1.1371, converged: false }),
     ];
 
     expect(getBenchmarkStats(entries, 0.0016)).toMatchObject({
-      accurate: 2,
+      accurate: 1,
       notAccurate: 1,
-      unscored: 1,
+      unscored: 2,
       notConverged: 1,
     });
+  });
+
+  it("does not score projected diagnostics as benchmark results", () => {
+    const entry = makeEntry({
+      algorithm: "kqd",
+      executionMetadata: makeExecutionMetadata({
+        reportedEnergyIsValid: true,
+        projectedSolveIsDiagnostic: true,
+        scientificConverged: false,
+      }),
+    });
+
+    expect(getBenchmarkEligibility(entry)).toEqual({
+      eligible: false,
+      reason: "projected_solve_diagnostic",
+    });
+    expect(assessBenchmarkEntry(entry, 0.0016).isScorable).toBe(false);
+  });
+
+  it("does not score scientifically unconverged results", () => {
+    const entry = makeEntry({
+      executionMetadata: makeExecutionMetadata({
+        reportedEnergyIsValid: true,
+        projectedSolveIsDiagnostic: false,
+        scientificConverged: false,
+      }),
+    });
+
+    expect(getBenchmarkEligibility(entry)).toEqual({
+      eligible: false,
+      reason: "scientific_convergence_not_established",
+    });
+    expect(assessBenchmarkEntry(entry, 0.0016).verdict).toBe("unscored");
+  });
+
+  it("does not fall back to a preset reference for a completed row", () => {
+    const entry = makeEntry({ classicalRefs: null });
+
+    expect(getBenchmarkEligibility(entry)).toEqual({
+      eligible: false,
+      reason: "reference_provenance_unavailable",
+    });
+    expect(assessBenchmarkEntry(entry, 0.0016).isScorable).toBe(false);
   });
 
   it("filters and sorts benchmark rows by verdict and absolute error", () => {
@@ -345,6 +417,7 @@ describe("benchmark molecule utilities", () => {
       algorithm: "kqd",
       preset: { ...preset, key: "custom", references: { hf: 0, fci: null, source: "test" } },
       energy: -1.12,
+      classicalRefs: null,
     });
 
     expect(filterBenchmarkRows([accurate, inaccurate, unscored], 0.0016, "accurate")).toEqual([

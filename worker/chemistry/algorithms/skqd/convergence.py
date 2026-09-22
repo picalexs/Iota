@@ -3,14 +3,15 @@
 The published SKQD algorithm (Yu, Robledo-Moreno et al., arXiv:2501.09702,
 Theorem 1) approximates the ground state once all ``L`` important bitstrings
 have been sampled into the subspace. In a sample-based run there is no explicit
-residual to test, so the practical convergence signal is *subspace saturation*:
+residual to test, so the useful diagnostic signal is *subspace saturation*:
 adding the final Krylov state's samples no longer expands the valid-sector
 determinant union, and the classical diagonalization used that entire union
 (no selected-CI cap dropped determinants).
 
 This module derives that verdict from the prefix diagnostics and the
-selected-CI summary that the workflow already produces, so the sample-union
-result stops reporting a hardcoded ``converged=False``.
+selected-CI summary that the workflow already produces. Saturation remains a
+diagnostic until full-sector coverage or another validated statistical test
+establishes scientific convergence.
 """
 
 from __future__ import annotations
@@ -27,9 +28,9 @@ def evaluate_sample_union_convergence(
 ) -> dict[str, Any]:
     """Return a subspace-saturation convergence verdict for a sample union.
 
-    ``converged`` is True when the sampled determinant union has saturated and
-    the diagonalization spans that entire union, or when the union already
-    covers the full CI sector. The returned diagnostics explain the verdict.
+    ``converged`` is True only when the union covers the full CI sector. A
+    saturated sampled subspace is reported separately because a plateau in a
+    partial sector does not establish scientific convergence.
     """
     krylov_states = len(prefix_summaries)
     postselected = int(selected_ci_summary.get("postselected_union_determinants", 0))
@@ -51,9 +52,11 @@ def evaluate_sample_union_convergence(
         growth_delta = final_space - previous_space
         saturated = final_space > 0 and growth_delta == 0
 
-    converged = bool(full_sector or (saturated and complete_solve))
-    if converged:
-        status = "subspace_saturated" if not full_sector else "full_sector_recovered"
+    converged = bool(full_sector)
+    if full_sector:
+        status = "full_sector_recovered"
+    elif saturated and complete_solve:
+        status = "subspace_saturated"
     elif krylov_states < 2 and not full_sector:
         status = "sampling_convergence_not_established_single_state"
     else:
@@ -70,9 +73,7 @@ def evaluate_sample_union_convergence(
         "postselected_union_determinants": postselected,
         "selected_union_determinants": selected,
         "selected_ci_fraction": selected_ci_fraction,
-        "convergence_criterion": (
-            "krylov_subspace_saturation_and_complete_selected_ci_solve"
-        ),
+        "convergence_criterion": "full_ci_sector_recovery",
     }
 
 

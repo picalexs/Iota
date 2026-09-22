@@ -147,7 +147,7 @@ def test_public_catalog_is_complete_and_defensive():
     catalog["recommendations"]["qse"]["balanced"]["max_subspace_dim"] = 1
     fresh_catalog = get_public_catalog()
     assert fresh_catalog["limits"] == PUBLIC_LIMITS
-    assert fresh_catalog["defaults"]["ansatz_name"] == "EfficientSU2"
+    assert fresh_catalog["defaults"]["ansatz_name"] == "NumberPreserving"
     assert fresh_catalog["recommendations"]["qse"]["balanced"]["max_subspace_dim"] == 8
 
 

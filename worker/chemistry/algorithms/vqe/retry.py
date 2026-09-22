@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
@@ -58,6 +59,20 @@ def warm_start_retry_indices(
     return [index for index in ordered_indices if index != selected_index]
 
 
+def _iteration_count(diagnostics: dict[str, Any]) -> int | None:
+    value = diagnostics.get("optimizer_iterations")
+    if isinstance(value, (int, np.integer)) and not isinstance(value, bool) and value >= 0:
+        return int(value)
+    return None
+
+
+def _optimizer_with_iteration_limit(optimizer: Any, iteration_limit: int) -> Any:
+    """Return an optimizer config capped to one retry's remaining budget."""
+    options = dict(getattr(optimizer, "options", None) or {})
+    options["maxiter"] = iteration_limit
+    return replace(optimizer, max_iterations=iteration_limit, options=options)
+
+
 def retry_stationary_warm_start(
     *,
     objective: Any,
@@ -72,14 +87,45 @@ def retry_stationary_warm_start(
 ) -> OptimizerResult:
     """Retry alternate warm starts until one improves the observed energy."""
     optimal_point, final_energy, iterations, converged, retry_diagnostics = current_result
+    selected_optimizer_iterations = _iteration_count(retry_diagnostics)
+    iteration_counts: list[int | None] = [selected_optimizer_iterations]
+    raw_iteration_budget = getattr(optimizer, "max_iterations", None)
+    iteration_budget = (
+        int(raw_iteration_budget)
+        if isinstance(raw_iteration_budget, (int, np.integer))
+        and not isinstance(raw_iteration_budget, bool)
+        and raw_iteration_budget > 0
+        else None
+    )
     retry_attempted_indices: list[int] = []
     retry_selected_index: int | None = None
+    last_retry_termination_reason: str | None = None
     for retry_index in warm_start_retry_indices(
         candidate_points=candidate_points,
         selected_initial_diagnostics=selected_initial_diagnostics,
     ):
+        if any(count is None for count in iteration_counts):
+            last_retry_termination_reason = "optimizer_iteration_count_unavailable"
+            break
+        total_before_retry = sum(int(count) for count in iteration_counts)
+        remaining_iterations = (
+            iteration_budget - total_before_retry if iteration_budget is not None else None
+        )
+        if remaining_iterations is not None and remaining_iterations <= 0:
+            last_retry_termination_reason = "max_iterations"
+            break
         retry_attempted_indices.append(retry_index)
         best_energy_before_retry = objective.best_energy
+        retry_optimizer = (
+            _optimizer_with_iteration_limit(optimizer, remaining_iterations)
+            if remaining_iterations is not None
+            else optimizer
+        )
+        retry_optimizer_diagnostics = {
+            **optimizer_diagnostics,
+            "optimizer_iteration_budget": iteration_budget,
+            "optimizer_attempt_max_iterations": remaining_iterations,
+        }
         (
             retry_optimal_point,
             retry_final_energy,
@@ -89,30 +135,70 @@ def retry_stationary_warm_start(
         ) = run_optimizer_fn(
             objective=objective,
             initial_point=candidate_points[retry_index],
-            optimizer=optimizer,
-            optimizer_diagnostics=optimizer_diagnostics,
+            optimizer=retry_optimizer,
+            optimizer_diagnostics=retry_optimizer_diagnostics,
             convergence_trace=convergence_trace,
             parameter_bounds=parameter_bounds,
             best_point_getter=lambda: objective.best_point,
             best_energy_getter=lambda: objective.best_energy,
         )
+        retry_iterations_used = _iteration_count(retry_result_diagnostics)
+        iteration_counts.append(retry_iterations_used)
+        last_retry_termination_reason = retry_result_diagnostics.get("termination_reason")
         best_energy_after_retry = objective.best_energy
-        if (
+        improved = not (
             best_energy_before_retry is None
             or best_energy_after_retry is None
             or best_energy_after_retry >= best_energy_before_retry - _WARM_START_RETRY_TOLERANCE
-        ):
+        )
+        if not improved:
+            if retry_iterations_used is None:
+                last_retry_termination_reason = "optimizer_iteration_count_unavailable"
+                break
+            if last_retry_termination_reason == "max_function_evaluations":
+                break
             continue
         optimal_point = retry_optimal_point
         final_energy = retry_final_energy
         iterations = retry_iterations
         converged = retry_converged
         retry_diagnostics = retry_result_diagnostics
+        selected_optimizer_iterations = retry_iterations_used
         retry_selected_index = retry_index
         break
 
+    known_iterations = [count for count in iteration_counts if count is not None]
+    total_iterations = (
+        sum(known_iterations) if len(known_iterations) == len(iteration_counts) else None
+    )
+    terminal_iteration_reason = (
+        "max_function_evaluations"
+        if last_retry_termination_reason == "max_function_evaluations"
+        else "optimizer_iteration_count_unavailable"
+        if last_retry_termination_reason == "optimizer_iteration_count_unavailable"
+        else "max_iterations"
+        if iteration_budget is not None
+        and total_iterations is not None
+        and total_iterations >= iteration_budget
+        else "stationary_initial_point"
+    )
     retry_diagnostics = {
         **retry_diagnostics,
+        "optimizer_iterations": total_iterations,
+        "optimizer_iterations_total": total_iterations,
+        "optimizer_iterations_by_attempt": iteration_counts,
+        "selected_optimizer_iterations": selected_optimizer_iterations,
+        "optimizer_iteration_budget": iteration_budget,
+        "effective_max_iterations": (
+            iteration_budget
+            if iteration_budget is not None
+            else retry_diagnostics.get("effective_max_iterations")
+        ),
+        "effective_optimizer_max_iterations": (
+            iteration_budget
+            if iteration_budget is not None
+            else retry_diagnostics.get("effective_optimizer_max_iterations")
+        ),
         "warm_start_retry_reason": "stationary_zero_candidate",
         "warm_start_retry_count": len(retry_attempted_indices),
         "warm_start_retry_attempted_indices": retry_attempted_indices,
@@ -124,10 +210,10 @@ def retry_stationary_warm_start(
     retry_diagnostics = {
         **retry_diagnostics,
         "success": False,
-        "termination_reason": "stationary_initial_point",
+        "termination_reason": terminal_iteration_reason,
         "message": (
-            "Gradient-based VQE stopped at the selected zero warm-start "
-            "candidate without improving any alternate warm start."
+            "Gradient-based VQE stopped without an alternate start that improved "
+            "the observed energy."
         ),
     }
     return optimal_point, final_energy, iterations, False, retry_diagnostics
@@ -167,6 +253,19 @@ def run_scipy_vqe_with_retry(
         optimizer_diagnostics=retry_diagnostics,
     ):
         return result
+
+    if _iteration_count(retry_diagnostics) is None:
+        retry_diagnostics = {
+            **retry_diagnostics,
+            "success": False,
+            "termination_reason": "optimizer_iteration_count_unavailable",
+            "warm_start_retry_reason": "stationary_zero_candidate",
+            "warm_start_retry_count": 0,
+            "warm_start_retry_attempted_indices": [],
+            "warm_start_retry_selected_index": None,
+            "warm_start_retry_skipped_reason": "optimizer_iteration_count_unavailable",
+        }
+        return optimal_point, final_energy, iterations, False, retry_diagnostics
 
     return retry_fn(
         objective=objective,

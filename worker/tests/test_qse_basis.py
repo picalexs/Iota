@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from worker.chemistry import qse_solver
-from worker.chemistry.algorithms.qse.basis import accept_basis_candidate, build_excitation_basis
+from worker.chemistry.algorithms.qse.basis import (
+    accept_basis_candidate,
+    build_basis_selection_summary,
+    build_excitation_basis,
+)
 
 
 def test_accept_basis_candidate_normalizes_and_reports_independence() -> None:
@@ -49,10 +52,6 @@ def test_accept_basis_candidate_rejects_zero_and_dependent_vectors() -> None:
     assert len(basis) == 1
 
 
-def test_qse_solver_keeps_legacy_basis_alias() -> None:
-    assert qse_solver._accept_basis_candidate is accept_basis_candidate
-
-
 def test_build_excitation_basis_emits_basis_progress() -> None:
     events: list[dict[str, object]] = []
     reference = np.zeros(16, dtype=complex)
@@ -72,3 +71,16 @@ def test_build_excitation_basis_emits_basis_progress() -> None:
     assert events[0]["step"] == "build_basis"
     assert events[0]["completed_iterations"] == 1
     assert events[0]["excitation_kind"] == "reference"
+
+
+def test_basis_selection_summary_distinguishes_exhausted_pool() -> None:
+    summary = build_basis_selection_summary(
+        [("reference", (), ())],
+        candidate_selection_policy="fermionic_generator_order",
+        excitation_level="singles",
+        dimension_cap=2,
+        actual_dimension=1,
+    )
+
+    assert summary["dimension_cap_reached"] is False
+    assert summary["basis_termination_reason"] == "candidate_pool_exhausted"

@@ -9,9 +9,10 @@ from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 
 from worker.adapters.base import BackendExecutionContext
-from worker.chemistry import qfd_solver
+from worker.chemistry.algorithms.qfd import workflow as qfd_solver
+from worker.chemistry.algorithms.qfd.definition import ALGORITHM_DEFINITION
 from worker.chemistry.eigensolver import StabilizedGeneralizedEigenproblemResult
-from worker.chemistry.qfd_solver import _projected_matrix_converged
+from worker.chemistry.projected_subspace import projected_matrix_converged
 from worker.jobs.dispatcher import dispatch_algorithm
 
 
@@ -149,16 +150,19 @@ def test_run_qfd_original_symmetric_persists_grid_provenance() -> None:
                 "num_time_points": 3,
                 "max_time": 1.0,
                 "time_grid_type": "linear",
-                "kappa": 2.0,
+                "kappa": 2.1,
             },
         },
     )
 
     assert result.conditioning_summary["qfd_variant"] == "qfd_original_symmetric"
-    assert result.conditioning_summary["kappa"] == pytest.approx(2.0)
+    assert result.conditioning_summary["kappa"] == pytest.approx(2.1)
     assert result.conditioning_summary["time_grid_values"] == pytest.approx(
-        [-np.pi, 0.0, np.pi]
+        [-2.0 * np.pi / 2.1, 0.0, 2.0 * np.pi / 2.1]
     )
+    assert result.conditioning_summary["spectral_width_bound"] == pytest.approx(2.0)
+    assert result.conditioning_summary["kappa_safety_margin"] == pytest.approx(0.02)
+    assert result.conditioning_summary["kappa_source"] == "user_supplied"
     assert len(result.conditioning_summary["time_grid_hash"]) == 64
     assert result.stability_summary["termination_reason"] in {
         "converged",
@@ -167,6 +171,68 @@ def test_run_qfd_original_symmetric_persists_grid_provenance() -> None:
         "projected_metric_not_positive_definite",
         "projected_metric_unstable",
     }
+
+
+def test_run_qfd_original_symmetric_derives_kappa_from_exact_spectrum() -> None:
+    result = qfd_solver.run_qfd(
+        hamiltonian=_single_qubit_x_hamiltonian(),
+        backend=None,
+        config={
+            "algorithm": "qfd",
+            "advanced_config": {
+                "algorithm": "qfd",
+                "qfd_variant": "qfd_original_symmetric",
+                "num_time_points": 3,
+            },
+        },
+    )
+
+    assert result.conditioning_summary["spectral_width_bound"] == pytest.approx(2.0)
+    assert result.conditioning_summary["kappa"] == pytest.approx(2.02)
+    assert result.conditioning_summary["kappa_source"] == "automatic_exact_dense_spectrum"
+    assert result.conditioning_summary["time_grid_values"] != pytest.approx(
+        [-2.0 * np.pi, 0.0, 2.0 * np.pi]
+    )
+
+
+def test_run_qfd_original_symmetric_uses_conservative_pauli_bound_on_branch_path() -> None:
+    result = qfd_solver.run_qfd(
+        hamiltonian=_single_qubit_x_hamiltonian(),
+        backend=StatevectorEstimator(),
+        config={
+            "algorithm": "qfd",
+            "advanced_config": {
+                "algorithm": "qfd",
+                "qfd_variant": "qfd_original_symmetric",
+                "num_time_points": 3,
+            },
+        },
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime"),
+    )
+
+    assert result.matrix_element_summary["matrix_element_strategy"] == "branch_estimator"
+    assert result.conditioning_summary["spectral_width_bound"] == pytest.approx(2.0)
+    assert result.conditioning_summary["kappa"] == pytest.approx(2.02)
+    assert result.conditioning_summary["kappa_source"] == (
+        "automatic_pauli_l1_conservative_bound"
+    )
+
+
+def test_run_qfd_original_symmetric_rejects_undersized_kappa() -> None:
+    with pytest.raises(ValueError, match="spectral-width bound plus overage"):
+        qfd_solver.run_qfd(
+            hamiltonian=_single_qubit_x_hamiltonian(),
+            backend=None,
+            config={
+                "algorithm": "qfd",
+                "advanced_config": {
+                    "algorithm": "qfd",
+                    "qfd_variant": "qfd_original_symmetric",
+                    "num_time_points": 3,
+                    "kappa": 2.0,
+                },
+            },
+        )
 
 
 def test_qfd_sector_states_match_dense_sector_matrix() -> None:
@@ -387,7 +453,7 @@ def test_run_qfd_does_not_mark_singular_dense_projection_converged(
     )
 
     assert result.converged is False
-    assert result.stability_summary["stability_state"] == "invalid"
+    assert result.stability_summary["stability_state"] == "stabilized"
 
 
 def test_run_qfd_ibm_context_uses_estimator_matrix_elements() -> None:
@@ -417,11 +483,54 @@ def test_run_qfd_ibm_context_uses_estimator_matrix_elements() -> None:
         "computational_basis_fallback"
     )
     assert result.matrix_element_summary["reference_descriptor"]["state_fingerprint"]
-    assert result.matrix_element_summary["residual_kind"] == "projected_generalized_eigenpair"
+    assert result.matrix_element_summary["residual_kind"] == "projected_gevp_equation"
+    assert result.converged is False
+    assert result.matrix_element_summary["projected_solver_converged"] is True
     assert result.conditioning_summary["relative_ritz_residual"] >= 0.0
     assert result.stability_summary["stability_state"] in {"stable", "stabilized"}
     assert result.raw_filter_eigenvalues
     assert events[-1]["time_evolution_backend"] == "hardware_branch_estimator"
+    assert events[-1]["scientific_converged"] is None
+    assert events[-1]["termination_reason"] == "full_space_residual_unavailable"
+
+
+def test_run_qfd_branch_path_uses_supported_default_time_points() -> None:
+    result = qfd_solver.run_qfd(
+        hamiltonian=_single_qubit_x_hamiltonian(),
+        backend=StatevectorEstimator(),
+        config={"algorithm": "qfd", "advanced_config": {"algorithm": "qfd"}},
+        backend_context=BackendExecutionContext(backend_target="ibm_runtime"),
+    )
+
+    assert result.primary_iterations == 7
+    assert result.matrix_element_summary["projected_dimension"] == 7
+
+
+def test_qfd_rejects_unsupported_branch_dimension_before_primitive_creation() -> None:
+    class _Backend:
+        create_calls = 0
+
+        def create_estimator(self, _context):
+            self.create_calls += 1
+            raise AssertionError("invalid configuration must fail before primitive creation")
+
+    backend = _Backend()
+    with pytest.raises(ValueError, match="supports at most 8 time points"):
+        ALGORITHM_DEFINITION.runner(
+            backend,
+            {
+                "algorithm": "qfd",
+                "advanced_config": {
+                    "algorithm": "qfd",
+                    "num_time_points": 9,
+                },
+            },
+            _single_qubit_x_hamiltonian(),
+            None,
+            BackendExecutionContext(backend_target="ibm_runtime"),
+        )
+
+    assert backend.create_calls == 0
 
 
 def test_run_qfd_returns_stabilized_noisy_projected_solve_as_diagnostic(
@@ -486,21 +595,21 @@ def test_run_qfd_returns_stabilized_noisy_projected_solve_as_diagnostic(
 
 
 def test_projected_matrix_converged_requires_stable_overlap_gate() -> None:
-    assert _projected_matrix_converged(
+    assert projected_matrix_converged(
         {
             "stability_state": "stable",
             "overlap_condition": 128.0,
             "overlap_min_eigenvalue": 1e-3,
         }
     )
-    assert not _projected_matrix_converged(
+    assert not projected_matrix_converged(
         {
             "stability_state": "stabilized",
             "overlap_condition": 128.0,
             "overlap_min_eigenvalue": 1e-3,
         }
     )
-    assert not _projected_matrix_converged(
+    assert not projected_matrix_converged(
         {
             "stability_state": "stable",
             "overlap_condition": 128.0,
@@ -571,6 +680,12 @@ def test_run_qfd_aer_state_propagation_matches_statevector() -> None:
     assert aer_result.conditioning_summary["time_points"] == pytest.approx(2.0)
     assert aer_result.matrix_element_summary["matrix_element_strategy"] == "dense_classical"
     assert aer_result.matrix_element_summary["projected_dimension"] == 2
+    assert aer_result.matrix_element_summary["implemented_evolution_method"] == (
+        "aer_pauli_lie_trotter"
+    )
+    assert aer_result.matrix_element_summary["reference_descriptor"]["execution_mode"] == (
+        "aer_pauli_lie_trotter"
+    )
     assert aer_result.matrix_element_summary["timing_breakdown"]["total_seconds"] >= 0.0
 
 
@@ -594,6 +709,40 @@ def test_run_qfd_rejects_empty_dense_spectrum(monkeypatch: pytest.MonkeyPatch) -
                 },
             },
         )
+
+
+def test_original_qfd_records_requested_and_applied_grid_parameters() -> None:
+    result = qfd_solver.run_qfd(
+        hamiltonian=_single_qubit_x_hamiltonian(),
+        backend=None,
+        config={
+            "algorithm": "qfd",
+            "advanced_config": {
+                "algorithm": "qfd",
+                "qfd_variant": "qfd_original_symmetric",
+                "num_time_points": 3,
+                "max_time": 0.25,
+                "time_grid_type": "geometric",
+                "kappa": 3.0,
+            },
+        },
+    )
+
+    summary = result.matrix_element_summary
+    assert summary["requested_grid_parameters"] == {
+        "num_time_points": 3,
+        "max_time": 0.25,
+        "time_grid_type": "geometric",
+        "kappa": 3.0,
+    }
+    assert summary["applied_grid_parameters"] == {
+        "num_time_points": 3,
+        "max_time": None,
+        "time_grid_type": "symmetric_kappa",
+        "kappa": 3.0,
+    }
+    assert summary["inactive_requested_grid_fields"] == ["max_time", "time_grid_type"]
+    assert summary["time_grid_type"] == "symmetric_kappa"
 
 
 def test_run_qfd_small_noisy_aer_uses_estimator_matrix_elements(

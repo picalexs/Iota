@@ -10,6 +10,7 @@
     "src/lib/app-logger.ts",
     "src/lib/benchmark-presets.ts",
     "src/lib/ibm-profile-events.ts",
+    "src/lib/results/execution-metadata.ts",
     "src/vite-env.d.ts"
   ]
 }

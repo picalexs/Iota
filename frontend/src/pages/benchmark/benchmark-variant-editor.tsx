@@ -30,6 +30,7 @@ import {
 interface BenchmarkVariantEditorProps {
   variant: BenchmarkAlgorithmVariant;
   chemicalAccuracyHa: number;
+  requiresBranchEstimator: boolean;
   disabled?: boolean;
   autoCollapse?: boolean;
   onChange: (variant: BenchmarkAlgorithmVariant) => void;
@@ -108,10 +109,12 @@ function BenchmarkVariantModeToggle({
 function BenchmarkVariantAlgorithmPanel({
   algorithm,
   metadata,
+  requiresBranchEstimator,
   onResetRecommended,
 }: Readonly<{
   algorithm: RunAlgorithm;
   metadata: RunConfigMetadataResponse | null;
+  requiresBranchEstimator: boolean;
   onResetRecommended: () => void;
 }>) {
   switch (algorithm) {
@@ -120,7 +123,12 @@ function BenchmarkVariantAlgorithmPanel({
     case "sqd":
       return <SQDPanel onResetRecommended={onResetRecommended} />;
     case "kqd":
-      return <KQDPanel onResetRecommended={onResetRecommended} />;
+      return (
+        <KQDPanel
+          requiresBranchEstimator={requiresBranchEstimator}
+          onResetRecommended={onResetRecommended}
+        />
+      );
     case "qfd":
       return <QFDPanel onResetRecommended={onResetRecommended} />;
     case "qse":
@@ -133,6 +141,7 @@ function BenchmarkVariantAlgorithmPanel({
 export function BenchmarkVariantEditor({
   variant,
   chemicalAccuracyHa,
+  requiresBranchEstimator,
   disabled = false,
   autoCollapse = false,
   onChange,
@@ -232,7 +241,12 @@ export function BenchmarkVariantEditor({
 
   function handleResetRecommended() {
     const nextValues = buildBenchmarkVariantFormValues(
-      createAdvancedBenchmarkVariant(variant.algorithm, chemicalAccuracyHa, configMetadata),
+      createAdvancedBenchmarkVariant(
+        variant.algorithm,
+        chemicalAccuracyHa,
+        configMetadata,
+        requiresBranchEstimator,
+      ),
     );
     nextValues.mode = "advanced";
     form.reset(nextValues);
@@ -329,9 +343,6 @@ export function BenchmarkVariantEditor({
               <div className="space-y-3">
                 <div>
                   <p className="text-sm font-semibold">Guided preset</p>
-                  <p className="text-xs text-muted-foreground">
-                    This row stays compact and uses the shared easy-mode preset family.
-                  </p>
                 </div>
                 <EasyGoalSlider id={`benchmark-variant-easy-${variant.id}`} disabled={disabled} />
               </div>
@@ -340,6 +351,7 @@ export function BenchmarkVariantEditor({
                 <BenchmarkVariantAlgorithmPanel
                   algorithm={variant.algorithm}
                   metadata={configMetadata}
+                  requiresBranchEstimator={requiresBranchEstimator}
                   onResetRecommended={handleResetRecommended}
                 />
               </div>

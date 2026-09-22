@@ -5,12 +5,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from worker.chemistry import sqd_solver
+from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 from worker.chemistry.algorithms.sqd.convergence import (
     build_iteration_signature,
     compute_iteration_deltas,
     is_iteration_converged,
     is_iteration_stalled,
+    iteration_values_are_finite,
 )
 
 
@@ -39,11 +40,58 @@ def test_compute_iteration_deltas_compares_energy_and_occupancies() -> None:
 
 
 @pytest.mark.parametrize(
+    "values",
+    [
+        {"energy_value": np.nan, "delta_energy": 0.0, "occupancy_delta": 0.0},
+        {"energy_value": -1.0, "delta_energy": np.inf, "occupancy_delta": 0.0},
+        {"energy_value": -1.0, "delta_energy": 0.0, "occupancy_delta": np.nan},
+    ],
+)
+def test_iteration_values_are_finite_rejects_invalid_scalars(
+    values: dict[str, float],
+) -> None:
+    assert not iteration_values_are_finite(
+        **values,
+        occupancy_vector=np.asarray([1.0, 0.0]),
+    )
+
+
+def test_iteration_values_are_finite_rejects_invalid_occupancies() -> None:
+    assert not iteration_values_are_finite(
+        energy_value=-1.0,
+        delta_energy=0.0,
+        occupancy_delta=0.0,
+        occupancy_vector=np.asarray([1.0, np.inf]),
+    )
+
+
+def test_iteration_values_are_finite_accepts_valid_inputs() -> None:
+    assert iteration_values_are_finite(
+        energy_value=-1.0,
+        delta_energy=1e-6,
+        occupancy_delta=1e-6,
+        occupancy_vector=np.asarray([1.0, 0.0]),
+    )
+
+
+def test_iteration_values_are_finite_accepts_first_iteration_delta_sentinels() -> None:
+    assert iteration_values_are_finite(
+        energy_value=-1.0,
+        delta_energy=float("inf"),
+        occupancy_delta=float("inf"),
+        occupancy_vector=np.asarray([1.0, 0.0]),
+        deltas_available=False,
+    )
+
+
+@pytest.mark.parametrize(
     ("iteration", "energy_delta", "occupancy_delta", "selected_count", "expected"),
     [
         (1, 0.0, 0.0, 10, False),
         (2, 0.01, 0.0, 10, False),
         (2, 0.0, 0.01, 10, False),
+        (2, np.nan, 0.0, 10, False),
+        (2, 0.0, np.inf, 10, False),
         (2, 0.0, 0.0, 1, False),
         (2, 0.0, 0.0, 2, True),
     ],

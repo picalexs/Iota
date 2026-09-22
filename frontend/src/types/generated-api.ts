@@ -987,10 +987,9 @@ export interface components {
             device?: ("CPU" | "GPU") | null;
             /**
              * Estimator Precision
-             * @description Estimator standard-error budget. Zero requests exact ideal-estimator values.
-             * @default 0
+             * @description Estimator standard-error budget. Omit or set null to derive 1/sqrt(shots) for noisy Aer. Zero requests exact estimator values.
              */
-            estimator_precision: number;
+            estimator_precision?: number | null;
             /**
              * Max Parallel Experiments
              * @description Bound Aer parallel experiments per worker.
@@ -1393,14 +1392,42 @@ export interface components {
         CustomNoisePreset: "depolarizing_cx" | "thermal_relaxation" | "readout_bias";
         /** CustomPresetNoiseProfile */
         CustomPresetNoiseProfile: {
+            /**
+             * Gate Time Us
+             * @description Gate time in microseconds for thermal relaxation.
+             */
+            gate_time_us?: number | null;
+            /**
+             * P01
+             * @description Probability of reading 1 when the true value is 0.
+             */
+            p01?: number | null;
+            /**
+             * P10
+             * @description Probability of reading 0 when the true value is 1.
+             */
+            p10?: number | null;
             preset: components["schemas"]["CustomNoisePreset"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
             source: "custom_preset";
-            /** Strength */
-            strength: number;
+            /**
+             * Strength
+             * @description Gate strength for depolarizing CX noise.
+             */
+            strength?: number | null;
+            /**
+             * T1 Us
+             * @description T1 relaxation time in microseconds.
+             */
+            t1_us?: number | null;
+            /**
+             * T2 Us
+             * @description T2 relaxation time in microseconds.
+             */
+            t2_us?: number | null;
         };
         /**
          * EasyGoal
@@ -1946,7 +1973,7 @@ export interface components {
              * @default qfd_chemistry_forward
              * @enum {string}
              */
-            qfd_variant: "qfd_chemistry_forward" | "qfd_original_symmetric" | "qfd_custom_grid";
+            qfd_variant: "qfd_chemistry_forward" | "qfd_original_symmetric";
             /** Residual Tolerance */
             residual_tolerance?: number | null;
             /**
@@ -2179,7 +2206,6 @@ export interface components {
          *       "algorithm": "vqe",
          *       "backend_options": {
          *         "aer_method": "automatic",
-         *         "estimator_precision": 0,
          *         "optimization_level": 1,
          *         "selection_policy": "manual",
          *         "shots": 4096

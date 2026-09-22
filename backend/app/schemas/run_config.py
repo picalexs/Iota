@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import EasyGoal, RunAlgorithm
 from shared.contracts.catalog import PUBLIC_LIMITS
@@ -29,12 +29,13 @@ class BackendOptions(BaseModel):
     selection_policy: BackendSelectionPolicy = BackendSelectionPolicy.MANUAL
     backend_name: str | None = Field(None, min_length=1, max_length=255)
     shots: int = Field(4096, ge=1, le=1_000_000)
-    estimator_precision: float = Field(
-        0.0,
+    estimator_precision: float | None = Field(
+        None,
         ge=0.0,
         allow_inf_nan=False,
         description=(
-            "Estimator standard-error budget. Zero requests exact ideal-estimator values."
+            "Estimator standard-error budget. Omit or set null to derive 1/sqrt(shots) "
+            "for noisy Aer. Zero requests exact estimator values."
         ),
     )
     optimization_level: int = Field(1, ge=0, le=3)
@@ -134,7 +135,19 @@ class BackendDerivedNoiseProfile(BaseModel):
 
     source: Literal[NoiseModelSource.BACKEND_DERIVED]
     reference_backend: str = Field(..., min_length=1)
-    temperature_mk: float | None = Field(None, ge=0.0)
+    temperature_mk: float | None = Field(None, ge=0.0, allow_inf_nan=False)
+
+    @field_validator("reference_backend")
+    @classmethod
+    def validate_reference_backend(cls, value: str) -> str:
+        normalized = value.strip()
+        if normalized.lower() in {
+            "aer_simulator",
+            "aer_simulator_statevector",
+            "statevector",
+        }:
+            raise ValueError("backend-derived noise requires an IBM backend reference")
+        return normalized
 
 
 class CustomPresetNoiseProfile(BaseModel):
@@ -142,7 +155,68 @@ class CustomPresetNoiseProfile(BaseModel):
 
     source: Literal[NoiseModelSource.CUSTOM_PRESET]
     preset: CustomNoisePreset
-    strength: float = Field(..., ge=0.0, le=1.0)
+    strength: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        description="Gate strength for depolarizing CX noise.",
+    )
+    p01: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        description="Probability of reading 1 when the true value is 0.",
+    )
+    p10: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        allow_inf_nan=False,
+        description="Probability of reading 0 when the true value is 1.",
+    )
+    t1_us: float | None = Field(
+        None,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="T1 relaxation time in microseconds.",
+    )
+    t2_us: float | None = Field(
+        None,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="T2 relaxation time in microseconds.",
+    )
+    gate_time_us: float | None = Field(
+        None,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="Gate time in microseconds for thermal relaxation.",
+    )
+
+    @model_validator(mode="after")
+    def validate_preset_parameters(self) -> "CustomPresetNoiseProfile":
+        populated = {
+            key
+            for key in ("strength", "p01", "p10", "t1_us", "t2_us", "gate_time_us")
+            if getattr(self, key) is not None
+        }
+        if self.preset == CustomNoisePreset.DEPOLARIZING_CX:
+            required = {"strength"}
+        elif self.preset == CustomNoisePreset.READOUT_BIAS:
+            required = {"p01", "p10"}
+        else:
+            required = {"t1_us", "t2_us", "gate_time_us"}
+        if populated != required:
+            expected = ", ".join(sorted(required))
+            raise ValueError(f"preset '{self.preset.value}' requires exactly: {expected}")
+        if self.preset == CustomNoisePreset.THERMAL_RELAXATION:
+            assert self.t1_us is not None
+            assert self.t2_us is not None
+            if self.t2_us > 2 * self.t1_us:
+                raise ValueError("t2_us must not exceed 2 * t1_us")
+        return self
 
 
 NoiseProfile = Annotated[
@@ -244,7 +318,6 @@ class QFDAdvancedConfig(BaseModel):
     qfd_variant: Literal[
         "qfd_chemistry_forward",
         "qfd_original_symmetric",
-        "qfd_custom_grid",
     ] = "qfd_chemistry_forward"
     kappa: float = Field(1.0, gt=0.0)
     trotter_steps: int = Field(1, ge=1, le=32)

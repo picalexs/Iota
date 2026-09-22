@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, ChevronDown, KeyRound, Plus } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, KeyRound, Plus, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
-import { forceRefreshBackendCapabilities, setActiveBackendCapabilitiesProfile } from "@/api/backends";
+import {
+  forceRefreshBackendCapabilities,
+  getBackendCapabilitiesCached,
+  setActiveBackendCapabilitiesProfile,
+} from "@/api/backends";
 import { activateIbmCredentialProfile, listIbmCredentialProfiles } from "@/api/profiles";
 import {
   SidebarMenuButton,
@@ -13,10 +17,12 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
+import { getIbmBackendStatus } from "@/components/forms/run-form/backend-card-state";
 import { showErrorToast } from "@/lib/error-handler";
 import {
   notifyIbmCredentialProfilesChanged,
   subscribeToIbmCredentialProfilesChanged,
+  type IbmBackendStatus,
 } from "@/lib/ibm-profile-events";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -64,10 +70,36 @@ function profileButtonAriaLabel(
 function ProfileSwitchIcon({
   isPending,
   isActive,
-}: Readonly<{ isPending: boolean; isActive: boolean }>) {
+  backendStatus,
+}: Readonly<{
+  isPending: boolean;
+  isActive: boolean;
+  backendStatus: IbmBackendStatus;
+}>) {
   if (isPending) return <Spinner />;
-  if (isActive) return <Check className="size-4" />;
+  if (isActive) return <BackendStatusIcon status={backendStatus} />;
   return <KeyRound className="size-4" />;
+}
+
+function BackendStatusIcon({ status }: Readonly<{ status: IbmBackendStatus }>) {
+  if (status === "ready") return <Check aria-hidden className="size-4 text-success" />;
+  if (status === "inactive") return <X aria-hidden className="size-4 text-destructive" />;
+  return <AlertTriangle aria-hidden className="size-4 text-warning" />;
+}
+
+function readActiveBackendStatus(profileId: string | null): {
+  status: IbmBackendStatus;
+} {
+  if (profileId == null) {
+    return { status: "inactive" };
+  }
+  const capability = getBackendCapabilitiesCached(profileId)?.backends.find(
+    (item) => item.target === "ibm_runtime",
+  );
+  if (capability == null) {
+    return { status: "loading" };
+  }
+  return { status: getIbmBackendStatus(capability) };
 }
 
 export function ProfileQuickSwitch() {
@@ -76,6 +108,8 @@ export function ProfileQuickSwitch() {
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<IbmBackendStatus>("loading");
   const [open, setOpen] = useState(false);
   const [recentProfileIds, setRecentProfileIds] = useLocalStorage<string[]>(
     SIDEBAR_RECENT_PROFILE_STORAGE_KEY,
@@ -101,14 +135,16 @@ export function ProfileQuickSwitch() {
   const refreshProfiles = useCallback(async () => {
     try {
       const response = await listIbmCredentialProfiles();
+      setProfileLoadError(false);
       setProfiles(response.profiles);
       setActiveProfileId(response.active_profile_id);
+      const activeBackendStatus = readActiveBackendStatus(response.active_profile_id);
+      setBackendStatus(activeBackendStatus.status);
       setRecentProfileIds((current) => rememberRecentProfile(current, response.active_profile_id));
-    } catch (error) {
-      showErrorToast(error, {
-        title: "IBM Profiles Unavailable",
-        fallbackDescription: "Failed to load IBM credential profiles.",
-      });
+    } catch {
+      setProfileLoadError(true);
+      setProfiles([]);
+      setActiveProfileId(null);
     } finally {
       setLoading(false);
     }
@@ -120,13 +156,26 @@ export function ProfileQuickSwitch() {
 
   useEffect(() => {
     return subscribeToIbmCredentialProfilesChanged((detail) => {
-      if (detail.backendCapabilitiesRefresh === "started") {
-        return;
+      if (detail.activeProfileId !== undefined) {
+        setActiveProfileId(detail.activeProfileId ?? null);
       }
-      setLoading(true);
-      void refreshProfiles();
+      if (
+        detail.backendCapabilitiesRefresh === "started" ||
+        detail.backendCapabilitiesRefresh === "progress"
+      ) {
+        setBackendStatus("loading");
+      } else if (detail.backendCapabilitiesRefresh === "completed") {
+        const refreshed = readActiveBackendStatus(detail.activeProfileId ?? activeProfileId);
+        setBackendStatus(detail.backendStatus ?? refreshed.status);
+      } else if (detail.backendCapabilitiesRefresh === "failed") {
+        setBackendStatus("unavailable");
+      }
+      if (detail.profilesChanged === true) {
+        setLoading(true);
+        void refreshProfiles();
+      }
     });
-  }, [refreshProfiles]);
+  }, [activeProfileId, refreshProfiles]);
 
   useEffect(() => {
     if (state === "collapsed" || (isMobile && !openMobile)) {
@@ -153,6 +202,7 @@ export function ProfileQuickSwitch() {
       await activateIbmCredentialProfile(profile.id);
       setActiveBackendCapabilitiesProfile(profile.id);
       setOpen(false);
+      setBackendStatus("loading");
       notifyIbmCredentialProfilesChanged({
         activeProfileId: profile.id,
         backendCapabilitiesRefresh: "started",
@@ -200,6 +250,23 @@ export function ProfileQuickSwitch() {
         </SidebarMenuSubButton>
       </SidebarMenuSubItem>
     );
+  } else if (profileLoadError) {
+    profileMenuContent = (
+      <SidebarMenuSubItem>
+        <SidebarMenuSubButton asChild>
+          <Link
+            to="/settings"
+            onClick={() => setOpen(false)}
+            onFocus={() => preloadPageModule("/settings")}
+            onPointerEnter={() => preloadPageModule("/settings")}
+            aria-label="Open IBM profile settings"
+          >
+            <KeyRound className="size-4" />
+            <span>Profiles unavailable</span>
+          </Link>
+        </SidebarMenuSubButton>
+      </SidebarMenuSubItem>
+    );
   } else if (recentProfiles.length === 0) {
     profileMenuContent = (
       <SidebarMenuSubItem>
@@ -228,7 +295,7 @@ export function ProfileQuickSwitch() {
             isActive={isActive || isPending}
             className={cn(
               isActive &&
-                "disabled:!opacity-100 data-[active=true]:!bg-success/10 data-[active=true]:!text-success data-[active=true]:[&>svg]:!text-success dark:data-[active=true]:!bg-success/15",
+                "disabled:!opacity-100 data-[active=true]:!bg-success/10 data-[active=true]:!text-success dark:data-[active=true]:!bg-success/15",
             )}
             aria-busy={isPending}
           >
@@ -238,9 +305,12 @@ export function ProfileQuickSwitch() {
               disabled={isActive || pendingProfileId !== null}
               aria-label={isActive ? `${profile.name} active` : `Switch to ${profile.name}`}
             >
-              <ProfileSwitchIcon isPending={isPending} isActive={isActive} />
+              <ProfileSwitchIcon
+                isPending={isPending}
+                isActive={isActive}
+                backendStatus={backendStatus}
+              />
               <span className="flex-1 truncate">{profile.name}</span>
-              {isActive ? <span className="text-success text-xs font-medium">Active</span> : null}
             </button>
           </SidebarMenuSubButton>
         </SidebarMenuSubItem>

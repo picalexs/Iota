@@ -20,7 +20,7 @@ export function BenchmarkInsights({
   chemicalAccuracyHa,
 }: Readonly<BenchmarkInsightsProps>) {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
-  const [showScatterLabels, setShowScatterLabels] = useState(true);
+  const [showScatterLabels, setShowScatterLabels] = useState(false);
   const points = useMemo(
     () => buildCompletedPoints(grouped, chemicalAccuracyHa),
     [chemicalAccuracyHa, grouped],

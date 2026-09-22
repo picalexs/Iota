@@ -11,6 +11,10 @@ services:
       start_period: 15s
   api:
     restart: always
+    environment:
+      ALLOW_INSECURE_DEFAULTS: "false"
+      DOCS_ENABLED: "false"
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-localhost,127.0.0.1}
 
   worker:
     restart: always

@@ -266,7 +266,7 @@ export function VQEPanel({ disabled = false, metadata, onResetRecommended }: VQE
         </div>
       </div>
 
-      <ExpertDisclosure description="Tune solver thresholds and pass JSON payloads straight into the supported runtime hooks.">
+      <ExpertDisclosure>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
             label="Seed"

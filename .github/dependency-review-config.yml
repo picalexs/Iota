@@ -1,5 +1,6 @@
 ---
-warn-only: true
+warn-only: false
+fail-on-severity: high
 vulnerability-check: true
 license-check: false
 comment-summary-in-pr: never
