@@ -133,6 +133,7 @@ def merge_backend_metadata(
         "simulator_method": backend_context.simulator_method,
         "optimization_level": backend_context.optimization_level,
         "noise_summary": {"enabled": bool(backend_context.noise_profile)},
+        "resource_metadata": dict(backend_context.resource_metadata),
         **adapter_metadata,
     }
     if provisional and algorithm in {"kqd", "qfd", "qse"}:

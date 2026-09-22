@@ -12,6 +12,7 @@ from worker.adapters.base import (
 )
 from worker.chemistry.backend_selector import build_backend_execution_context
 from worker.chemistry.aer_runtime import validate_aer_runtime
+from worker.chemistry.thread_controls import configure_thread_limits
 
 from .execution_config import (
     _chemistry_options_from_config,
@@ -43,6 +44,7 @@ def build_backend_context_for_run(
         selection_policy=_selection_policy_from_config(config_snapshot),
         chemistry_options=_chemistry_options_from_config(config_snapshot),
     )
+    resource_metadata = configure_thread_limits(backend_context.backend_options)
     if backend_context.backend_target == "ibm_runtime":
         return BackendExecutionContext(
             backend_target=backend_context.backend_target,
@@ -56,6 +58,7 @@ def build_backend_context_for_run(
             optimization_level=backend_context.optimization_level,
             simulator_method=backend_context.simulator_method,
             chemistry_options=backend_context.chemistry_options,
+            resource_metadata=resource_metadata,
             primitive_run_guard=run_guard_factory(run_id),
             primitive_job_observer=ibm_job_observer_factory(
                 run_id=run_id,
@@ -80,6 +83,7 @@ def build_backend_context_for_run(
         optimization_level=backend_context.optimization_level,
         simulator_method=backend_context.simulator_method,
         chemistry_options=backend_context.chemistry_options,
+        resource_metadata=resource_metadata,
         primitive_run_guard=run_guard_factory(run_id),
         primitive_job_observer=local_job_observer_factory(run_id=run_id),
     )
