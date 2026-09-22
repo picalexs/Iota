@@ -18,7 +18,7 @@ mypy==2.3.1
     # via -r requirements-ci.in
 mypy-extensions==1.1.0
     # via mypy
-packaging==26.2
+packaging==26.3
     # via
     #   -r requirements-ci.in
     #   pytest
@@ -30,18 +30,18 @@ pluggy==1.6.0
     #   pytest-cov
 pygments==2.20.0
     # via pytest
-pytest==9.0.3
+pytest==9.1.1
     # via
     #   -r requirements-ci.in
     #   pytest-asyncio
     #   pytest-cov
-pytest-asyncio==1.3.0
+pytest-asyncio==1.4.0
     # via -r requirements-ci.in
 pytest-cov==7.1.0
     # via -r requirements-ci.in
-ruff==0.15.1
+ruff==0.16.8
     # via -r requirements-ci.in
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   -r requirements-ci.in
     #   mypy
