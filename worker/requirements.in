@@ -1,6 +1,6 @@
 rq==2.7.0
 redis>=5,<9
-pydantic>=2.0,<3
+pydantic>=2.13.5,<3
 pydantic-settings>=2.14.2
 
 # Security floors for transitive runtime dependencies.
