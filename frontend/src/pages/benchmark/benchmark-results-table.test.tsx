@@ -129,6 +129,41 @@ describe("BenchmarkResultsTable", () => {
     expect(screen.getByText("1.50 mHa")).toBeInTheDocument();
   });
 
+  it("renders a dash when a persisted row omits its energy", async () => {
+    renderBenchmarkResultsTable({
+      grouped: buildGroupedRows({
+        energy: undefined,
+        currentEnergy: undefined,
+      } as unknown as Partial<BenchmarkEntry>),
+    });
+
+    expect(await screen.findByText("Done")).toBeInTheDocument();
+    expect(screen.getAllByText("-")).toHaveLength(2);
+  });
+
+  it("renders persisted rows when the embedded preset omits references", async () => {
+    const grouped = buildGroupedRows();
+    const group = grouped[0];
+    if (!group) throw new Error("Expected a benchmark group");
+    const incompletePreset = {
+      ...group.preset,
+      formula: null,
+      references: undefined,
+    } as unknown as MoleculePreset;
+    group.preset = incompletePreset;
+    group.rows = group.rows.map((entry) => ({
+      ...entry,
+      preset: incompletePreset,
+      classicalRefs: null,
+    }));
+
+    renderBenchmarkResultsTable({ grouped });
+
+    expect(await screen.findByText("Done")).toBeInTheDocument();
+    expect(screen.queryByText(/HF:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Preset reference:/)).not.toBeInTheDocument();
+  });
+
   it("shows chemical accuracy for valid results when benchmark eligibility is false", async () => {
     renderBenchmarkResultsTable({
       grouped: buildGroupedRows({

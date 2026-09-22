@@ -299,6 +299,19 @@ describe("benchmark molecule utilities", () => {
     expect(shouldPollEntry(normalized)).toBe(false);
   });
 
+  it("normalizes omitted persisted energy values to null", () => {
+    const persistedRow = {
+      ...makeEntry({ status: "completed" }),
+      energy: undefined,
+      currentEnergy: undefined,
+    } as unknown as BenchmarkEntry;
+
+    const normalized = normalizeStoredEntry(persistedRow);
+
+    expect(normalized.energy).toBeNull();
+    expect(normalized.currentEnergy).toBeNull();
+  });
+
   it.each([
     ["vqe", "vqe.easy.balanced", "Balanced"],
     ["sqd", "sqd.easy.fastest", "Quick scan"],

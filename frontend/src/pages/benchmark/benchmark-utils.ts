@@ -309,6 +309,7 @@ export function normalizeStoredEntry(entry: BenchmarkEntry): BenchmarkEntry {
     mode,
     easyOptions: entry.easyOptions ?? null,
     advancedConfig: entry.advancedConfig ?? null,
+    energy: entry.energy ?? null,
     currentEnergy: entry.currentEnergy ?? entry.energy ?? null,
     elapsedSeconds: entry.elapsedSeconds ?? null,
     executionMetadata: entry.executionMetadata ?? null,
@@ -481,7 +482,14 @@ export function effectiveRefs(entry: BenchmarkEntry): {
   if (entry.classicalRefs) {
     return { hf: entry.classicalRefs.hf, fci: entry.classicalRefs.fci, computed: true };
   }
-  return { hf: entry.preset.references.hf, fci: entry.preset.references.fci, computed: false };
+  const presetReferences = entry.preset.references;
+  const hf = presetReferences?.hf;
+  const fci = presetReferences?.fci;
+  return {
+    hf: typeof hf === "number" && Number.isFinite(hf) ? hf : 0,
+    fci: typeof fci === "number" && Number.isFinite(fci) ? fci : null,
+    computed: false,
+  };
 }
 
 export function getBenchmarkEligibility(entry: BenchmarkEntry): {

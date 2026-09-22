@@ -120,7 +120,7 @@ function benchmarkStatusIndicator(entry: BenchmarkEntry) {
 function EnergyCell({ entry }: { entry: BenchmarkEntry }) {
   const { energy, status } = entry;
   const displayEnergy = status === "completed" ? energy : entry.currentEnergy;
-  if (displayEnergy === null) {
+  if (displayEnergy == null) {
     return <span className="text-muted-foreground">-</span>;
   }
   return (
@@ -289,7 +289,13 @@ function getDisplayReferences({ preset, rows }: BenchmarkGroupedRows) {
   if (runtimeReferences) {
     return { ...runtimeReferences, label: "CASCI active-space" };
   }
-  return { ...preset.references, label: "Preset reference" };
+  const presetHf = preset.references?.hf;
+  const presetFci = preset.references?.fci;
+  return {
+    hf: typeof presetHf === "number" && Number.isFinite(presetHf) ? presetHf : 0,
+    fci: typeof presetFci === "number" && Number.isFinite(presetFci) ? presetFci : null,
+    label: "Preset reference",
+  };
 }
 
 function runRowClassName({
