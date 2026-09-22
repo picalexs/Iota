@@ -185,7 +185,7 @@ export function getBenchmarkBackendOptions(
       value: "aer_simulator_backend_noise",
       label: `Aer simulator with backend noise${pendingSuffix}`,
       warning: ibmEnabled
-        ? "Uses the selected IBM backend calibration as an Aer noise reference."
+        ? ""
         : ibmUnavailableReason,
       enabled: ibmEnabled,
     },
