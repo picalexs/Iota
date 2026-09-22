@@ -46,6 +46,7 @@ class BenchmarkRun(Base):
     selected_basis: Mapped[str] = mapped_column(String(255), nullable=False, default="sto-3g")
     selected_backend_mode: Mapped[str] = mapped_column(String(64), nullable=False)
     selected_backend_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    shots: Mapped[int] = mapped_column(nullable=False, default=1024)
     chemical_accuracy_ha: Mapped[float] = mapped_column(Float, nullable=False, default=1.6e-3)
     custom_molecules: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite"),
