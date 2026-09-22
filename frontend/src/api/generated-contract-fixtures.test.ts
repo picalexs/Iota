@@ -370,6 +370,11 @@ const benchmarkCreateRequest = {
   selectedBasis: "sto-3g",
   selectedBackendMode: "statevector",
   selectedBackendName: null,
+  shots: 4096,
+  optimizationLevel: 1,
+  seedTranspiler: null,
+  dynamicalDecoupling: false,
+  twirling: false,
   chemicalAccuracyHa: 0.0016,
 } satisfies ApiBenchmarkRunCreate;
 
@@ -417,6 +422,8 @@ const transpilePreviewRequest = {
     credential_profile_id: null,
     seed_simulator: null,
     seed_transpiler: null,
+    dynamical_decoupling: false,
+    twirling: false,
   },
 } satisfies ApiTranspilePreviewRequest;
 

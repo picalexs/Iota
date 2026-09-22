@@ -39,6 +39,11 @@ interface BenchmarkControlsProps {
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   selectedBackendName: string | null;
+  shots?: number;
+  optimizationLevel?: 0 | 1 | 2 | 3;
+  seedTranspiler?: number | null;
+  dynamicalDecoupling?: boolean;
+  twirling?: boolean;
   backendOptions: readonly BenchmarkBackendOption[];
   ibmBackends: readonly BackendDeviceSummary[];
   backendSelectionRequired: boolean;
@@ -77,6 +82,11 @@ interface BenchmarkControlsProps {
   onBasisChange: (basis: string) => void;
   onBackendModeChange: (backend: BenchmarkBackendMode) => void;
   onBackendNameChange: (backendName: string) => void;
+  onShotsChange?: (shots: number) => void;
+  onOptimizationLevelChange?: (level: 0 | 1 | 2 | 3) => void;
+  onSeedTranspilerChange?: (seed: number | null) => void;
+  onDynamicalDecouplingChange?: (enabled: boolean) => void;
+  onTwirlingChange?: (enabled: boolean) => void;
   onBackendOptionsOpen: () => void;
   onChemicalAccuracyChange: (thresholdHa: number) => void;
   onAddCustomMolecule: (molecule: MoleculeResponse) => void;
@@ -101,6 +111,11 @@ export function BenchmarkControls({
   selectedBasis,
   selectedBackendMode,
   selectedBackendName,
+  shots = 4096,
+  optimizationLevel = 1,
+  seedTranspiler = null,
+  dynamicalDecoupling = false,
+  twirling = false,
   backendOptions,
   ibmBackends,
   backendSelectionRequired,
@@ -136,6 +151,11 @@ export function BenchmarkControls({
   onBasisChange,
   onBackendModeChange,
   onBackendNameChange,
+  onShotsChange = () => undefined,
+  onOptimizationLevelChange = () => undefined,
+  onSeedTranspilerChange = () => undefined,
+  onDynamicalDecouplingChange = () => undefined,
+  onTwirlingChange = () => undefined,
   onBackendOptionsOpen,
   onChemicalAccuracyChange,
   onAddCustomMolecule,
@@ -294,6 +314,16 @@ export function BenchmarkControls({
           backendNameLabel={backendNameLabel}
           selectedBackendName={selectedBackendName}
           onBackendNameChange={onBackendNameChange}
+          shots={shots}
+          optimizationLevel={optimizationLevel}
+          seedTranspiler={seedTranspiler}
+          dynamicalDecoupling={dynamicalDecoupling}
+          twirling={twirling}
+          onShotsChange={onShotsChange}
+          onOptimizationLevelChange={onOptimizationLevelChange}
+          onSeedTranspilerChange={onSeedTranspilerChange}
+          onDynamicalDecouplingChange={onDynamicalDecouplingChange}
+          onTwirlingChange={onTwirlingChange}
           ibmBackends={ibmBackends}
           backendCapabilitiesLoading={backendCapabilitiesLoading}
           backendCapabilitiesRefreshing={backendCapabilitiesRefreshing}

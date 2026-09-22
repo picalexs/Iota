@@ -82,6 +82,11 @@ export function isBenchmarkBackendMode(value: unknown): value is BenchmarkBacken
 export interface BenchmarkExecutionSettings {
   mode: BenchmarkBackendMode;
   backendName: string | null;
+  shots?: number;
+  optimizationLevel?: 0 | 1 | 2 | 3;
+  seedTranspiler?: number | null;
+  dynamicalDecoupling?: boolean;
+  twirling?: boolean;
 }
 
 export interface SavedBenchmarkRun {
@@ -97,6 +102,11 @@ export interface SavedBenchmarkRun {
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   selectedBackendName: string | null;
+  shots?: number;
+  optimizationLevel?: 0 | 1 | 2 | 3;
+  seedTranspiler?: number | null;
+  dynamicalDecoupling?: boolean;
+  twirling?: boolean;
   chemicalAccuracyHa: number;
   customMolecules: MoleculeResponse[];
   entries: BenchmarkEntry[];

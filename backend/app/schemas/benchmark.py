@@ -72,6 +72,31 @@ class BenchmarkRunBase(BaseModel):
         validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
         serialization_alias="selectedBackendName",
     )
+    shots: int = Field(4096, ge=1, le=1_000_000)
+    optimization_level: int = Field(
+        1,
+        ge=0,
+        le=3,
+        validation_alias=AliasChoices("optimizationLevel", "optimization_level"),
+        serialization_alias="optimizationLevel",
+    )
+    seed_transpiler: int | None = Field(
+        None,
+        ge=0,
+        le=2**32 - 1,
+        validation_alias=AliasChoices("seedTranspiler", "seed_transpiler"),
+        serialization_alias="seedTranspiler",
+    )
+    dynamical_decoupling: bool = Field(
+        False,
+        validation_alias=AliasChoices("dynamicalDecoupling", "dynamical_decoupling"),
+        serialization_alias="dynamicalDecoupling",
+    )
+    twirling: bool = Field(
+        False,
+        validation_alias=AliasChoices("twirling"),
+        serialization_alias="twirling",
+    )
     chemical_accuracy_ha: float = Field(
         1.6e-3,
         gt=0.0,
@@ -148,6 +173,31 @@ class BenchmarkRunUpdate(BaseModel):
         max_length=255,
         validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
         serialization_alias="selectedBackendName",
+    )
+    shots: int | None = Field(None, ge=1, le=1_000_000)
+    optimization_level: int | None = Field(
+        None,
+        ge=0,
+        le=3,
+        validation_alias=AliasChoices("optimizationLevel", "optimization_level"),
+        serialization_alias="optimizationLevel",
+    )
+    seed_transpiler: int | None = Field(
+        None,
+        ge=0,
+        le=2**32 - 1,
+        validation_alias=AliasChoices("seedTranspiler", "seed_transpiler"),
+        serialization_alias="seedTranspiler",
+    )
+    dynamical_decoupling: bool | None = Field(
+        None,
+        validation_alias=AliasChoices("dynamicalDecoupling", "dynamical_decoupling"),
+        serialization_alias="dynamicalDecoupling",
+    )
+    twirling: bool | None = Field(
+        None,
+        validation_alias=AliasChoices("twirling"),
+        serialization_alias="twirling",
     )
     chemical_accuracy_ha: float | None = Field(
         None,

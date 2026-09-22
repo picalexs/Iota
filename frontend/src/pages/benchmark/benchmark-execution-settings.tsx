@@ -6,6 +6,7 @@ import {
 } from "@/lib/run-form-recommendations";
 import type { BackendDeviceSummary, BasisSetMetadata } from "@/types/run";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -100,6 +101,16 @@ export function BenchmarkExecutionSettings({
   backendOptions,
   backendNameLabel,
   selectedBackendName,
+  shots,
+  optimizationLevel,
+  seedTranspiler,
+  dynamicalDecoupling,
+  twirling,
+  onShotsChange,
+  onOptimizationLevelChange,
+  onSeedTranspilerChange,
+  onDynamicalDecouplingChange,
+  onTwirlingChange,
   onBackendNameChange,
   ibmBackends,
   backendCapabilitiesLoading,
@@ -121,6 +132,16 @@ export function BenchmarkExecutionSettings({
   backendOptions: readonly BenchmarkBackendOption[];
   backendNameLabel: string;
   selectedBackendName: string | null;
+  shots: number;
+  optimizationLevel: 0 | 1 | 2 | 3;
+  seedTranspiler: number | null;
+  dynamicalDecoupling: boolean;
+  twirling: boolean;
+  onShotsChange: (shots: number) => void;
+  onOptimizationLevelChange: (level: 0 | 1 | 2 | 3) => void;
+  onSeedTranspilerChange: (seed: number | null) => void;
+  onDynamicalDecouplingChange: (enabled: boolean) => void;
+  onTwirlingChange: (enabled: boolean) => void;
   onBackendNameChange: (backendName: string) => void;
   ibmBackends: readonly BackendDeviceSummary[];
   backendCapabilitiesLoading: boolean;
@@ -159,6 +180,92 @@ export function BenchmarkExecutionSettings({
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="col-span-full grid gap-3 rounded-xl border border-border/70 bg-card p-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="benchmark-shots" className="text-xs text-muted-foreground">
+            Shots
+          </Label>
+          <Input
+            id="benchmark-shots"
+            type="number"
+            min={1}
+            max={1_000_000}
+            step={1}
+            value={shots}
+            disabled={workspaceLocked}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (Number.isInteger(next) && next >= 1 && next <= 1_000_000) {
+                onShotsChange(next);
+              }
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="benchmark-optimization-level" className="text-xs text-muted-foreground">
+            Optimization level
+          </Label>
+          <Select
+            value={String(optimizationLevel)}
+            onValueChange={(value) => onOptimizationLevelChange(Number(value) as 0 | 1 | 2 | 3)}
+            disabled={workspaceLocked}
+          >
+            <SelectTrigger id="benchmark-optimization-level">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[0, 1, 2, 3].map((level) => (
+                <SelectItem key={level} value={String(level)}>
+                  Level {level}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="benchmark-transpiler-seed" className="text-xs text-muted-foreground">
+            Transpiler seed
+          </Label>
+          <Input
+            id="benchmark-transpiler-seed"
+            type="number"
+            min={0}
+            max={4_294_967_295}
+            step={1}
+            placeholder="Automatic"
+            value={seedTranspiler ?? ""}
+            disabled={workspaceLocked}
+            onChange={(event) => {
+              const raw = event.target.value.trim();
+              if (raw === "") {
+                onSeedTranspilerChange(null);
+                return;
+              }
+              const next = Number(raw);
+              if (Number.isInteger(next) && next >= 0 && next <= 4_294_967_295) {
+                onSeedTranspilerChange(next);
+              }
+            }}
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={dynamicalDecoupling}
+            disabled={workspaceLocked || selectedBackendMode !== "ibm_runtime"}
+            onCheckedChange={(checked) => onDynamicalDecouplingChange(checked === true)}
+          />
+          <span>Dynamical decoupling</span>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={twirling}
+            disabled={workspaceLocked || selectedBackendMode !== "ibm_runtime"}
+            onCheckedChange={(checked) => onTwirlingChange(checked === true)}
+          />
+          <span>Twirling</span>
+        </label>
       </div>
 
       <div className="flex h-full min-w-0 flex-col justify-center gap-2">

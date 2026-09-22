@@ -21,6 +21,8 @@ import {
   request,
 } from "./http";
 
+type BenchmarkOptimizationLevel = 0 | 1 | 2 | 3;
+
 export interface BenchmarkRunListResponse {
   items: SavedBenchmarkRun[];
   total: number;
@@ -63,6 +65,17 @@ function isBenchmarkRunResponse(value: unknown): value is ApiBenchmarkRunRespons
     BENCHMARK_BACKEND_MODES.has(
       value.selectedBackendMode as ApiBenchmarkRunResponse["selectedBackendMode"],
     ) &&
+    (!("shots" in value) || (isFiniteNumber(value.shots) && value.shots >= 1)) &&
+    (!("optimizationLevel" in value) ||
+      (isFiniteNumber(value.optimizationLevel) &&
+        value.optimizationLevel >= 0 &&
+        value.optimizationLevel <= 3 &&
+        Number.isInteger(value.optimizationLevel))) &&
+    (!("seedTranspiler" in value) ||
+      value.seedTranspiler === null ||
+      (isFiniteNumber(value.seedTranspiler) && value.seedTranspiler >= 0)) &&
+    (!("dynamicalDecoupling" in value) || typeof value.dynamicalDecoupling === "boolean") &&
+    (!("twirling" in value) || typeof value.twirling === "boolean") &&
     (!("selectedBackendName" in value) ||
       value.selectedBackendName === null ||
       typeof value.selectedBackendName === "string") &&
@@ -106,6 +119,11 @@ function toSavedBenchmarkRun(data: ApiBenchmarkRunResponse): SavedBenchmarkRun {
     selectedMoleculeKeys: data.selectedMoleculeKeys ?? [],
     selectedAlgorithms: data.selectedAlgorithms ?? [],
     selectedBackendName: data.selectedBackendName ?? null,
+    shots: data.shots ?? 4096,
+    optimizationLevel: (data.optimizationLevel ?? 1) as BenchmarkOptimizationLevel,
+    seedTranspiler: data.seedTranspiler ?? null,
+    dynamicalDecoupling: data.dynamicalDecoupling ?? false,
+    twirling: data.twirling ?? false,
     customMolecules: (data.customMolecules ?? []) as unknown as MoleculeResponse[],
     entries: (data.entries ?? []) as unknown as BenchmarkEntry[],
   };
@@ -129,6 +147,11 @@ function toBenchmarkRunCreate(data: BenchmarkRunCreate): ApiBenchmarkRunCreate {
     selectedBasis: data.selectedBasis,
     selectedBackendMode: data.selectedBackendMode,
     selectedBackendName: data.selectedBackendName,
+    shots: data.shots ?? 4096,
+    optimizationLevel: data.optimizationLevel ?? 1,
+    seedTranspiler: data.seedTranspiler ?? null,
+    dynamicalDecoupling: data.dynamicalDecoupling ?? false,
+    twirling: data.twirling ?? false,
     chemicalAccuracyHa: data.chemicalAccuracyHa,
     customMolecules: toJsonObjects(data.customMolecules),
     entries: toJsonObjects(data.entries),
@@ -143,6 +166,11 @@ function toBenchmarkRunUpdate(data: BenchmarkRunUpdate): ApiBenchmarkRunUpdate {
     selectedBasis: data.selectedBasis,
     selectedBackendMode: data.selectedBackendMode,
     selectedBackendName: data.selectedBackendName,
+    shots: data.shots,
+    optimizationLevel: data.optimizationLevel,
+    seedTranspiler: data.seedTranspiler,
+    dynamicalDecoupling: data.dynamicalDecoupling,
+    twirling: data.twirling,
     chemicalAccuracyHa: data.chemicalAccuracyHa,
     customMolecules: toJsonObjects(data.customMolecules),
     entries: toJsonObjects(data.entries),

@@ -19,6 +19,11 @@ def _benchmark_payload(name: str = "Saved H2 VQE") -> dict:
         "selectedBasis": "sto-3g",
         "selectedBackendMode": "statevector",
         "selectedBackendName": None,
+        "shots": 2048,
+        "optimizationLevel": 2,
+        "seedTranspiler": 19,
+        "dynamicalDecoupling": True,
+        "twirling": False,
         "chemicalAccuracyHa": 0.0016,
         "customMolecules": [],
         "entries": [
@@ -91,6 +96,11 @@ def test_create_list_get_update_delete_benchmark(client: ASGISyncTestClient) -> 
     assert created["selectedMoleculeKeys"] == ["h2"]
     assert created["selectedAlgorithms"] == ["vqe"]
     assert created["chemicalAccuracyHa"] == pytest.approx(0.0016)
+    assert created["shots"] == 2048
+    assert created["optimizationLevel"] == 2
+    assert created["seedTranspiler"] == 19
+    assert created["dynamicalDecoupling"] is True
+    assert created["twirling"] is False
     assert created["entries"][0]["status"] == "completed"
 
     list_response = client.get(BENCHMARKS_API)

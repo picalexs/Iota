@@ -986,6 +986,12 @@ export interface components {
              */
             device?: ("CPU" | "GPU") | null;
             /**
+             * Dynamical Decoupling
+             * @description Enable IBM Runtime dynamical decoupling. This is an explicit execution variant and does not enable Runtime resilience.
+             * @default false
+             */
+            dynamical_decoupling: boolean;
+            /**
              * Estimator Precision
              * @description Estimator standard-error budget. Omit or set null to derive 1/sqrt(shots) for noisy Aer. Zero requests exact estimator values.
              */
@@ -1031,6 +1037,12 @@ export interface components {
              * @default 4096
              */
             shots: number;
+            /**
+             * Twirling
+             * @description Enable IBM Runtime gate and measurement twirling. This is an explicit execution variant and does not enable Runtime resilience.
+             * @default false
+             */
+            twirling: boolean;
         };
         /**
          * BackendProcessorType
@@ -1185,14 +1197,26 @@ export interface components {
             customMolecules?: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Dynamicaldecoupling
+             * @default false
+             */
+            dynamicalDecoupling: boolean;
             /** Entries */
             entries?: {
                 [key: string]: unknown;
             }[];
             /** Name */
             name: string;
+            /**
+             * Optimizationlevel
+             * @default 1
+             */
+            optimizationLevel: number;
             /** Registrationdigest */
             registrationDigest: string;
+            /** Seedtranspiler */
+            seedTranspiler?: number | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1210,6 +1234,16 @@ export interface components {
             selectedBasis: string;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 4096
+             */
+            shots: number;
+            /**
+             * Twirling
+             * @default false
+             */
+            twirling: boolean;
         };
         /**
          * BenchmarkRunCreate
@@ -1231,14 +1265,26 @@ export interface components {
             customMolecules?: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Dynamicaldecoupling
+             * @default false
+             */
+            dynamicalDecoupling: boolean;
             /** Entries */
             entries?: {
                 [key: string]: unknown;
             }[];
             /** Name */
             name: string;
+            /**
+             * Optimizationlevel
+             * @default 1
+             */
+            optimizationLevel: number;
             /** Registrationdigest */
             registrationDigest?: string | null;
+            /** Seedtranspiler */
+            seedTranspiler?: number | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1256,6 +1302,16 @@ export interface components {
             selectedBasis: string;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 4096
+             */
+            shots: number;
+            /**
+             * Twirling
+             * @default false
+             */
+            twirling: boolean;
         };
         /**
          * BenchmarkRunListResponse
@@ -1296,6 +1352,11 @@ export interface components {
             customMolecules?: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Dynamicaldecoupling
+             * @default false
+             */
+            dynamicalDecoupling: boolean;
             /** Entries */
             entries?: {
                 [key: string]: unknown;
@@ -1307,8 +1368,15 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /**
+             * Optimizationlevel
+             * @default 1
+             */
+            optimizationLevel: number;
             /** Registrationdigest */
             registrationDigest?: string | null;
+            /** Seedtranspiler */
+            seedTranspiler?: number | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1326,6 +1394,16 @@ export interface components {
             selectedBasis: string;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 4096
+             */
+            shots: number;
+            /**
+             * Twirling
+             * @default false
+             */
+            twirling: boolean;
             /**
              * Updatedat
              * Format: date-time
@@ -1347,12 +1425,18 @@ export interface components {
             customMolecules?: {
                 [key: string]: unknown;
             }[] | null;
+            /** Dynamicaldecoupling */
+            dynamicalDecoupling?: boolean | null;
             /** Entries */
             entries?: {
                 [key: string]: unknown;
             }[] | null;
             /** Name */
             name?: string | null;
+            /** Optimizationlevel */
+            optimizationLevel?: number | null;
+            /** Seedtranspiler */
+            seedTranspiler?: number | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][] | null;
             /** Selectedbackendmode */
@@ -1363,6 +1447,10 @@ export interface components {
             selectedBasis?: string | null;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[] | null;
+            /** Shots */
+            shots?: number | null;
+            /** Twirling */
+            twirling?: boolean | null;
         };
         /**
          * ConfigChoiceMetadata

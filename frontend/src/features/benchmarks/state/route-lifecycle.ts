@@ -50,6 +50,11 @@ export function useBenchmarkRouteReset({
   setSelectedBasis,
   setSelectedBackendMode,
   setSelectedBackendName,
+  setShots,
+  setOptimizationLevel,
+  setSeedTranspiler,
+  setDynamicalDecoupling,
+  setTwirling,
   setChemicalAccuracyHa,
   setCustomMolecules,
   setSavedBenchmarkLoadError,
@@ -69,6 +74,11 @@ export function useBenchmarkRouteReset({
   setSelectedBasis: Dispatch<SetStateAction<string>>;
   setSelectedBackendMode: Dispatch<SetStateAction<BenchmarkBackendMode>>;
   setSelectedBackendName: Dispatch<SetStateAction<string | null>>;
+  setShots?: Dispatch<SetStateAction<number>>;
+  setOptimizationLevel?: Dispatch<SetStateAction<0 | 1 | 2 | 3>>;
+  setSeedTranspiler?: Dispatch<SetStateAction<number | null>>;
+  setDynamicalDecoupling?: Dispatch<SetStateAction<boolean>>;
+  setTwirling?: Dispatch<SetStateAction<boolean>>;
   setChemicalAccuracyHa: Dispatch<SetStateAction<number>>;
   setCustomMolecules: Dispatch<SetStateAction<MoleculeResponse[]>>;
   setSavedBenchmarkLoadError: Dispatch<SetStateAction<string | null>>;
@@ -92,6 +102,11 @@ export function useBenchmarkRouteReset({
       setSelectedBasis,
       setSelectedBackendMode,
       setSelectedBackendName,
+      setShots,
+      setOptimizationLevel,
+      setSeedTranspiler,
+      setDynamicalDecoupling,
+      setTwirling,
       setChemicalAccuracyHa,
       setCustomMolecules,
     });
@@ -109,6 +124,11 @@ export function useBenchmarkRouteReset({
     setAlgorithmVariants,
     setSelectedBackendMode,
     setSelectedBackendName,
+    setShots,
+    setOptimizationLevel,
+    setSeedTranspiler,
+    setDynamicalDecoupling,
+    setTwirling,
     setSelectedBasis,
     setSelectedMoleculeKeys,
     setSelectedSavedBenchmarkId,
