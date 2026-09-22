@@ -9,9 +9,9 @@ from worker.chemistry.algorithms.sqd import workflow as sqd_solver
 from worker.chemistry.algorithms.sqd.convergence import (
     build_iteration_signature,
     compute_iteration_deltas,
-    iteration_values_are_finite,
     is_iteration_converged,
     is_iteration_stalled,
+    iteration_values_are_finite,
 )
 
 
