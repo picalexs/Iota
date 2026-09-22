@@ -172,8 +172,8 @@ The command writes four plots and `plot_manifest.json`:
 - `error_vs_runtime`: positive runtime and error points on log axes.
 
 Error and runtime plots group rows by algorithm and actual execution path.
-This prevents Aer sampler, Aer estimator, local classical, and diagnostic
-paths from appearing as one method.
+This prevents Aer sampler, Aer estimator, and local classical paths from
+appearing as one method.
 
 Use `--error-view signed` for signed error plots. Use `--format svg` for
 editable vector output or `--format both` for PNG and SVG. The plot writer
@@ -204,7 +204,3 @@ The tests use fake API clients and local rows. They do not submit QSS runs.
   manifest helpers. It defines the export eligibility contract;
 - `benchmark_plots.py`: layout-safe Matplotlib plot builders;
 - `tests/`: focused exporter tests;
-- `quantum_diag/`: older local benchmark and diagnostic tools.
-
-The older local tools remain available for development diagnostics. They are
-not required by the three-step API workflow.
