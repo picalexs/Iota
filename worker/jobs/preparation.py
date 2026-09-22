@@ -104,6 +104,11 @@ def prepare_backend_and_hamiltonian(
         "reference_gpu_fallback_reason",
         "scf_device",
         "casci_device",
+        "reference_scf_seconds",
+        "casci_seconds",
+        "pauli_build_seconds",
+        "hamiltonian_total_seconds",
+        "reference_transfer_seconds",
     ):
         if key in hamiltonian_bundle.metadata:
             backend_context.resource_metadata[key] = hamiltonian_bundle.metadata[key]

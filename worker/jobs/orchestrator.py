@@ -23,6 +23,84 @@ from .run_execution.contracts import (
 
 logger = logging.getLogger(__name__)
 
+_TIMING_LEDGER_VERSION = 1
+
+
+def _numeric_seconds(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and value >= 0:
+        return float(value)
+    return None
+
+
+def _algorithm_stage_timing(result: dict[str, Any]) -> dict[str, float]:
+    """Normalize algorithm-reported nested timers without double counting them."""
+    metrics = result.get("algorithm_metrics")
+    if not isinstance(metrics, dict):
+        return {}
+    candidates: list[dict[str, Any]] = []
+    matrix_summary = metrics.get("matrix_element_summary")
+    if isinstance(matrix_summary, dict):
+        breakdown = matrix_summary.get("timing_breakdown")
+        if isinstance(breakdown, dict):
+            candidates.append(breakdown)
+    sci_package = metrics.get("sci_result_package")
+    if isinstance(sci_package, dict):
+        breakdown = sci_package.get("timing_breakdown")
+        if isinstance(breakdown, dict):
+            candidates.append(breakdown)
+    for key in ("timing_breakdown", "timing"):
+        breakdown = metrics.get(key)
+        if isinstance(breakdown, dict):
+            candidates.append(breakdown)
+
+    normalized: dict[str, float] = {}
+    aliases = {
+        "state_generation_or_sampling_seconds": (
+            "state_evolution_seconds",
+            "matrix_element_estimation_seconds",
+            "sampling_seconds",
+        ),
+        "selected_ci_seconds": ("selected_ci_seconds",),
+        "projected_solve_seconds": ("projected_solve_seconds",),
+        "algorithm_preparation_seconds": ("preparation_seconds",),
+        "algorithm_solve_postprocess_seconds": ("solve_and_postprocess_seconds",),
+        "optimizer_wall_seconds": ("optimizer_wall_time_seconds",),
+    }
+    for output_key, source_keys in aliases.items():
+        for candidate in candidates:
+            value = None
+            for source_key in source_keys:
+                value = _numeric_seconds(candidate.get(source_key))
+                if value is not None:
+                    break
+            if value is not None:
+                normalized[output_key] = value
+                break
+    return normalized
+
+
+def _cpu_stage_seconds(
+    *,
+    timing_components: dict[str, Any],
+    stage_timing: dict[str, float],
+    resource_metadata: dict[str, Any],
+) -> float:
+    """Sum only known CPU-owned wall times; unknown work stays unattributed."""
+    values: list[float] = []
+    for key in ("backend_setup_seconds", "casci_seconds", "pauli_build_seconds"):
+        value = _numeric_seconds(timing_components.get(key) or resource_metadata.get(key))
+        if value is not None:
+            values.append(value)
+    reference_device = resource_metadata.get("reference_device_actual")
+    if reference_device != "GPU":
+        value = _numeric_seconds(resource_metadata.get("reference_scf_seconds"))
+        if value is not None:
+            values.append(value)
+    projected = stage_timing.get("projected_solve_seconds")
+    if projected is not None:
+        values.append(projected)
+    return sum(values)
+
 
 def dispatch_and_finalize_run(
     *,
@@ -165,6 +243,9 @@ def dispatch_and_finalize_run(
     segment_wall = max(time.monotonic() - run_wall_start, 0.0)
     total_wall = execution_duration_seconds(progress_state)
     timing_components = dict(progress_state.get("timing_components") or {})
+    timing_metadata = progress_state.get("timing_metadata")
+    if isinstance(timing_metadata, dict):
+        timing_components.update(timing_metadata)
     timing_components["algorithm_dispatch_seconds"] = algorithm_seconds
     resource_metadata = prepared.backend_context.resource_metadata
     for source_key, timing_key in (
@@ -174,20 +255,68 @@ def dispatch_and_finalize_run(
         value = resource_metadata.get(source_key)
         if isinstance(value, (int, float)):
             timing_components[timing_key] = max(float(value), 0.0)
-    timing_components["segment_wall_seconds"] = segment_wall
-    timing_components["total_wall_seconds"] = total_wall
-    measured_seconds = sum(
-        value
-        for key, value in timing_components.items()
-        if key
-        not in {
-            "total_wall_seconds",
-            "segment_wall_seconds",
-            "unattributed_lifecycle_seconds",
-        }
-        and isinstance(value, (int, float))
+    algorithm_stage_timing = _algorithm_stage_timing(result)
+    reference_scf_seconds = _numeric_seconds(resource_metadata.get("reference_scf_seconds"))
+    casci_seconds = _numeric_seconds(resource_metadata.get("casci_seconds"))
+    pauli_build_seconds = _numeric_seconds(resource_metadata.get("pauli_build_seconds"))
+    hamiltonian_total_seconds = _numeric_seconds(
+        resource_metadata.get("hamiltonian_total_seconds")
     )
-    timing_components["unattributed_lifecycle_seconds"] = max(segment_wall - measured_seconds, 0.0)
+    stage_wall_seconds: dict[str, float | None] = {
+        "backend_setup": _numeric_seconds(timing_components.get("backend_setup_seconds")),
+        "reference_scf": reference_scf_seconds,
+        "hamiltonian_build": hamiltonian_total_seconds
+        or _numeric_seconds(timing_components.get("hamiltonian_preparation_seconds")),
+        "state_generation_or_sampling": algorithm_stage_timing.get(
+            "state_generation_or_sampling_seconds"
+        ),
+        "selected_ci": algorithm_stage_timing.get("selected_ci_seconds"),
+        "projected_solve": algorithm_stage_timing.get("projected_solve_seconds"),
+        "finalize": None,
+    }
+    timing_components["timing_ledger_version"] = _TIMING_LEDGER_VERSION
+    timing_components["stage_wall_seconds"] = stage_wall_seconds
+    timing_components["algorithm_stage_timing"] = algorithm_stage_timing
+    timing_components["aer_simulation_wall_seconds"] = timing_components.get(
+        "aer_simulation_seconds"
+    )
+    timing_components["transfer_wall_seconds"] = timing_components.get(
+        "reference_transfer_seconds", 0.0
+    )
+    chemistry_gpu_seconds = (
+        reference_scf_seconds
+        if resource_metadata.get("reference_device_actual") == "GPU"
+        else 0.0
+    )
+    timing_components["chemistry_gpu_wall_seconds"] = chemistry_gpu_seconds
+    timing_components["cpu_stage_wall_seconds"] = _cpu_stage_seconds(
+        timing_components=timing_components,
+        stage_timing=algorithm_stage_timing,
+        resource_metadata=resource_metadata,
+    )
+    timing_components["timing_accounting"] = "exclusive_top_level_plus_nested_stage_wall"
+    timing_components["segment_wall_seconds"] = segment_wall
+    timing_components["worker_wall_seconds"] = segment_wall
+    timing_components["total_wall_seconds"] = total_wall
+    exclusive_keys = (
+        "backend_setup_seconds",
+        "hamiltonian_preparation_seconds",
+        "algorithm_dispatch_seconds",
+    )
+    exclusive_seconds = sum(
+        value
+        for key in exclusive_keys
+        for value in [_numeric_seconds(timing_components.get(key))]
+        if value is not None
+    )
+    timing_components["unattributed_worker_seconds"] = max(
+        segment_wall - exclusive_seconds, 0.0
+    )
+    timing_components["unattributed_lifecycle_seconds"] = timing_components[
+        "unattributed_worker_seconds"
+    ]
+    timing_components["idle_gap_seconds"] = None
+    timing_components["idle_gap_status"] = "unavailable_without_stage_markers"
     timing_components["timing_basis"] = WORKER_RUNTIME_BASIS
     result["execution_timing"] = timing_components
     result_metrics = result.get("algorithm_metrics")

@@ -88,6 +88,7 @@ def execute_sqd_iteration(
     """Run one SQD sampling and recovery iteration and update run state."""
     iter_start = time.monotonic()
     reuse_sample_set = state.measured_bitstring_matrix is not None
+    sampling_started = time.monotonic()
     sampling = sampling_iteration(
         iteration=iteration,
         backend=backend,
@@ -101,6 +102,7 @@ def execute_sqd_iteration(
         measured_bitstring_matrix=state.measured_bitstring_matrix,
         measured_circuit=state.measured_circuit,
     )
+    state.sampling_seconds += max(time.monotonic() - sampling_started, 0.0)
     if not reuse_sample_set:
         state.measured_bitstring_matrix = sampling.raw_bitstring_matrix
         state.measured_circuit = sampling.sampled_circuit
@@ -133,6 +135,7 @@ def execute_sqd_iteration(
     state.carryover_ci_strings = batch_outcome.carryover_ci_strings
     state.last_carryover_summary = batch_outcome.last_carryover_summary
     state.last_batch_energies = batch_outcome.last_batch_energies
+    state.selected_ci_seconds += batch_outcome.selected_ci_seconds
     state.selected_ci_dimensions.extend(batch_outcome.selected_ci_dimensions)
     state.selected_ci_fractions.extend(batch_outcome.selected_ci_fractions)
 

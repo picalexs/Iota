@@ -107,6 +107,11 @@ def test_orchestrator_keeps_estimate_dispatch_and_finalization_order() -> None:
     )
     assert result["execution_timing"]["algorithm_dispatch_seconds"] >= 0.0
     assert result["execution_timing"]["total_wall_seconds"] == result["runtime_seconds"]
+    assert result["execution_timing"]["timing_ledger_version"] == 1
+    assert result["execution_timing"]["stage_wall_seconds"]["projected_solve"] is None
+    assert result["execution_timing"]["worker_wall_seconds"] >= 0.0
+    assert result["execution_timing"]["idle_gap_status"] == "unavailable_without_stage_markers"
+    assert result["execution_timing"]["unattributed_worker_seconds"] >= 0.0
     assert isinstance(result["run_finished_at"], str)
     assert estimate_projected_paths == [True]
     assert order == [

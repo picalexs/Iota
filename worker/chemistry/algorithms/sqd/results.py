@@ -38,6 +38,8 @@ class SQDRunState(Protocol):
     sampled_circuits: list[tuple[int, Any]]
     selected_ci_dimensions: list[int]
     selected_ci_fractions: list[float]
+    sampling_seconds: float
+    selected_ci_seconds: float
     last_selected_ci_summary: dict[str, Any]
     last_batch_energies: list[float]
     best_observed_energy: float
@@ -152,6 +154,10 @@ def _build_subsampling_summary(
             "actual_device": options.selected_ci_actual_device,
             "provider": options.selected_ci_provider,
             "fallback_reason": options.selected_ci_fallback_reason,
+        },
+        "timing_breakdown": {
+            "sampling_seconds": max(float(state.sampling_seconds), 0.0),
+            "selected_ci_seconds": max(float(state.selected_ci_seconds), 0.0),
         },
     }
     if state.selected_ci_dimensions:

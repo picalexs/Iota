@@ -29,6 +29,30 @@ def current_rq_job_id() -> str | None:
     return str(job_id) if job_id else None
 
 
+def _current_rq_job() -> Any | None:
+    """Return the current RQ job without making RQ a hard import dependency."""
+    try:
+        from rq import get_current_job
+    except ImportError:
+        return None
+    return get_current_job()
+
+
+def _queue_wait_seconds(job: Any, worker_started_at: datetime) -> float | None:
+    """Calculate wall-clock queue wait from the enqueue metadata when present."""
+    metadata = getattr(job, "meta", None)
+    enqueued_at = metadata.get("qss_enqueued_at") if isinstance(metadata, dict) else None
+    if not isinstance(enqueued_at, str):
+        return None
+    try:
+        enqueued = datetime.fromisoformat(enqueued_at)
+    except ValueError:
+        return None
+    if enqueued.tzinfo is None:
+        enqueued = enqueued.replace(tzinfo=UTC)
+    return max((worker_started_at - enqueued).total_seconds(), 0.0)
+
+
 def start_execution_segment(
     session: Any,
     *,
@@ -48,6 +72,12 @@ def start_execution_segment(
     progress_state[SEGMENT_PRIOR_DURATION_KEY] = repository.get_closed_execution_duration(run_id)
     progress_state[SEGMENT_ID_KEY] = segment_id
     progress_state[SEGMENT_STARTED_KEY] = time.monotonic()
+    timing_components = progress_state.setdefault("timing_components", {})
+    queue_wait = _queue_wait_seconds(_current_rq_job(), worker_started_at)
+    timing_components["queue_wait_seconds"] = queue_wait
+    progress_state["timing_metadata"] = {
+        "queue_wait_status": "measured" if queue_wait is not None else "unavailable",
+    }
     return segment_id
 
 

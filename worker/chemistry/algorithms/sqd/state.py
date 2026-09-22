@@ -36,6 +36,8 @@ class SQDRunState:
     sampled_circuits: list[tuple[int, Any]] = field(default_factory=list)
     selected_ci_dimensions: list[int] = field(default_factory=list)
     selected_ci_fractions: list[float] = field(default_factory=list)
+    sampling_seconds: float = 0.0
+    selected_ci_seconds: float = 0.0
     last_selected_ci_summary: dict[str, Any] = field(default_factory=dict)
     last_batch_energies: list[float] = field(default_factory=list)
     best_observed_energy: float = float("inf")

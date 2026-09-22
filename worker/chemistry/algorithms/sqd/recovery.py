@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -46,6 +47,8 @@ class SQDBatchOutcome:
     effective_samples_per_batch: int
     selected_ci_dimensions: list[int]
     selected_ci_fractions: list[float]
+    sampling_seconds: float = 0.0
+    selected_ci_seconds: float = 0.0
 
 
 def _emit_progress(
@@ -140,6 +143,7 @@ def run_selected_ci_batches(
 ) -> SQDBatchOutcome:
     """Run selected-CI batch solves for one SQD recovery iteration."""
     effective_samples_per_batch = min(options.samples_per_batch, int(selected_bits.shape[0]))
+    sampling_started = time.monotonic()
     selected_batches = deps.subsample(
         selected_bits,
         selected_probs,
@@ -161,8 +165,11 @@ def run_selected_ci_batches(
     best_batch_fraction = 0.0
     full_sci_dimension = options.selected_ci_limit_summary["full_sci_dimension"]
     batch_occupancy_values: list[tuple[np.ndarray, np.ndarray]] = []
+    sampling_seconds = max(time.monotonic() - sampling_started, 0.0)
+    selected_ci_seconds = 0.0
 
     for batch_index, batch in enumerate(selected_batches, start=1):
+        selected_ci_started = time.monotonic()
         batch_bits, batch_probs, _batch_counts = aggregate_bitstring_frequencies(batch)
         ci_strings, ci_summary = selected_ci_strings_from_bitstrings(
             batch_bits,
@@ -214,6 +221,7 @@ def run_selected_ci_batches(
             best_batch_spin_sq = float(spin_sq)
             best_batch_summary = dict(ci_summary)
             best_batch_fraction = selected_ci_fractions[-1]
+        selected_ci_seconds += max(time.monotonic() - selected_ci_started, 0.0)
 
         _emit_selected_ci_batch_completed_progress(
             iteration=iteration,
@@ -300,4 +308,6 @@ def run_selected_ci_batches(
         effective_samples_per_batch=effective_samples_per_batch,
         selected_ci_dimensions=selected_ci_dimensions,
         selected_ci_fractions=selected_ci_fractions,
+        sampling_seconds=sampling_seconds,
+        selected_ci_seconds=selected_ci_seconds,
     )

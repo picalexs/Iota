@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -96,11 +97,13 @@ def execute_sector_qse(
     real_scalar_fn: RealScalar,
 ) -> QSEExecutionOutcome:
     """Execute the QSE fixed-particle-sector path."""
+    total_started = time.monotonic()
     reference_method, reference_state, reference_artifacts = resolve_reference_state_fn(
         hamiltonian=hamiltonian,
         action=action,
         resolved_config=resolved_config,
     )
+    reference_seconds = max(time.monotonic() - total_started, 0.0)
     basis_selection_callback, selected_specs = _basis_selection_observer()
     basis = build_excitation_basis_fn(
         reference_state,
@@ -112,6 +115,7 @@ def execute_sector_qse(
         progress_callback=progress_callback,
         selection_callback=basis_selection_callback,
     )
+    basis_seconds = max(time.monotonic() - total_started - reference_seconds, 0.0)
     basis_matrix = np.column_stack(basis)
     eigenvalues, _, diagnostics, residual_diagnostics, _ = solve_action_subspace_fn(
         action,
@@ -119,6 +123,7 @@ def execute_sector_qse(
         residual_tolerance=residual_tolerance,
         regularization=0.0,
     )
+    solve_seconds = max(time.monotonic() - total_started - reference_seconds - basis_seconds, 0.0)
     diagnostics["regularization"] = 0.0
     dominant_reference_used = (
         dominant_sector_occupations(reference_state, action) is not None
@@ -157,6 +162,12 @@ def execute_sector_qse(
     if callable(matvec):
         residual = matvec(reference_state) - reference_energy * reference_state
         reference_variance = float(np.vdot(residual, residual).real)
+    diagnostics["timing_breakdown"] = {
+        "reference_seconds": reference_seconds,
+        "basis_seconds": basis_seconds,
+        "projected_solve_seconds": solve_seconds,
+        "total_seconds": max(time.monotonic() - total_started, 0.0),
+    }
     return QSEExecutionOutcome(
         eigenvalues=eigenvalues,
         basis_rank=basis_matrix.shape[1],
@@ -195,6 +206,7 @@ def execute_dense_qse(
     execution_mode: str = "dense_exact_emulation",
 ) -> QSEExecutionOutcome:
     """Execute the dense QSE path with an exact projected eigensystem solve."""
+    total_started = time.monotonic()
     reference_method, reference_state, reference_artifacts = resolve_reference_state_fn(
         hamiltonian=hamiltonian,
         backend=backend,
@@ -202,6 +214,7 @@ def execute_dense_qse(
         resolved_config=resolved_config,
         progress_callback=progress_callback,
     )
+    reference_seconds = max(time.monotonic() - total_started, 0.0)
     basis_selection_callback, selected_specs = _basis_selection_observer()
     basis = build_excitation_basis_fn(
         reference_state,
@@ -213,6 +226,7 @@ def execute_dense_qse(
         progress_callback=progress_callback,
         selection_callback=basis_selection_callback,
     )
+    basis_seconds = max(time.monotonic() - total_started - reference_seconds, 0.0)
     basis_matrix = np.column_stack(basis)
     overlap = build_overlap_matrix_fn(basis)
     projected_hamiltonian = basis_matrix.conj().T @ operator @ basis_matrix
@@ -220,6 +234,7 @@ def execute_dense_qse(
         projected_hamiltonian,
         overlap,
     )
+    solve_seconds = max(time.monotonic() - total_started - reference_seconds - basis_seconds, 0.0)
     if eigenvalues.size:
         ritz_state = basis_matrix @ eigenvectors[:, 0]
         full_residual = operator @ ritz_state - eigenvalues[0] * ritz_state
@@ -281,6 +296,12 @@ def execute_dense_qse(
         **diagnostics,
         "reference_state_execution": "exact_emulation",
         "matrix_element_source": "exact_operator_and_statevectors",
+        "timing_breakdown": {
+            "reference_seconds": reference_seconds,
+            "basis_seconds": basis_seconds,
+            "projected_solve_seconds": solve_seconds,
+            "total_seconds": max(time.monotonic() - total_started, 0.0),
+        },
     }
     return QSEExecutionOutcome(
         eigenvalues=eigenvalues,
@@ -318,12 +339,14 @@ def execute_measured_qse(
     A rank-reduced (``stabilized``) solve becomes a non-converged diagnostic; a
     zero-rank or non-finite solve raises a hard failure inside the solver.
     """
+    total_started = time.monotonic()
     estimate_matrices_fn = execution_dependencies["estimate_matrices_fn"]
     solve_stabilized_fn = execution_dependencies["solve_stabilized_fn"]
     diagnostic_reportable_fn = execution_dependencies["diagnostic_reportable_fn"]
     build_reference_descriptor_fn = execution_dependencies["build_reference_descriptor_fn"]
     build_hf_reference_state_fn = execution_dependencies["build_hf_reference_state_fn"]
 
+    estimate_started = time.monotonic()
     estimate = estimate_matrices_fn(
         hamiltonian=hamiltonian,
         estimator=estimator,
@@ -332,16 +355,19 @@ def execute_measured_qse(
         backend_context=backend_context,
         progress_callback=progress_callback,
     )
+    matrix_seconds = max(time.monotonic() - estimate_started, 0.0)
     projected_hamiltonian = estimate.projected_hamiltonian
     overlap = estimate.overlap
     basis_rank = projected_hamiltonian.shape[0]
 
+    solve_started = time.monotonic()
     stabilized = solve_stabilized_fn(
         projected_hamiltonian,
         overlap,
         regularization=regularization,
         max_standard_error=estimate.summary.get("max_overlap_standard_error"),
     )
+    solve_seconds = max(time.monotonic() - solve_started, 0.0)
     if stabilized.eigenvalues.size == 0:
         raise ValueError("Measured QSE projected solve produced no eigenvalues")
 
@@ -407,6 +433,11 @@ def execute_measured_qse(
         ),
         "reference_descriptor": reference_descriptor,
         "backend_target": getattr(backend_context, "backend_target", None),
+        "timing_breakdown": {
+            "matrix_element_estimation_seconds": matrix_seconds,
+            "projected_solve_seconds": solve_seconds,
+            "total_seconds": max(time.monotonic() - total_started, 0.0),
+        },
         **estimate.summary,
     }
     _record_regularization_scope(

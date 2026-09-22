@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
@@ -285,6 +286,14 @@ def enqueue_run(
         on_success="worker.jobs.on_job_success",
         on_failure="worker.jobs.on_job_failure",
     )
+    existing_meta = getattr(job, "meta", None)
+    existing_meta = existing_meta if isinstance(existing_meta, dict) else {}
+    job.meta = {
+        **existing_meta,
+        "qss_enqueued_at": datetime.now(UTC).isoformat(),
+        "qss_queue_name": selected_queue_name,
+    }
+    job.save_meta()
     logger.info(
         "Enqueued run %s as RQ job %s on queue '%s' with timeout=%ss",
         run_id,
