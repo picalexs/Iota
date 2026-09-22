@@ -382,6 +382,14 @@ class RunControlService:
         try:
             queue_routing = queue_service.queue_routing_for_run(run)
             queue_service.record_queue_routing_metadata(run, queue_routing)
+            if queue_routing.routing_error is not None:
+                logger.error(
+                    "Run %s was not enqueued because provider routing is unavailable: %s",
+                    run.id,
+                    queue_routing.routing_error,
+                )
+                self.db.commit()
+                return None
             return queue_service.enqueue_run(
                 run.id,
                 redis_client,

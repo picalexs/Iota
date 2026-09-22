@@ -143,12 +143,49 @@ def test_queue_name_for_run_keeps_cpu_default_queue():
 
 
 def test_queue_name_for_run_routes_gpu_chemistry_requests():
-    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    settings = MagicMock(
+        queue_name="quantum",
+        gpu_queue_name="quantum-gpu",
+        gpu4pyscf_queue_name="quantum-gpu4pyscf",
+    )
     run = MagicMock(
         config_json={"chemistry_options": {"reference_device": "GPU"}}
     )
 
-    assert queue_name_for_run(run, settings=settings) == "quantum-gpu"
+    assert queue_name_for_run(run, settings=settings) == "quantum-gpu4pyscf"
+
+
+def test_queue_name_for_run_rejects_unconfigured_chemistry_gpu_queue():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(config_json={"chemistry_options": {"reference_device": "GPU"}})
+
+    decision = queue_routing_for_run(run, settings=settings)
+
+    assert decision.queue_name == "quantum"
+    assert decision.provider == "gpu4pyscf"
+    assert decision.routing_error == "gpu4pyscf_gpu_queue_not_configured"
+
+
+def test_queue_name_for_run_rejects_mixed_gpu_provider_request():
+    settings = MagicMock(
+        queue_name="quantum",
+        gpu_queue_name="quantum-gpu",
+        gpu4pyscf_queue_name="quantum-gpu4pyscf",
+        sbd_gpu_queue_name="quantum-sbd",
+    )
+    run = MagicMock(
+        config_json={
+            "backend_options": {"device": "GPU"},
+            "chemistry_options": {"reference_device": "GPU"},
+        }
+    )
+
+    decision = queue_routing_for_run(run, settings=settings)
+
+    assert decision.provider_requirements == ("aer", "gpu4pyscf")
+    assert decision.routing_error == (
+        "multiple_gpu_providers_require_one_validated_combined_image_or_stage_split"
+    )
 
 
 def test_queue_name_for_run_keeps_automatic_chemistry_on_cpu_queue():

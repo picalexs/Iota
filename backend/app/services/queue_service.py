@@ -37,6 +37,9 @@ class QueueRoutingDecision:
     resource_class: str
     fallback_reason: str | None = None
     requested_auto_stages: tuple[str, ...] = ()
+    provider: str | None = None
+    provider_requirements: tuple[str, ...] = ()
+    routing_error: str | None = None
 
 
 def _classify_queue_error(error: BaseException) -> QueueFailureReason:
@@ -92,6 +95,61 @@ def _normalize_setting(value: Any) -> str | None:
     return value.strip().upper()
 
 
+def _configured_provider_queue(settings: Any, provider: str) -> str | None:
+    """Return an explicitly configured queue for one chemistry provider."""
+    setting_name = {
+        "gpu4pyscf": "gpu4pyscf_queue_name",
+        "sbd": "sbd_gpu_queue_name",
+    }.get(provider)
+    value = getattr(settings, setting_name, None) if setting_name else None
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return value.strip()
+
+
+def _provider_routing_decision(
+    *,
+    settings: Any,
+    providers: tuple[str, ...],
+    requested_auto_stages: tuple[str, ...],
+) -> QueueRoutingDecision | None:
+    """Resolve provider-specific GPU routing without guessing image contents."""
+    if not providers:
+        return None
+    if len(providers) > 1:
+        return QueueRoutingDecision(
+            queue_name=str(settings.queue_name),
+            resource_class="gpu",
+            requested_auto_stages=requested_auto_stages,
+            provider_requirements=providers,
+            routing_error=(
+                "multiple_gpu_providers_require_one_validated_combined_image_or_stage_split"
+            ),
+        )
+
+    provider = providers[0]
+    if provider == "aer":
+        queue_name = str(settings.gpu_queue_name)
+    else:
+        queue_name = _configured_provider_queue(settings, provider)
+        if queue_name is None:
+            return QueueRoutingDecision(
+                queue_name=str(settings.queue_name),
+                resource_class="gpu",
+                requested_auto_stages=requested_auto_stages,
+                provider=provider,
+                provider_requirements=providers,
+                routing_error=f"{provider}_gpu_queue_not_configured",
+            )
+    return QueueRoutingDecision(
+        queue_name=queue_name,
+        resource_class="gpu",
+        requested_auto_stages=requested_auto_stages,
+        provider=provider,
+        provider_requirements=providers,
+    )
+
+
 def queue_routing_for_run(
     run: object,
     *,
@@ -113,36 +171,35 @@ def queue_routing_for_run(
         )
 
     backend_options = config_snapshot.get("backend_options")
-    if isinstance(backend_options, dict) and _normalize_setting(
-        backend_options.get("device")
-    ) == "GPU":
-        return QueueRoutingDecision(
-            queue_name=str(resolved_settings.gpu_queue_name),
-            resource_class="gpu",
-        )
-
     chemistry_options = config_snapshot.get("chemistry_options")
-    if not isinstance(chemistry_options, dict):
-        return QueueRoutingDecision(
-            queue_name=str(resolved_settings.queue_name),
-            resource_class="cpu",
-        )
-
+    chemistry_options = chemistry_options if isinstance(chemistry_options, dict) else {}
     chemistry_stages = {
         "reference_scf": chemistry_options.get("reference_device"),
         "selected_ci": chemistry_options.get("selected_ci_device"),
     }
-    if any(_normalize_setting(value) == "GPU" for value in chemistry_stages.values()):
-        return QueueRoutingDecision(
-            queue_name=str(resolved_settings.gpu_queue_name),
-            resource_class="gpu",
-        )
 
     auto_stages = tuple(
         stage
         for stage, value in chemistry_stages.items()
         if _normalize_setting(value) == "AUTO"
     )
+    providers: list[str] = []
+    if isinstance(backend_options, dict) and _normalize_setting(
+        backend_options.get("device")
+    ) == "GPU":
+        providers.append("aer")
+    if _normalize_setting(chemistry_stages["reference_scf"]) == "GPU":
+        providers.append("gpu4pyscf")
+    if _normalize_setting(chemistry_stages["selected_ci"]) == "GPU":
+        providers.append("sbd")
+
+    provider_decision = _provider_routing_decision(
+        settings=resolved_settings,
+        providers=tuple(dict.fromkeys(providers)),
+        requested_auto_stages=auto_stages,
+    )
+    if provider_decision is not None:
+        return provider_decision
     return QueueRoutingDecision(
         queue_name=str(resolved_settings.queue_name),
         resource_class="cpu",
@@ -165,7 +222,11 @@ def record_queue_routing_metadata(
     decision: QueueRoutingDecision,
 ) -> None:
     """Record deferred AUTO intent in the existing run metadata field."""
-    if decision.fallback_reason is None:
+    if (
+        decision.fallback_reason is None
+        and decision.provider is None
+        and decision.routing_error is None
+    ):
         return
 
     metadata = getattr(run, "run_metadata", None)
@@ -182,6 +243,12 @@ def record_queue_routing_metadata(
         "requested_auto_stages": list(decision.requested_auto_stages),
         "fallback_reason": decision.fallback_reason,
     }
+    if decision.provider is not None:
+        routing_metadata["provider"] = decision.provider
+    if decision.provider_requirements:
+        routing_metadata["provider_requirements"] = list(decision.provider_requirements)
+    if decision.routing_error is not None:
+        routing_metadata["routing_error"] = decision.routing_error
     run.run_metadata = {**metadata, "queue_routing": routing_metadata}
 
 

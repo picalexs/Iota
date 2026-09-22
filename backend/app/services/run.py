@@ -290,6 +290,15 @@ def _enqueue_created_run(db: Session, *, run: Run, redis_client) -> None:
     try:
         queue_routing = queue_service.queue_routing_for_run(run)
         queue_service.record_queue_routing_metadata(run, queue_routing)
+        if queue_routing.routing_error is not None:
+            logger.error(
+                "Run %s was not enqueued because provider routing is unavailable: %s",
+                run.id,
+                queue_routing.routing_error,
+            )
+            db.commit()
+            db.refresh(run)
+            return
         rq_job_id = queue_service.enqueue_run(
             run.id,
             redis_client,
