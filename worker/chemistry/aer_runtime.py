@@ -116,6 +116,8 @@ def extract_aer_result_metadata(result: Any, *, experiment_index: int = 0) -> di
 
     experiment_metadata: dict[str, Any] = {}
     results = getattr(result, "results", None)
+    if not isinstance(results, (list, tuple)):
+        results = getattr(result, "pub_results", None)
     if isinstance(results, (list, tuple)) and 0 <= experiment_index < len(results):
         experiment_metadata = _metadata_mapping(
             getattr(results[experiment_index], "metadata", None)

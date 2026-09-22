@@ -21,9 +21,26 @@ from worker.chemistry.matrix_element_circuits import (
     transpile_aer_circuit,
 )
 from worker.chemistry.aer_runtime import aer_runtime_metadata, validate_aer_runtime
+from worker.chemistry.aer_runtime import extract_aer_result_metadata
 
 _DEFAULT_CONTEXT = BackendExecutionContext(backend_target="aer_simulator")
 logger = logging.getLogger(__name__)
+
+
+class _ResultObservingJob:
+    """Proxy a local Aer job so result-level device facts are retained."""
+
+    def __init__(self, job: Any, observer: Callable[[dict[str, Any]], None]) -> None:
+        self._job = job
+        self._observer = observer
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._job, name)
+
+    def result(self, *args: Any, **kwargs: Any) -> Any:
+        result = self._job.result(*args, **kwargs)
+        self._observer(extract_aer_result_metadata(result))
+        return result
 
 
 class AerAdapter(BackendAdapter):
@@ -238,10 +255,13 @@ class AerAdapter(BackendAdapter):
             if isinstance(pub_count, (int, float)):
                 self._last_metadata["pub_count"] = int(pub_count)
 
+            observed_job = job
+            if callable(getattr(job, "result", None)):
+                observed_job = _ResultObservingJob(job, self._record_result_metadata)
             if primitive_job_observer is None:
-                return None
-            return primitive_job_observer(
-                job,
+                return observed_job
+            callback_result = primitive_job_observer(
+                observed_job,
                 {
                     **metadata,
                     "backend": "aer_simulator",
@@ -249,8 +269,14 @@ class AerAdapter(BackendAdapter):
                     "selection_policy": context.selection_policy,
                 },
             )
+            return observed_job if callback_result is None else callback_result
 
         return observe
+
+    def _record_result_metadata(self, metadata: dict[str, Any]) -> None:
+        if not metadata:
+            return
+        self._last_metadata.update(metadata)
 
     def _build_primitive_options(
         self,

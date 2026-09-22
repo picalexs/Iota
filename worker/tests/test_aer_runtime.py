@@ -83,3 +83,39 @@ def test_extract_aer_result_metadata_keeps_aggregate_and_experiment_facts() -> N
 
 def test_extract_aer_result_metadata_allows_missing_metadata() -> None:
     assert extract_aer_result_metadata(SimpleNamespace()) == {}
+
+
+def test_extract_aer_result_metadata_supports_primitive_pub_results() -> None:
+    result = SimpleNamespace(
+        metadata={"time_taken_execute": 0.5},
+        pub_results=[SimpleNamespace(metadata={"device": "GPU", "method": "statevector"})],
+    )
+
+    metadata = extract_aer_result_metadata(result)
+
+    assert metadata["aer_result_metadata"]["time_taken_execute"] == 0.5
+    assert metadata["aer_experiment_metadata"] == {
+        "device": "GPU",
+        "method": "statevector",
+    }
+    assert metadata["actual_device"] == "GPU"
+    assert metadata["device_verified"] is True
+
+
+def test_aer_job_proxy_records_metadata_when_primitive_result_is_consumed() -> None:
+    from worker.adapters.aer_adapter import _ResultObservingJob
+
+    result = SimpleNamespace(
+        pub_results=[SimpleNamespace(metadata={"device": "CPU", "method": "statevector"})]
+    )
+
+    class FakeJob:
+        def result(self):
+            return result
+
+    captured: dict[str, object] = {}
+    proxy = _ResultObservingJob(FakeJob(), captured.update)
+
+    assert proxy.result() is result
+    assert captured["actual_device"] == "CPU"
+    assert captured["device_verified"] is True
