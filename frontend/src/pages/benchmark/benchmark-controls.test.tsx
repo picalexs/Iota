@@ -216,6 +216,19 @@ describe("BenchmarkControls", () => {
     expect(addFromLibrary.className).toContain("bg-surface-raised");
   });
 
+  it("locks execution controls after a completed benchmark", async () => {
+    render(<BenchmarkControls {...makeDefaultProps({ total: 1, done: 1 })} />);
+
+    await screen.findByLabelText("Shots");
+
+    expect(screen.getByLabelText("Shots")).toBeDisabled();
+    expect(screen.getByLabelText("Transpiler seed")).toBeDisabled();
+    expect(
+      screen.getByRole("checkbox", { name: "Dynamical decoupling" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Twirling" })).toBeDisabled();
+  });
+
   it("renders unselected benchmark option cards with the raised surface", async () => {
     render(
       <BenchmarkControls
