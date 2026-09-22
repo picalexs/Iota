@@ -2113,6 +2113,8 @@ export interface components {
             vqe_reference_optimizer_name?: string | null;
             /** Vqe Reference Reps */
             vqe_reference_reps?: number | null;
+            /** Vqe Reference Seed */
+            vqe_reference_seed?: number | null;
         };
         /**
          * QSEComplexAmplitude
