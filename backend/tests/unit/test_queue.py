@@ -14,6 +14,8 @@ from app.services.queue_service import (
     count_workers,
     enqueue_run,
     queue_name_for_run,
+    queue_routing_for_run,
+    record_queue_routing_metadata,
 )
 from redis.exceptions import ConnectionError as RedisConnectionError
 from rq.exceptions import InvalidJobOperation, NoSuchJobError
@@ -147,6 +149,82 @@ def test_queue_name_for_run_routes_gpu_chemistry_requests():
     )
 
     assert queue_name_for_run(run, settings=settings) == "quantum-gpu"
+
+
+def test_queue_name_for_run_keeps_automatic_chemistry_on_cpu_queue():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(
+        config_json={"chemistry_options": {"reference_device": "AUTO"}}
+    )
+
+    decision = queue_routing_for_run(run, settings=settings)
+
+    assert decision.queue_name == "quantum"
+    assert decision.resource_class == "cpu"
+    assert decision.fallback_reason == "auto_gpu_provider_selection_deferred_to_worker"
+    assert decision.requested_auto_stages == ("reference_scf",)
+
+
+def test_queue_name_for_run_keeps_cpu_and_automatic_chemistry_on_cpu_queue():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(
+        config_json={
+            "chemistry_options": {
+                "reference_device": "CPU",
+                "selected_ci_device": "AUTO",
+            }
+        }
+    )
+
+    assert queue_name_for_run(run, settings=settings) == "quantum"
+
+
+def test_queue_name_for_run_preserves_ibm_default_queue_with_automatic_chemistry():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(
+        config_json={
+            "backend_target": "ibm_runtime",
+            "chemistry_options": {"reference_device": "AUTO"},
+        }
+    )
+
+    assert queue_name_for_run(run, settings=settings) == "quantum"
+
+
+def test_record_queue_routing_metadata_preserves_existing_run_metadata():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(
+        config_json={"chemistry_options": {"selected_ci_device": "AUTO"}},
+        run_metadata={"algorithm": "sqd", "rq_job_id": "job-1"},
+    )
+    decision = queue_routing_for_run(run, settings=settings)
+
+    record_queue_routing_metadata(run, decision)
+
+    assert run.run_metadata["algorithm"] == "sqd"
+    assert run.run_metadata["rq_job_id"] == "job-1"
+    assert run.run_metadata["queue_routing"] == {
+        "queue": "quantum",
+        "resource_class": "cpu",
+        "requested_auto_stages": ["selected_ci"],
+        "fallback_reason": "auto_gpu_provider_selection_deferred_to_worker",
+    }
+
+
+def test_explicit_gpu_stage_wins_over_automatic_chemistry_fallback():
+    settings = MagicMock(queue_name="quantum", gpu_queue_name="quantum-gpu")
+    run = MagicMock(
+        config_json={
+            "backend_options": {"device": "GPU"},
+            "chemistry_options": {"reference_device": "AUTO"},
+        }
+    )
+
+    decision = queue_routing_for_run(run, settings=settings)
+
+    assert decision.queue_name == "quantum-gpu"
+    assert decision.resource_class == "gpu"
+    assert decision.fallback_reason is None
 
 
 def test_enqueue_run_uses_configured_queue_name():

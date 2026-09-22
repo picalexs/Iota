@@ -288,11 +288,13 @@ def _enqueue_created_run(db: Session, *, run: Run, redis_client) -> None:
 
     rq_job_id: str | None = None
     try:
+        queue_routing = queue_service.queue_routing_for_run(run)
+        queue_service.record_queue_routing_metadata(run, queue_routing)
         rq_job_id = queue_service.enqueue_run(
             run.id,
             redis_client,
             execution_generation=run.execution_generation,
-            queue_name=queue_service.queue_name_for_run(run),
+            queue_name=queue_routing.queue_name,
         )
         run.run_metadata = {
             **(run.run_metadata or {}),

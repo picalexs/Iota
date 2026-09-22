@@ -5,6 +5,7 @@ Redis/RQ queue service for job management.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
@@ -26,6 +27,16 @@ class QueueFailureReason(StrEnum):
     MISSING_JOB = "missing_job"
     INVALID_JOB_STATE = "invalid_job_state"
     UNKNOWN = "unknown_failure"
+
+
+@dataclass(frozen=True, slots=True)
+class QueueRoutingDecision:
+    """Internal queue and resource decision for one persisted run."""
+
+    queue_name: str
+    resource_class: str
+    fallback_reason: str | None = None
+    requested_auto_stages: tuple[str, ...] = ()
 
 
 def _classify_queue_error(error: BaseException) -> QueueFailureReason:
@@ -75,21 +86,103 @@ def _log_queue_failure(
     )
 
 
-def queue_name_for_run(run: object, *, settings: Any | None = None) -> str:
-    """Route GPU-backed Aer or chemistry requests to the GPU worker queue."""
+def _normalize_setting(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    return value.strip().upper()
+
+
+def queue_routing_for_run(
+    run: object,
+    *,
+    settings: Any | None = None,
+) -> QueueRoutingDecision:
+    """Resolve the worker queue without guessing provider availability.
+
+    Explicit GPU stages require the GPU queue. Chemistry ``AUTO`` requests are
+    resolved by the worker and therefore remain on the CPU queue until a
+    provider is selected explicitly. This avoids reserving a GPU worker for a
+    request that may fall back to CPU.
+    """
     resolved_settings = settings or get_settings()
     config_snapshot = getattr(run, "config_json", None)
-    if isinstance(config_snapshot, dict):
-        backend_options = config_snapshot.get("backend_options")
-        if isinstance(backend_options, dict) and backend_options.get("device") == "GPU":
-            return str(resolved_settings.gpu_queue_name)
-        chemistry_options = config_snapshot.get("chemistry_options")
-        if isinstance(chemistry_options, dict) and any(
-            chemistry_options.get(field) in {"GPU", "AUTO"}
-            for field in ("reference_device", "selected_ci_device")
-        ):
-            return str(resolved_settings.gpu_queue_name)
-    return str(resolved_settings.queue_name)
+    if not isinstance(config_snapshot, dict):
+        return QueueRoutingDecision(
+            queue_name=str(resolved_settings.queue_name),
+            resource_class="cpu",
+        )
+
+    backend_options = config_snapshot.get("backend_options")
+    if isinstance(backend_options, dict) and _normalize_setting(
+        backend_options.get("device")
+    ) == "GPU":
+        return QueueRoutingDecision(
+            queue_name=str(resolved_settings.gpu_queue_name),
+            resource_class="gpu",
+        )
+
+    chemistry_options = config_snapshot.get("chemistry_options")
+    if not isinstance(chemistry_options, dict):
+        return QueueRoutingDecision(
+            queue_name=str(resolved_settings.queue_name),
+            resource_class="cpu",
+        )
+
+    chemistry_stages = {
+        "reference_scf": chemistry_options.get("reference_device"),
+        "selected_ci": chemistry_options.get("selected_ci_device"),
+    }
+    if any(_normalize_setting(value) == "GPU" for value in chemistry_stages.values()):
+        return QueueRoutingDecision(
+            queue_name=str(resolved_settings.gpu_queue_name),
+            resource_class="gpu",
+        )
+
+    auto_stages = tuple(
+        stage
+        for stage, value in chemistry_stages.items()
+        if _normalize_setting(value) == "AUTO"
+    )
+    return QueueRoutingDecision(
+        queue_name=str(resolved_settings.queue_name),
+        resource_class="cpu",
+        fallback_reason=(
+            "auto_gpu_provider_selection_deferred_to_worker"
+            if auto_stages
+            else None
+        ),
+        requested_auto_stages=auto_stages,
+    )
+
+
+def queue_name_for_run(run: object, *, settings: Any | None = None) -> str:
+    """Return the queue selected by :func:`queue_routing_for_run`."""
+    return queue_routing_for_run(run, settings=settings).queue_name
+
+
+def record_queue_routing_metadata(
+    run: object,
+    decision: QueueRoutingDecision,
+) -> None:
+    """Record deferred AUTO intent in the existing run metadata field."""
+    if decision.fallback_reason is None:
+        return
+
+    metadata = getattr(run, "run_metadata", None)
+    if not isinstance(metadata, dict):
+        return
+
+    routing_metadata = metadata.get("queue_routing")
+    if not isinstance(routing_metadata, dict):
+        routing_metadata = {}
+    routing_metadata = {
+        **routing_metadata,
+        "queue": decision.queue_name,
+        "resource_class": decision.resource_class,
+        "requested_auto_stages": list(decision.requested_auto_stages),
+        "fallback_reason": decision.fallback_reason,
+    }
+    run.run_metadata = {**metadata, "queue_routing": routing_metadata}
 
 
 def enqueue_run(

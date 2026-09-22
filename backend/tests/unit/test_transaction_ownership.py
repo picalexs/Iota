@@ -105,6 +105,40 @@ def test_created_run_enqueue_rolls_back_and_cancels_orphan_job() -> None:
     db.refresh.assert_not_called()
 
 
+def test_created_run_enqueue_records_automatic_gpu_fallback_intent() -> None:
+    db = MagicMock()
+    run_id = uuid4()
+    run = MagicMock(
+        id=run_id,
+        execution_generation=1,
+        config_json={"chemistry_options": {"reference_device": "AUTO"}},
+        run_metadata={"algorithm": "vqe"},
+    )
+    redis = MagicMock()
+
+    with patch(
+        "app.services.run.queue_service.enqueue_run", return_value="rq-job-id"
+    ) as enqueue:
+        _enqueue_created_run(db, run=run, redis_client=redis)
+
+    enqueue.assert_called_once_with(
+        run_id,
+        redis,
+        execution_generation=1,
+        queue_name="quantum",
+    )
+    assert run.run_metadata["algorithm"] == "vqe"
+    assert run.run_metadata["queue_routing"]["resource_class"] == "cpu"
+    assert run.run_metadata["queue_routing"]["requested_auto_stages"] == [
+        "reference_scf"
+    ]
+    assert (
+        run.run_metadata["queue_routing"]["fallback_reason"]
+        == "auto_gpu_provider_selection_deferred_to_worker"
+    )
+    assert run.run_metadata["rq_job_id"] == "rq-job-id"
+
+
 @pytest.mark.asyncio
 async def test_pubchem_import_rolls_back_and_sanitizes_persistence_error() -> None:
     db = MagicMock()

@@ -380,11 +380,13 @@ class RunControlService:
         if redis_client is None:
             return None
         try:
+            queue_routing = queue_service.queue_routing_for_run(run)
+            queue_service.record_queue_routing_metadata(run, queue_routing)
             return queue_service.enqueue_run(
                 run.id,
                 redis_client,
                 execution_generation=int(run.execution_generation or 1),
-                queue_name=queue_service.queue_name_for_run(run),
+                queue_name=queue_routing.queue_name,
             )
         except Exception:
             logger.warning(
