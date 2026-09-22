@@ -12,6 +12,25 @@ from worker.contracts import (
     HamiltonianBundleContract,
 )
 
+_LOCAL_EXECUTION_ONLY_FIELDS = (
+    "job_id",
+    "job_ids",
+    "ibm_job_id",
+    "runtime_failure_payloads",
+    "runtime_submission_ledger",
+    "runtime_accounting",
+    "transpilation_records",
+    "transpiled_circuit_preview",
+    "runtime_policy",
+)
+
+
+def _scrub_local_execution_evidence(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Remove provider execution evidence when a result actually ran locally."""
+    for key in _LOCAL_EXECUTION_ONLY_FIELDS:
+        metadata.pop(key, None)
+    return metadata
+
 
 def dense_classical_execution_metadata(
     algorithm: str,
@@ -168,7 +187,7 @@ def _refine_qse_backend_metadata(
     metrics = result.get("algorithm_metrics")
     metrics = metrics if isinstance(metrics, dict) else {}
     if metrics.get("execution_mode") == "dense_exact_emulation":
-        return {
+        return _scrub_local_execution_evidence({
             **backend_metadata,
             "execution_mode": "qse_dense_exact_emulation",
             "actual_path_class": "qse_dense_exact_emulation",
@@ -184,10 +203,10 @@ def _refine_qse_backend_metadata(
                 "QSE uses an exact local statevector reference and exact local projected "
                 "matrix construction; the requested backend is not invoked on this path."
             ),
-        }
+        })
     execution_mode = metrics.get("execution_mode") or "qse_projected_local"
     is_sector_emulation = execution_mode == "sector_matrix_free"
-    return {
+    return _scrub_local_execution_evidence({
         **backend_metadata,
         "execution_mode": execution_mode,
         "actual_path_class": execution_mode,
@@ -206,7 +225,7 @@ def _refine_qse_backend_metadata(
             "QSE uses a local reference and local projected diagonalization; "
             "no backend primitive was executed."
         ),
-    }
+    })
 
 
 def refine_backend_metadata_from_result(
@@ -271,9 +290,9 @@ def refine_backend_metadata_from_result(
                 ),
             }
         )
-        return metadata
+        return _scrub_local_execution_evidence(metadata)
     if isinstance(summary, dict) and summary.get("matrix_element_strategy") == "sector_matrix_free":
-        return {
+        return _scrub_local_execution_evidence({
             **backend_metadata,
             "execution_mode": "sector_matrix_free",
             "actual_path_class": "sector_matrix_free",
@@ -286,13 +305,13 @@ def refine_backend_metadata_from_result(
                 f"{algorithm.upper()} uses local matrix-free sector evolution and a local "
                 "projected solve; no backend primitive was invoked."
             ),
-        }
+        })
 
     context = BackendExecutionContext(backend_target=backend_target)
-    return {
+    return _scrub_local_execution_evidence({
         **backend_metadata,
         **dense_classical_execution_metadata(algorithm, context),
-    }
+    })
 
 
 def build_hamiltonian_message(chemistry_input: ChemistryInputContract) -> str:

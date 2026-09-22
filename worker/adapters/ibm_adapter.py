@@ -55,6 +55,7 @@ class IBMAdapter(BackendAdapter):
         self._last_transpilation_summary: dict[str, Any] = {}
         self._last_transpiled_preview: dict[str, Any] = {}
         self._transpilation_records: list[dict[str, Any]] = []
+        self._pending_transpilation_batches: list[list[dict[str, Any]]] = []
         self._last_runtime_observation: dict[str, Any] = {}
         self._runtime_submitted_job_count = 0
         self._runtime_submission_ledger: list[dict[str, Any]] = []
@@ -72,6 +73,7 @@ class IBMAdapter(BackendAdapter):
         self._last_transpilation_summary = {}
         self._last_transpiled_preview = {}
         self._transpilation_records = []
+        self._pending_transpilation_batches = []
         self._last_runtime_observation = {}
         self._runtime_submitted_job_count = 0
         self._runtime_submission_ledger = []
@@ -115,6 +117,7 @@ class IBMAdapter(BackendAdapter):
         self._last_transpilation_summary = {}
         self._last_transpiled_preview = {}
         self._transpilation_records = []
+        self._pending_transpilation_batches = []
         self._last_runtime_observation = {}
         self._runtime_submitted_job_count = 0
         self._runtime_submission_ledger = []
@@ -246,7 +249,7 @@ class IBMAdapter(BackendAdapter):
                     "measured_reason": "Runtime metadata does not expose measured precision",
                 },
             },
-            "raw_runtime_policy": _raw_runtime_policy_metadata(resolved),
+            "runtime_policy": _raw_runtime_policy_metadata(resolved),
         }
         if "pub_count" in self._last_runtime_observation:
             metadata["pub_count"] = int(self._last_runtime_observation["pub_count"])
@@ -286,18 +289,22 @@ class IBMAdapter(BackendAdapter):
     ) -> Callable[[tuple[Any, ...], dict[str, Any], Any], None]:
         def observe(args: tuple[Any, ...], kwargs: dict[str, Any], _job: Any) -> None:
             self._runtime_submitted_job_count += 1
+            submission_index = self._next_submission_index()
             pub_count = _runtime_pub_count(args, kwargs)
             shots = _runtime_requested_shots(context, kwargs)
             job_id = _extract_runtime_job_id(_job)
             record: dict[str, Any] = {
-                "submission_index": self._runtime_submitted_job_count,
+                "submission_index": submission_index,
                 "status": "submitted",
                 "job_id": job_id,
                 "pub_count": pub_count,
                 "requested_shots": shots,
             }
             if pub_count is not None:
-                record["pub_records"] = self._records_for_submission(pub_count)
+                record["pub_records"] = self._records_for_submission(
+                    pub_count,
+                    submission_index=submission_index,
+                )
             self._runtime_submission_ledger.append(record)
             if not self._last_transpilation_summary:
                 circuit = _extract_pub_circuit(args, kwargs)
@@ -307,6 +314,13 @@ class IBMAdapter(BackendAdapter):
                         backend=backend,
                         optimization_level=context.optimization_level,
                         seed_transpiler=context.backend_options.get("seed_transpiler"),
+                    )
+                    self._last_transpilation_summary.update(
+                        {
+                            "transpiler_seed": context.backend_options.get("seed_transpiler"),
+                            "provenance_class": "qss_client_transpilation_summary",
+                            "provider_final_compilation": "unknown",
+                        }
                     )
 
         return observe
@@ -343,18 +357,20 @@ class IBMAdapter(BackendAdapter):
     ) -> None:
         pub_count = _runtime_pub_count(args, kwargs)
         shots = _runtime_requested_shots(context, kwargs)
+        submission_index = self._next_submission_index()
         failure_record: dict[str, Any] = {
             "stage": "submission",
             "error_type": type(error).__name__,
             "status": "failed",
-            "submission_index": len(self._runtime_submission_ledger)
-            + len(self._runtime_failed_submission_ledger)
-            + 1,
+            "submission_index": submission_index,
             "pub_count": pub_count,
             "requested_shots": shots,
         }
         if pub_count is not None:
-            failure_record["pub_records"] = self._records_for_submission(pub_count)
+            failure_record["pub_records"] = self._records_for_submission(
+                pub_count,
+                submission_index=submission_index,
+            )
         self._runtime_failed_submission_ledger.append(failure_record)
         payload: dict[str, Any] = {
             "stage": "submission",
@@ -461,6 +477,7 @@ class IBMAdapter(BackendAdapter):
     def _record_transpilation_pubs(self, pubs: list[Any], transpiler: "_RuntimeTranspiler") -> None:
         records = transpiler.records_for_pubs(pubs)
         self._transpilation_records.extend(records)
+        self._pending_transpilation_batches.append([dict(record) for record in records])
         if not self._last_transpilation_summary:
             for record in records:
                 summary = record.get("metrics")
@@ -472,15 +489,28 @@ class IBMAdapter(BackendAdapter):
             if preview:
                 self._last_transpiled_preview = dict(preview)
 
-    def _records_for_submission(self, pub_count: int) -> list[dict[str, Any]]:
+    def _next_submission_index(self) -> int:
+        return len(self._runtime_submission_ledger) + len(self._runtime_failed_submission_ledger) + 1
+
+    def _records_for_submission(
+        self,
+        pub_count: int,
+        *,
+        submission_index: int,
+    ) -> list[dict[str, Any]]:
         if pub_count <= 0:
             return []
-        records = self._transpilation_records[-pub_count:]
+        records = (
+            self._pending_transpilation_batches.pop(0)
+            if self._pending_transpilation_batches
+            else []
+        )
         if len(records) == pub_count:
-            return [dict(record) for record in records]
+            return [{**record, "submission_index": submission_index} for record in records]
         return [
             {
                 "pub_index": index,
+                "submission_index": submission_index,
                 "provenance_class": "unknown",
                 "provider_final_compilation": "unknown",
                 "metrics": None,

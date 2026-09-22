@@ -764,7 +764,9 @@ def test_ibm_adapter_records_each_pub_and_isa_gate_metrics(monkeypatch) -> None:
     assert records[0]["metrics"]["one_qubit_gate_count"] == 1
     assert records[0]["metrics"]["two_qubit_gate_count"] == 1
     assert records[1]["metrics"]["two_qubit_gate_count"] == 1
-    assert metadata["runtime_submission_ledger"][0]["pub_records"] == records
+    assert metadata["runtime_submission_ledger"][0]["pub_records"] == [
+        {**record, "submission_index": 1} for record in records
+    ]
 
 
 @pytest.mark.parametrize(
@@ -809,7 +811,7 @@ def test_ibm_adapter_records_explicit_execution_policy(
         "enable_gates": twirling,
         "enable_measure": twirling,
     }
-    assert adapter.execution_metadata(context)["raw_runtime_policy"] == {
+    assert adapter.execution_metadata(context)["runtime_policy"] == {
         "name": policy_name,
         "resilience_level": 0,
         "dynamical_decoupling": {"enable": dynamical_decoupling},
