@@ -192,9 +192,7 @@ export function getBenchmarkBackendOptions(
     {
       value: "ibm_runtime",
       label: `IBM Quantum backend${pendingSuffix}`,
-      warning: ibmEnabled
-        ? "Submits benchmark jobs to the selected IBM backend through the active profile."
-        : ibmUnavailableReason,
+      ...(ibmEnabled ? {} : { warning: ibmUnavailableReason }),
       enabled: ibmEnabled,
     },
   ];

@@ -30,13 +30,15 @@ function buildBackendOptions(
   execution: BenchmarkExecutionSettings,
   backendName: string | null,
 ): BackendOptions {
+  const ibmRuntimeSelected = execution.mode === "ibm_runtime";
+
   return {
     selection_policy: "manual",
     backend_name: backendName,
     shots: execution.shots ?? 4096,
     optimization_level: execution.optimizationLevel ?? 1,
-    dynamical_decoupling: execution.dynamicalDecoupling ?? false,
-    twirling: execution.twirling ?? false,
+    dynamical_decoupling: ibmRuntimeSelected && (execution.dynamicalDecoupling ?? false),
+    twirling: ibmRuntimeSelected && (execution.twirling ?? false),
     seed_simulator: null,
     seed_transpiler: execution.seedTranspiler ?? null,
     aer_method: "automatic",
