@@ -103,6 +103,11 @@ The default workflow targets `statevector` or `aer_simulator`. IBM Runtime
 submission is blocked unless the caller passes `--allow-ibm`. Do not pass that
 flag for local tests or this workflow.
 
+Backend-derived Aer noise reads IBM backend properties for a local simulation.
+It requires an active saved IBM profile and the local operator token. Set
+`QSS_LOCAL_OPERATOR_TOKEN` for the exporter process. The exporter sends the
+token in the local operator header and does not write it to campaign files.
+
 ### Noisy Aer budget
 
 For noisy Aer, omit `estimator_precision` from `backend.options` to use the

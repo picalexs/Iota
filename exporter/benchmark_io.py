@@ -918,15 +918,19 @@ class QssApiClient:
         base_url: str,
         *,
         timeout: float = 30.0,
+        operator_token: str | None = None,
         opener: Callable[..., Any] | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.operator_token = operator_token.strip() if operator_token else None
         self._opener = opener or urlopen
 
     def request(self, method: str, path: str, payload: Mapping[str, Any] | None = None) -> Any:
         body = None
         headers = {"Accept": "application/json"}
+        if self.operator_token:
+            headers["X-Local-Operator-Token"] = self.operator_token
         if payload is not None:
             body = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"

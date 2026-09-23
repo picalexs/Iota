@@ -12,6 +12,7 @@ campaigns=(
   "preset-comparison-4m.json|paper-preset-comparison-4m"
   "aer-noisy-core-2m.json|paper-aer-noisy-core-2m"
   "aer-noisy-reduced-2m.json|paper-aer-noisy-reduced-2m"
+  "aer-noisy-phoenix-2m.json|paper-aer-noisy-phoenix-2m"
   "seed-role-study.json|paper-seed-role-study"
   "resource-ablation.json|paper-resource-ablation"
 )

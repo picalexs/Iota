@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -495,6 +496,7 @@ def create_campaign(
     wait_timeout: float = 3600.0,
     poll_seconds: float = 5.0,
     allow_ibm: bool = False,
+    operator_token: str | None = None,
     client: QssApiClient | None = None,
 ) -> dict[str, Any]:
     campaign = validate_campaign(manifest)
@@ -503,7 +505,11 @@ def create_campaign(
             "IBM Runtime submission is disabled. Pass --allow-ibm only for an explicitly approved workload."
         )
 
-    api = client or QssApiClient(base_url, timeout=timeout)
+    api = client or QssApiClient(
+        base_url,
+        timeout=timeout,
+        operator_token=operator_token,
+    )
     output_dir = output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = output_dir / "submission.json"
@@ -644,6 +650,10 @@ def main(argv: list[str] | None = None) -> int:
             wait_timeout=max(0.1, args.wait_timeout),
             poll_seconds=max(0.1, args.poll_seconds),
             allow_ibm=args.allow_ibm,
+            operator_token=(
+                os.environ.get("QSS_LOCAL_OPERATOR_TOKEN")
+                or os.environ.get("LOCAL_OPERATOR_TOKEN")
+            ),
         )
     except ExporterError as exc:
         print(f"error: {exc}", file=sys.stderr)

@@ -9,8 +9,9 @@ Each campaign uses seeds `11`, `17`, `23`, `29`, and `41`. The exporter writes
 resumable checkpoints under `output/paper-*`. Run a command again after a
 failure to submit only entries without a run ID.
 
-The manifests do not target IBM Runtime. The noisy campaign uses only the local
-custom depolarizing profile and excludes the large molecules from noisy Aer.
+The manifests do not target IBM Runtime. The noisy campaigns use local Aer and
+exclude the large molecules from noisy Aer. Backend-derived noise reads IBM
+backend properties but does not submit an IBM quantum job.
 
 ## Campaigns
 
@@ -21,6 +22,7 @@ custom depolarizing profile and excludes the large molecules from noisy Aer.
 | `preset-comparison-4m.json` | statevector | 4 molecules, 4 variants, 6 algorithms | 480 |
 | `aer-noisy-core-2m.json` | custom noisy Aer | H2/LiH, 6 algorithms | 60 |
 | `aer-noisy-reduced-2m.json` | custom noisy Aer | H2O/BeH2, VQE/SQD/SKQD | 30 |
+| `aer-noisy-phoenix-2m.json` | Phoenix-derived noisy Aer | H2/LiH, 6 algorithms | 60 |
 | `seed-role-study.json` | statevector | H2/LiH, five explicit seed-role variants | 50 |
 | `resource-ablation.json` | statevector | H2/LiH/BeH2, SQD and SKQD budget variants | 90 |
 
@@ -52,3 +54,6 @@ exporter/campaigns/resume_all.sh
 ```
 
 Set `QSS_BASE_URL` when the API is not at `http://localhost:18000`.
+
+For the Phoenix-derived campaign, also set `QSS_LOCAL_OPERATOR_TOKEN` before
+running the script. The token is required to use the active saved IBM profile.
