@@ -1607,6 +1607,36 @@ def test_normalize_result_keeps_qse_scientific_status_indeterminate_without_hier
     )
 
 
+def test_normalize_result_accepts_qse_when_full_pool_is_exhausted() -> None:
+    result = QSEResult(
+        algorithm="qse",
+        primary_energy=-1.0,
+        primary_iterations=2,
+        converged=True,
+        eigenvalues=[-1.0],
+        overlap_condition=1.0,
+        reference_state_energy=-0.9,
+        relative_residual=1e-12,
+        convergence_threshold=1e-8,
+        execution_mode="dense_exact_emulation",
+        conditioning_summary={
+            "stability_state": "stable",
+            "overlap_min_eigenvalue": 1.0,
+        },
+        matrix_element_summary={
+            "basis_selection": {
+                "basis_termination_reason": "candidate_pool_exhausted",
+            }
+        },
+    )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["scientific_converged"] is True
+    assert convergence["completeness_evidence"] == "configured_excitation_pool_exhausted"
+    assert convergence["convergence_failure_reason"] is None
+
+
 def test_normalize_result_rejects_unstable_projected_convergence() -> None:
     normalized = normalize_result(
         KQDResult(

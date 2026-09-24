@@ -1075,6 +1075,14 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
     threshold = _finite_float(metrics.get("convergence_threshold"))
     conditioning_summary = metrics.get("conditioning_summary")
     conditioning_summary = conditioning_summary if isinstance(conditioning_summary, dict) else {}
+    matrix_element_summary = metrics.get("matrix_element_summary")
+    matrix_element_summary = (
+        matrix_element_summary if isinstance(matrix_element_summary, dict) else {}
+    )
+    basis_selection = matrix_element_summary.get("basis_selection")
+    basis_selection = basis_selection if isinstance(basis_selection, dict) else {}
+    basis_termination_reason = basis_selection.get("basis_termination_reason")
+    fixed_pool_exhausted = basis_termination_reason == "candidate_pool_exhausted"
     termination_reason = conditioning_summary.get("termination_reason")
     termination_reason = termination_reason if isinstance(termination_reason, str) else None
     metadata = {
@@ -1085,6 +1093,7 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
         "convergence_value": residual,
         "convergence_threshold": threshold,
         "termination_reason": termination_reason,
+        "basis_termination_reason": basis_termination_reason,
     }
     if residual is None:
         metadata.update(
@@ -1120,10 +1129,20 @@ def _qse_convergence_metadata(metrics: dict[str, Any], result: QSEResult) -> dic
             return metadata
         scientific_converged = bool(result.converged) and projected_converged
         if scientific_converged:
-            metadata["scientific_converged"] = None
-            metadata["convergence_failure_reason"] = (
-                "scientific_completeness_evidence_unavailable"
-            )
+            if fixed_pool_exhausted and result.execution_mode != "measured_matrix_elements":
+                metadata["scientific_converged"] = True
+                metadata["convergence_criterion"] = (
+                    "full_space_ritz_residual_and_excitation_pool_exhausted"
+                )
+                metadata["completeness_evidence"] = (
+                    "configured_excitation_pool_exhausted"
+                )
+                metadata["convergence_failure_reason"] = None
+            else:
+                metadata["scientific_converged"] = None
+                metadata["convergence_failure_reason"] = (
+                    "scientific_completeness_evidence_unavailable"
+                )
         else:
             metadata["scientific_converged"] = False
             metadata["convergence_failure_reason"] = "solver_reported_not_converged"
