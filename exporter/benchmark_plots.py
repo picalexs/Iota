@@ -253,8 +253,8 @@ def render_plots(
 
     if error_view not in {"absolute", "signed"}:
         raise ValueError("error_view must be absolute or signed")
-    if output_format not in {"png", "svg", "both"}:
-        raise ValueError("output_format must be png, svg, or both")
+    if output_format not in {"png", "svg", "pdf", "both"}:
+        raise ValueError("output_format must be png, svg, pdf, or both")
 
     plots = [
         ("error_by_algorithm", lambda: _error_plot(rows, error_view)),

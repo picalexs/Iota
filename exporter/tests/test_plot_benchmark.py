@@ -111,6 +111,18 @@ def test_plot_from_folder_writes_manifest_and_all_formats(tmp_path: Path) -> Non
         assert path.stat().st_size > 0
 
 
+def test_plot_from_folder_supports_pdf_output(tmp_path: Path) -> None:
+    source_dir = tmp_path / "export"
+    source_dir.mkdir()
+    write_rows_json(_rows(), source_dir / "runs.json")
+    output_dir = tmp_path / "plots"
+
+    plot_source(input_dir=source_dir, output_dir=output_dir, output_format="pdf")
+
+    assert (output_dir / "error_by_algorithm.pdf").is_file()
+    assert (output_dir / "error_vs_runtime.pdf").is_file()
+
+
 class FakeApi:
     def get(self, path: str) -> object:
         if path == "/api/benchmarks/benchmark-1":

@@ -7,6 +7,7 @@ import csv
 import hashlib
 import json
 import math
+import re
 import statistics
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -17,11 +18,15 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v2"
+EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v3"
 CANONICAL_FIELDS = (
     "benchmark_id",
     "benchmark_name",
     "entry_id",
+    "variant_id",
+    "variant_label",
+    "variant_mode",
+    "variant_config_sha256",
     "run_id",
     "molecule_id",
     "molecule",
@@ -291,6 +296,62 @@ def _parse_seed_roles(value: Any) -> list[str]:
     return [str(item) for item in _parse_list(value) if str(item).strip()]
 
 
+def _stable_config_value(value: Any) -> Any:
+    """Remove per-run identifiers before hashing a variant configuration."""
+    if isinstance(value, Mapping):
+        return {
+            str(key): _stable_config_value(item)
+            for key, item in sorted(value.items(), key=lambda item: str(item[0]))
+            if "seed" not in str(key).lower() and str(key).lower() not in {
+                "client_request_id",
+                "clientrequestid",
+            }
+        }
+    if isinstance(value, list):
+        return [_stable_config_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_stable_config_value(item) for item in value]
+    return value
+
+
+def _variant_config_sha256(config: Mapping[str, Any] | None) -> str | None:
+    if not config:
+        return None
+    payload = _stable_config_value(config)
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _variant_metadata(
+    *,
+    entry: Mapping[str, Any] | None,
+    config: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Extract stable variant metadata without using the seed-specific entry id."""
+    entry_record = _record(entry)
+    raw_id = _text(_first(entry_record, "variant_id", "variantId"))
+    raw_label = _text(_first(entry_record, "variant_label", "variantLabel"))
+    entry_id = _text(_first(entry_record, "id", "entry_id", "entryId"))
+
+    if raw_id is None and entry_id is not None:
+        match = re.search(r":([^:]+):seed=-?\d+$", entry_id)
+        if match:
+            raw_id = match.group(1)
+    if raw_id is not None:
+        raw_id = re.sub(r":seed=-?\d+$", "", raw_id)
+    if raw_label is not None:
+        raw_label = re.sub(r"\s+seed=-?\d+$", "", raw_label).strip()
+
+    return {
+        "variant_id": raw_id,
+        "variant_label": raw_label or raw_id,
+        "variant_mode": _text(_first(entry_record, "variant_mode", "variantMode", "mode")),
+        "variant_config_sha256": _variant_config_sha256(config),
+    }
+
+
 def _backend_name(config: Mapping[str, Any]) -> str | None:
     options = _record(_first(config, "backend_options", "backendOptions"))
     return _text(_first(options, "backend_name", "backendName"))
@@ -369,10 +430,24 @@ def _benchmark_quality_fields(
         )
     )
     explicit_eligible = _boolean(
-        _first(provenance, "benchmark_eligible", "benchmarkEligible")
+        _first(
+            provenance,
+            "benchmark_eligible",
+            "benchmarkEligible",
+            default=_first(result_record, "benchmark_eligible", "benchmarkEligible"),
+        )
     )
     explicit_exclusion_reason = _text(
-        _first(provenance, "benchmark_exclusion_reason", "benchmarkExclusionReason")
+        _first(
+            provenance,
+            "benchmark_exclusion_reason",
+            "benchmarkExclusionReason",
+            default=_first(
+                result_record,
+                "benchmark_exclusion_reason",
+                "benchmarkExclusionReason",
+            ),
+        )
     )
 
     reported_valid = _boolean(
@@ -537,6 +612,7 @@ def normalize_api_row(
     algorithm = _text(_first(entry, "algorithm")) or _text(_first(run, "algorithm"))
     algorithm = algorithm.lower() if algorithm is not None else None
     config = _record(_first(run, "config_json", "configJson", "config"))
+    variant_fields = _variant_metadata(entry=entry, config=config)
     execution_fields = _benchmark_execution_fields(result=result, config=config)
     entry_seed = _first(entry, "seed")
     seed, inferred_roles = _config_seed(config, algorithm)
@@ -571,6 +647,7 @@ def normalize_api_row(
         "benchmark_id": benchmark_id,
         "benchmark_name": benchmark_name,
         "entry_id": entry_id,
+        **variant_fields,
         "run_id": _text(_first(entry, "runId", "run_id", "runId"))
         or _text(_first(run, "id")),
         "molecule_id": _text(_first(run, "molecule_id", "moleculeId"))
@@ -656,6 +733,37 @@ def normalize_folder_row(
         reference_energy=reference_energy,
         converged=converged,
     )
+    # Canonical exports already contain the quality decision and provenance.
+    # Preserve those values instead of recomputing them from the compact row.
+    for field_name in (
+        "reference_method",
+        "reference_solver_path",
+        "reference_basis",
+        "reference_backend_target",
+        "reference_validity_status",
+        "reference_hamiltonian_sha256",
+        "primary_energy_source",
+        "convergence_failure_reason",
+        "benchmark_exclusion_reason",
+    ):
+        value = _text(source.get(field_name))
+        if value is not None:
+            quality_fields[field_name] = value
+    if "reference_active_space" in source:
+        active_space = _parse_list(source.get("reference_active_space"))
+        if active_space:
+            quality_fields["reference_active_space"] = [
+                _integer(item) if _integer(item) is not None else item for item in active_space
+            ]
+    for field_name in (
+        "reported_energy_is_valid",
+        "projected_solve_is_diagnostic",
+        "scientific_converged",
+        "benchmark_eligible",
+    ):
+        value = _boolean(source.get(field_name))
+        if value is not None:
+            quality_fields[field_name] = value
     seed_fields = _config_seeds(source, algorithm)
     for field_name in seed_fields:
         explicit_seed = _number(_first(source, field_name))
@@ -663,21 +771,43 @@ def normalize_folder_row(
             seed_fields[field_name] = _integer(explicit_seed)
 
     execution_fields = _benchmark_execution_fields(result=source, config=source)
-    for field in (
+    integer_execution_fields = {
         "requested_shots",
         "effective_shots",
+        "sampler_requested_shots_total",
+    }
+    numeric_execution_fields = {
         "requested_estimator_precision",
         "effective_estimator_precision",
+    }
+    text_execution_fields = {
         "measurement_mode",
         "simulator_method",
         "noise_source",
         "noise_fingerprint",
         "actual_execution_target",
         "actual_path_class",
-        "sampler_requested_shots_total",
-    ):
+    }
+    for field in integer_execution_fields:
         if field in source:
-            execution_fields[field] = source.get(field)
+            execution_fields[field] = _integer(source.get(field))
+    for field in numeric_execution_fields:
+        if field in source:
+            execution_fields[field] = _number(source.get(field))
+    for field in text_execution_fields:
+        if field in source:
+            execution_fields[field] = _text(source.get(field))
+
+    variant_fields = _variant_metadata(entry=source, config=None)
+    for field_name in (
+        "variant_id",
+        "variant_label",
+        "variant_mode",
+        "variant_config_sha256",
+    ):
+        value = _text(source.get(field_name))
+        if value is not None:
+            variant_fields[field_name] = value
 
     canonical = {
         "benchmark_id": _text(_first(source, "benchmark_id", "benchmarkId"))
@@ -685,6 +815,7 @@ def normalize_folder_row(
         "benchmark_name": _text(_first(source, "benchmark_name", "benchmarkName"))
         or _text(_first(benchmark, "name")),
         "entry_id": entry_id,
+        **variant_fields,
         "run_id": run_id,
         "molecule_id": _text(_first(source, "molecule_id", "moleculeId")),
         "molecule": molecule,
@@ -819,6 +950,37 @@ def _find_folder_rows(input_dir: Path) -> Path:
     raise ExporterError(f"No benchmark rows found in {input_dir}; expected {expected}")
 
 
+def _campaign_variants(campaign: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Index campaign variants for folders that retain the campaign manifest."""
+    result: dict[str, dict[str, Any]] = {}
+    for item in _parse_list(campaign.get("algorithms")):
+        if not isinstance(item, Mapping):
+            continue
+        algorithm = _text(item.get("algorithm")) or "algorithm"
+        explicit = _text(item.get("id", item.get("variant_id", item.get("variantId"))))
+        mode = _text(item.get("mode")) or ("advanced" if item.get("advanced_config") else "easy")
+        key = explicit or f"{algorithm}-{mode}"
+        key = re.sub(r"[^a-z0-9]+", "-", key.lower()).strip("-") or "algorithm"
+        result[key] = {
+            "variant_id": key,
+            "variant_label": _text(item.get("label")) or key,
+            "variant_mode": mode,
+            "variant_config_sha256": _variant_config_sha256(
+                _record(item.get("advanced_config"))
+            ),
+        }
+    return result
+
+
+def _load_campaign_manifest(input_dir: Path) -> dict[str, Any]:
+    for candidate in (input_dir / "campaign.json", input_dir.parent / "campaign.json"):
+        if candidate.is_file():
+            value = _read_json(candidate)
+            if isinstance(value, Mapping):
+                return dict(value)
+    return {}
+
+
 def compact_benchmark(benchmark: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key in (
@@ -856,6 +1018,13 @@ def compact_benchmark(benchmark: Mapping[str, Any]) -> dict[str, Any]:
         for key in (
             "id",
             "algorithm",
+            "variant_id",
+            "variantId",
+            "variant_label",
+            "variantLabel",
+            "variant_mode",
+            "variantMode",
+            "mode",
             "status",
             "moleculeId",
             "molecule_id",
@@ -886,6 +1055,14 @@ def load_folder_source(input_dir: Path) -> SourceBundle:
         raise ExporterError(f"Expected an object in {benchmark_path}")
 
     rows_path = _find_folder_rows(input_dir)
+    campaign = _load_campaign_manifest(input_dir)
+    campaign_variants = _campaign_variants(campaign)
+    benchmark_entries = {
+        str(item.get("id", item.get("entry_id", item.get("entryId")))): item
+        for item in _parse_list(benchmark.get("entries"))
+        if isinstance(item, Mapping)
+        and item.get("id", item.get("entry_id", item.get("entryId"))) is not None
+    }
     raw_rows = (
         _submission_rows(rows_path, benchmark)
         if rows_path.name == "submission.json"
@@ -894,7 +1071,18 @@ def load_folder_source(input_dir: Path) -> SourceBundle:
     rows: list[dict[str, Any]] = []
     runtime_sources: Counter[str] = Counter()
     for index, raw_row in enumerate(raw_rows):
-        normalized, runtime_source = normalize_folder_row(raw_row, benchmark=benchmark, index=index)
+        enriched = dict(raw_row)
+        entry_id = _text(_first(enriched, "entry_id", "entryId"))
+        entry = benchmark_entries.get(entry_id or "")
+        if entry is not None:
+            for field in ("variant_id", "variantId", "variant_label", "variantLabel", "variant_mode", "variantMode", "mode"):
+                if field not in enriched and field in entry:
+                    enriched[field] = entry[field]
+        normalized_variant = _variant_metadata(entry=enriched, config=None)
+        variant_key = normalized_variant.get("variant_id")
+        if variant_key in campaign_variants:
+            enriched.update(campaign_variants[variant_key])
+        normalized, runtime_source = normalize_folder_row(enriched, benchmark=benchmark, index=index)
         rows.append(normalized)
         if runtime_source:
             runtime_sources[runtime_source] += 1
@@ -1150,13 +1338,38 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
             )
 
     status_counts = Counter(str(row.get("status") or "missing") for row in rows)
+    field_presence = [
+        {
+            "field": field,
+            "present_count": sum(row.get(field) is not None for row in rows),
+            "missing_count": sum(row.get(field) is None for row in rows),
+        }
+        for field in CANONICAL_FIELDS
+    ]
+    eligibility_counts: Counter[str] = Counter()
+    for row in rows:
+        status = str(row.get("status") or "missing").lower()
+        if _benchmark_row_is_eligible(row):
+            eligibility_counts["eligible"] += 1
+        elif status != "completed":
+            eligibility_counts["incomplete_or_failed"] += 1
+        elif row.get("projected_solve_is_diagnostic") is True:
+            eligibility_counts["diagnostic"] += 1
+        elif row.get("scientific_converged") is False or row.get("converged") is False:
+            eligibility_counts["non_converged"] += 1
+        else:
+            eligibility_counts["invalid_or_missing"] += 1
     return {
         "row_count": len(rows),
         "successful_result_count": len(successful),
         "status_counts": dict(sorted(status_counts.items())),
+        "eligibility_counts": dict(sorted(eligibility_counts.items())),
+        "field_presence": field_presence,
         "by_algorithm": by_algorithm,
         "by_algorithm_path": by_algorithm_path,
         "by_molecule": by_molecule,
+        "by_variant": _group_summary(rows, "variant_id"),
+        "by_seed": _group_summary(rows, "seed"),
         "best_algorithm_by_molecule": best,
     }
 
@@ -1267,6 +1480,9 @@ def write_summary_files(summary: Mapping[str, Any], output_dir: Path) -> None:
     write_records_csv(summary["by_algorithm"], summaries_dir / "by_algorithm.csv")
     write_records_csv(summary["by_algorithm_path"], summaries_dir / "by_algorithm_path.csv")
     write_records_csv(summary["by_molecule"], summaries_dir / "by_molecule.csv")
+    write_records_csv(summary["by_variant"], summaries_dir / "by_variant.csv")
+    write_records_csv(summary["by_seed"], summaries_dir / "by_seed.csv")
+    write_records_csv(summary["field_presence"], summaries_dir / "field_presence.csv")
     write_records_csv(
         summary["best_algorithm_by_molecule"],
         summaries_dir / "best_algorithm_by_molecule.csv",

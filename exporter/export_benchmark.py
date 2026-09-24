@@ -135,6 +135,9 @@ def export_source(
         "summaries/by_algorithm.csv",
         "summaries/by_algorithm_path.csv",
         "summaries/by_molecule.csv",
+        "summaries/by_variant.csv",
+        "summaries/by_seed.csv",
+        "summaries/field_presence.csv",
         "summaries/best_algorithm_by_molecule.csv",
     ]
     if include_raw and bundle.source_type == "api":

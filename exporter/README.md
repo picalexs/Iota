@@ -152,7 +152,9 @@ The exporter keeps only the fields needed for comparison and audit:
   reason, execution generation, and restart parent.
 
 The exporter keeps diagnostic rows for audit. It marks them with
-`benchmark_eligible: false`. Summaries and plots use only eligible rows.
+`benchmark_eligible: false`. Aggregate summaries and the general benchmark
+plots use only eligible rows. The paper report also plots finite diagnostic
+and unvalidated observations with separate markers.
 Eligible rows must have a completed status, a finite energy and reference,
 valid reported energy, no projected-solve diagnostic flag, and established
 scientific convergence. A finite diagnostic energy is not a benchmark result.
@@ -167,6 +169,8 @@ The default output contains:
 - `benchmark.json`: compact benchmark metadata;
 - `runs.json` and `runs.csv`: one compact row per campaign entry;
 - `summaries/`: status-aware algorithm and molecule summaries;
+- `summaries/field_presence.csv`: present and missing counts for every exported
+  canonical field;
 - `manifest.json`: schema version, counts, runtime source, and source digest.
 
 The exporter does not include event streams or raw result payloads by default.
@@ -203,14 +207,43 @@ Error and runtime plots group rows by algorithm and actual execution path.
 This prevents Aer sampler, Aer estimator, and local classical paths from
 appearing as one method.
 
-Use `--error-view signed` for signed error plots. Use `--format svg` for
-editable vector output or `--format both` for PNG and SVG. The plot writer
+Use `--error-view signed` for signed error plots. Use `--format pdf` for a
+manuscript-ready vector figure, `--format svg` for editable vector output, or
+`--format both` for PNG and SVG. The plot writer
 reserves legend space and saves with a tight bounding box to keep text visible.
 
 Rows without the required values, rows with diagnostic energies, and rows that
 did not establish scientific convergence are excluded from the relevant plot.
 The counts are reported in `plot_manifest.json`. Signed runtime plots use a
 symlog error axis so negative errors remain visible.
+
+## 4. Create the paper report
+
+Generate one reproducible report from several campaign folders:
+
+```sh
+.venv/bin/python -m exporter.paper_report \
+  output/paper-statevector-balanced-10m \
+  output/paper-aer-ideal-balanced-10m \
+  output/paper-preset-comparison-4m \
+  output/paper-aer-noisy-core-2m \
+  output/paper-aer-noisy-phoenix-2m \
+  output/paper-seed-role-study \
+  output/paper-resource-ablation \
+  --output-dir output/paper-report --format both
+```
+
+The report writes `statistics.json`, CSV summaries, LaTeX table fragments, and
+PDF/PNG figures for eligibility, accuracy versus runtime, presets, backend and
+noise conditions, seed sensitivity, molecule coverage, resources, and execution
+paths. Validated aggregate statistics use only rows with
+`benchmark_eligible: true`. Completed rows with finite error and runtime remain
+visible as diagnostic or unvalidated observations. Non-converged finite rows
+are not shown as missing values and do not enter validated aggregates. The
+report manifest defines these populations. The report also writes
+`field_presence.csv`, which distinguishes unavailable measurements from lost
+export fields. `unvalidated_by_campaign_algorithm.csv` lists the convergence
+failure reasons behind finite unvalidated observations.
 
 ## Tests
 
@@ -231,4 +264,6 @@ The tests use fake API clients and local rows. They do not submit QSS runs.
 - `benchmark_io.py`: shared row normalization, API access, summaries, and
   manifest helpers. It defines the export eligibility contract;
 - `benchmark_plots.py`: layout-safe Matplotlib plot builders;
+- `paper_report.py`: multi-campaign statistics, LaTeX fragments, and
+  publication figures;
 - `tests/`: focused exporter tests;

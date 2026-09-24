@@ -260,6 +260,47 @@ def test_folder_source_accepts_canonical_json_and_csv_round_trip(tmp_path: Path)
     assert loaded_csv.rows[0]["converged"] is True
 
 
+def test_folder_source_preserves_explicit_quality_and_variant_fields(tmp_path: Path) -> None:
+    rows = [
+        {
+            "entry_id": "h2:kqd-balanced:seed=11",
+            "variant_id": "kqd-balanced",
+            "variant_label": "KQD balanced",
+            "variant_mode": "advanced",
+            "variant_config_sha256": "config-hash",
+            "molecule": "H2",
+            "algorithm": "kqd",
+            "status": "completed",
+            "final_energy": -1.1,
+            "reference_energy": -1.2,
+            "absolute_error": 0.1,
+            "converged": False,
+            "reported_energy_is_valid": True,
+            "projected_solve_is_diagnostic": True,
+            "scientific_converged": False,
+            "primary_energy_source": "projected_branch_diagnostic",
+            "reference_method": "CASCI",
+            "reference_solver_path": "pyscf+ffsim",
+            "reference_basis": "sto-3g",
+            "reference_active_space": [2, 2],
+            "benchmark_eligible": False,
+            "benchmark_exclusion_reason": "projected_solve_diagnostic",
+        }
+    ]
+    write_rows_csv(rows, tmp_path / "runs.csv")
+
+    loaded = load_folder_source(tmp_path)
+    row = loaded.rows[0]
+
+    assert row["variant_label"] == "KQD balanced"
+    assert row["variant_config_sha256"] == "config-hash"
+    assert row["benchmark_eligible"] is False
+    assert row["benchmark_exclusion_reason"] == "projected_solve_diagnostic"
+    assert row["reference_method"] == "CASCI"
+    assert row["reference_solver_path"] == "pyscf+ffsim"
+    assert row["reference_active_space"] == [2, 2]
+
+
 def test_folder_source_accepts_create_checkpoint_status_rows(tmp_path: Path) -> None:
     (tmp_path / "benchmark.json").write_text(
         json.dumps({"id": "benchmark-1", "name": "seed campaign", "selectedBasis": "sto-3g"}),
