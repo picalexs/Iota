@@ -237,6 +237,7 @@ def _solve_qfd_branch_path(
         "time_grid_type": time_grid_type,
         "implemented_evolution_method": "pauli_lie_trotter",
         "projected_dimension": num_time_points,
+        "requested_time_points": num_time_points,
         "full_space_dimension": None,
         "basis_complete": False,
         "full_space_residual_available": False,
@@ -372,6 +373,7 @@ def _solve_qfd_sector_path(
         **diagnostics,
         **grid_metadata,
         "time_points": float(len(states)),
+        "requested_time_points": float(len(time_grid)),
         "max_time": max_time,
         "sector_dimension": float(sector_action.dimension),
     }
@@ -390,6 +392,7 @@ def _solve_qfd_sector_path(
         "sector_dimension": sector_action.dimension,
         "num_spatial_orbitals": sector_action.norb,
         "projected_dimension": len(states),
+        "requested_time_points": len(time_grid),
         "full_space_dimension": sector_action.dimension,
         "basis_complete": len(states) >= sector_action.dimension,
         "full_space_residual_available": len(states) >= sector_action.dimension,
