@@ -1,0 +1,132 @@
+{
+  "name": "Worker smoke H2",
+  "campaign_id": "worker-smoke-h2",
+  "molecules": [
+    {
+      "id": "ce9bda97-c4fd-4949-9783-8f0d8b3c3983",
+      "name": "Hydrogen",
+      "key": "h2"
+    }
+  ],
+  "algorithms": [
+    {
+      "id": "vqe-short",
+      "label": "VQE short worker smoke",
+      "algorithm": "vqe",
+      "mode": "advanced",
+      "seed_roles": ["algorithm"],
+      "advanced_config": {
+        "algorithm": "vqe",
+        "ansatz_name": "EfficientSU2",
+        "optimizer_name": "COBYLA",
+        "max_iterations": 8,
+        "max_function_evaluations": 8,
+        "reps": 1,
+        "initial_point_strategy": "zero_plus_seeded_random",
+        "initial_point_candidates": 1,
+        "seed": null
+      }
+    },
+    {
+      "id": "qse-complete-worker",
+      "label": "QSE worker completeness",
+      "algorithm": "qse",
+      "mode": "advanced",
+      "advanced_config": {
+        "algorithm": "qse",
+        "reference_method": "hf",
+        "excitation_level": "singles_doubles",
+        "max_subspace_dim": 8,
+        "regularization": 1e-7,
+        "overlap_threshold": 1e-5,
+        "residual_tolerance": 1e-8
+      }
+    },
+    {
+      "id": "kqd-short-worker",
+      "label": "KQD worker smoke",
+      "algorithm": "kqd",
+      "mode": "advanced",
+      "advanced_config": {
+        "algorithm": "kqd",
+        "krylov_dim": 4,
+        "time_step": 0.2,
+        "evolution_method": "exact",
+        "trotter_steps": 1,
+        "residual_tolerance": 1e-8
+      }
+    },
+    {
+      "id": "qfd-short-worker",
+      "label": "QFD worker smoke",
+      "algorithm": "qfd",
+      "mode": "advanced",
+      "advanced_config": {
+        "algorithm": "qfd",
+        "num_time_points": 5,
+        "max_time": 0.8,
+        "time_grid_type": "linear",
+        "qfd_variant": "qfd_chemistry_forward",
+        "kappa": 1.0,
+        "trotter_steps": 1,
+        "residual_tolerance": 1e-6
+      }
+    },
+    {
+      "id": "sqd-short-worker",
+      "label": "SQD short worker smoke",
+      "algorithm": "sqd",
+      "mode": "advanced",
+      "seed_roles": ["algorithm"],
+      "advanced_config": {
+        "algorithm": "sqd",
+        "samples_per_batch": 128,
+        "num_batches": 2,
+        "max_iterations": 2,
+        "sampling_state_source": "hf",
+        "energy_tol": 1e-4,
+        "occupancies_tol": 1e-4,
+        "min_selected_configurations": 2,
+        "seed": null,
+        "symmetrize_spin": false,
+        "max_dim": 8
+      }
+    },
+    {
+      "id": "skqd-short-worker",
+      "label": "SKQD short worker smoke",
+      "algorithm": "skqd",
+      "mode": "advanced",
+      "seed_roles": ["algorithm"],
+      "advanced_config": {
+        "algorithm": "skqd",
+        "samples_per_state": 128,
+        "base_sampling_options": {
+          "min_selected_configurations": 2,
+          "seed": null,
+          "symmetrize_spin": false,
+          "max_dim": 8
+        },
+        "krylov_extension_dim": 1,
+        "sampling_mode": "sample_union_exact",
+        "time_step": 0.2,
+        "trotter_steps": 1,
+        "residual_tolerance": 1e-6
+      }
+    }
+  ],
+  "seeds": [11, 17],
+  "basis_set": "sto-3g",
+  "backend": {
+    "target": "statevector",
+    "options": {
+      "aer_method": "statevector",
+      "optimization_level": 1
+    }
+  },
+  "metadata": {
+    "purpose": "bounded worker submission smoke test",
+    "paper_use": false,
+    "budget_policy": "short local validation only"
+  }
+}
