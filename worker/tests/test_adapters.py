@@ -1581,6 +1581,55 @@ def test_normalize_result_does_not_infer_scientific_convergence_from_one_project
 
 
 @pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
+def test_normalize_result_accepts_stable_full_space_residual_without_complete_basis(
+    algorithm: str,
+) -> None:
+    diagnostics = {
+        "stability_state": "stable",
+        "overlap_condition": 1.0,
+        "overlap_min_eigenvalue": 1.0,
+        "relative_ritz_residual": 1e-12,
+        "residual_convergence_threshold": 1e-8,
+    }
+    matrix_summary = {
+        "matrix_element_strategy": "sector_matrix_free",
+        "full_space_dimension": 4,
+        "basis_complete": False,
+        "full_space_residual_available": True,
+        "projected_dimension": 2,
+    }
+    if algorithm == "kqd":
+        result = KQDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            ritz_values=[-1.0],
+            krylov_rank=2,
+            orthogonality_metrics=diagnostics,
+            matrix_element_summary=matrix_summary,
+            stability_summary=diagnostics,
+        )
+    else:
+        result = QFDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            filter_eigenvalues=[-1.0],
+            conditioning_summary=diagnostics,
+            matrix_element_summary=matrix_summary,
+            stability_summary=diagnostics,
+        )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["scientific_converged"] is True
+    assert convergence["completeness_evidence"] == "full_space_ritz_residual"
+    assert convergence["convergence_criterion"] == "full_space_ritz_residual"
+
+
+@pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
 def test_normalize_result_accepts_complete_local_projected_basis(algorithm: str) -> None:
     diagnostics = {
         "stability_state": "stable",

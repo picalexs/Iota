@@ -202,6 +202,7 @@ def test_run_kqd_sector_path_does_not_materialize_dense_matrix(
     assert result.primary_energy is not None
     assert result.matrix_element_summary["matrix_element_strategy"] == "sector_matrix_free"
     assert result.matrix_element_summary["projected_dimension"] == result.krylov_rank
+    assert result.matrix_element_summary["full_space_residual_available"] is True
     assert result.matrix_element_summary["projected_matrix_element_count"] > 0
     assert result.matrix_element_summary["timing_breakdown"]["total_seconds"] >= 0.0
     assert result.matrix_element_summary["basis_index_convention"] == "k=0..krylov_dim-1"
@@ -520,6 +521,7 @@ def test_kqd_exact_ideal_aer_uses_sector_evolution_without_an_estimator() -> Non
 
     assert result.matrix_element_summary["matrix_element_strategy"] == "sector_matrix_free"
     assert result.matrix_element_summary["implemented_evolution_method"] == "sector_expm_multiply"
+    assert result.matrix_element_summary["full_space_residual_available"] is True
 
 
 def test_kqd_exact_ideal_aer_rejects_branch_fallback_before_estimator_creation() -> None:

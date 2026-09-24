@@ -1074,12 +1074,18 @@ def _projected_convergence_metadata(
         else:
             scientific_converged = bool(result.converged) and projected_converged
             if scientific_converged:
-                if basis_complete and full_space_residual_available:
+                if full_space_residual_available:
                     metadata.update(
                         scientific_converged=True,
-                        completeness_evidence="complete_full_space_basis",
+                        completeness_evidence=(
+                            "complete_full_space_basis"
+                            if basis_complete
+                            else "full_space_ritz_residual"
+                        ),
                         convergence_criterion=(
                             "full_space_ritz_residual_and_complete_basis"
+                            if basis_complete
+                            else "full_space_ritz_residual"
                         ),
                     )
                 else:

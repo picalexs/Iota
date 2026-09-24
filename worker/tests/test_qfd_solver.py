@@ -647,6 +647,7 @@ def test_run_qfd_large_ideal_aer_uses_sector_projection_without_dense_resolution
     assert result.matrix_element_summary["matrix_element_strategy"] == "sector_matrix_free"
     assert result.matrix_element_summary["implemented_evolution_method"] == "sector_expm_multiply"
     assert result.matrix_element_summary["sector_dimension"] > 0
+    assert result.matrix_element_summary["full_space_residual_available"] is True
 
 
 def test_run_qfd_aer_state_propagation_matches_statevector() -> None:
@@ -680,6 +681,7 @@ def test_run_qfd_aer_state_propagation_matches_statevector() -> None:
     assert aer_result.conditioning_summary["time_points"] == pytest.approx(2.0)
     assert aer_result.matrix_element_summary["matrix_element_strategy"] == "dense_classical"
     assert aer_result.matrix_element_summary["projected_dimension"] == 2
+    assert aer_result.matrix_element_summary["full_space_residual_available"] is True
     assert aer_result.matrix_element_summary["implemented_evolution_method"] == (
         "aer_pauli_lie_trotter"
     )
