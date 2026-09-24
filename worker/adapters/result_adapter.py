@@ -993,12 +993,26 @@ def _projected_convergence_metadata(
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
     stability_summary = metrics.get("stability_summary")
     stability_summary = stability_summary if isinstance(stability_summary, dict) else {}
+    matrix_element_summary = metrics.get("matrix_element_summary")
+    matrix_element_summary = (
+        matrix_element_summary if isinstance(matrix_element_summary, dict) else {}
+    )
     termination_reason = stability_summary.get("termination_reason") or diagnostics.get(
         "termination_reason"
     )
     termination_reason = termination_reason if isinstance(termination_reason, str) else None
     residual = _finite_float(diagnostics.get("relative_ritz_residual"))
     threshold = _finite_float(diagnostics.get("residual_convergence_threshold"))
+    basis_rank = _finite_float(
+        matrix_element_summary.get("basis_rank")
+        or diagnostics.get("basis_numerical_rank")
+        or matrix_element_summary.get("projected_dimension")
+    )
+    full_space_dimension = _finite_float(matrix_element_summary.get("full_space_dimension"))
+    basis_complete = matrix_element_summary.get("basis_complete") is True
+    full_space_residual_available = (
+        matrix_element_summary.get("full_space_residual_available") is True
+    )
     metadata = {
         "numerical_stable": stable,
         "projected_solver_converged": None,
@@ -1007,6 +1021,10 @@ def _projected_convergence_metadata(
         "convergence_value": residual,
         "convergence_threshold": threshold,
         "termination_reason": termination_reason,
+        "basis_rank": basis_rank,
+        "full_space_dimension": full_space_dimension,
+        "basis_complete": basis_complete,
+        "full_space_residual_available": full_space_residual_available,
     }
     if residual is None:
         metadata.update(
@@ -1056,10 +1074,19 @@ def _projected_convergence_metadata(
         else:
             scientific_converged = bool(result.converged) and projected_converged
             if scientific_converged:
-                metadata["scientific_converged"] = None
-                metadata["convergence_failure_reason"] = (
-                    "scientific_completeness_evidence_unavailable"
-                )
+                if basis_complete and full_space_residual_available:
+                    metadata.update(
+                        scientific_converged=True,
+                        completeness_evidence="complete_full_space_basis",
+                        convergence_criterion=(
+                            "full_space_ritz_residual_and_complete_basis"
+                        ),
+                    )
+                else:
+                    metadata["scientific_converged"] = None
+                    metadata["convergence_failure_reason"] = (
+                        "scientific_completeness_evidence_unavailable"
+                    )
             else:
                 metadata["scientific_converged"] = False
                 metadata["convergence_failure_reason"] = "solver_reported_not_converged"

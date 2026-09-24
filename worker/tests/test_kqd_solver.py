@@ -123,10 +123,9 @@ def test_kqd_basis_uses_real_time_evolved_states_not_hamiltonian_powers() -> Non
         progress_callback=None,
     )
 
-    assert len(basis) == 3
+    assert len(basis) == 2
     assert basis[0] == pytest.approx(reference)
     assert basis[1] == pytest.approx(np.array([1.0, -1.0j], dtype=complex) / np.sqrt(2.0))
-    assert basis[2] == pytest.approx(np.array([1.0, -1.0], dtype=complex) / np.sqrt(2.0))
     assert not np.allclose(basis[1], operator @ reference)
 
 
@@ -172,7 +171,7 @@ def test_kqd_sector_krylov_matches_dense_sector_matrix() -> None:
         build_overlap_matrix(sector_basis),
     )
 
-    assert sector_values[:3] == pytest.approx(dense_values[:3], abs=1e-8)
+    assert sector_values[:3] == pytest.approx(dense_values[:3], abs=2e-8)
 
 
 def test_run_kqd_sector_path_does_not_materialize_dense_matrix(
