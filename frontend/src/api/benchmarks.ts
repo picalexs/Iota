@@ -1,11 +1,17 @@
 /** Benchmark API calls. */
 
-import type { BenchmarkEntry, SavedBenchmarkRun } from "@/types/benchmark";
+import type {
+  BenchmarkEntry,
+  SavedBenchmarkRun,
+  SavedBenchmarkRunSummary,
+} from "@/types/benchmark";
 import type { MoleculeResponse, UUID } from "@/types/run";
 import type {
   ApiBenchmarkRunResponse,
   ApiBenchmarkRunCreate,
   ApiBenchmarkRunListResponse,
+  ApiBenchmarkRunSummaryListResponse,
+  ApiBenchmarkRunSummaryResponse,
   ApiBenchmarkRunUpdate,
 } from "@/types/api";
 import { isRunAlgorithm } from "@/types/run-status";
@@ -86,6 +92,47 @@ function isBenchmarkRunResponse(value: unknown): value is ApiBenchmarkRunRespons
   );
 }
 
+function isBenchmarkRunSummaryResponse(value: unknown): value is ApiBenchmarkRunSummaryResponse {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.createdAt === "string" &&
+    typeof value.updatedAt === "string" &&
+    isOptionalStringArray(value, "selectedMoleculeKeys") &&
+    typeof value.selectedBasis === "string" &&
+    BENCHMARK_BACKEND_MODES.has(
+      value.selectedBackendMode as ApiBenchmarkRunSummaryResponse["selectedBackendMode"],
+    ) &&
+    (!("selectedBackendName" in value) ||
+      value.selectedBackendName === null ||
+      typeof value.selectedBackendName === "string") &&
+    typeof value.status === "string" &&
+    [
+      "draft",
+      "running",
+      "paused",
+      "finished",
+      "partial",
+      "failed",
+      "cancelled",
+      "planned",
+      "excluded",
+    ].includes(value.status) &&
+    [
+      "rowCount",
+      "completedCount",
+      "activeCount",
+      "pausedCount",
+      "failedCount",
+      "cancelledCount",
+      "plannedCount",
+      "excludedCount",
+      "associatedRunCount",
+    ].every((key) => isFiniteNumber(value[key]))
+  );
+}
+
 export function parseBenchmarkRunResponse(value: unknown): ApiBenchmarkRunResponse {
   if (!isBenchmarkRunResponse(value)) {
     throw invalidApiResponse("Invalid benchmark run response");
@@ -105,6 +152,22 @@ export function parseBenchmarkRunListResponse(value: unknown): ApiBenchmarkRunLi
     throw invalidApiResponse("Invalid benchmark run list response");
   }
   return value as ApiBenchmarkRunListResponse;
+}
+
+export function parseBenchmarkRunSummaryListResponse(
+  value: unknown,
+): ApiBenchmarkRunSummaryListResponse {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.items) ||
+    !value.items.every(isBenchmarkRunSummaryResponse) ||
+    !isFiniteNumber(value.total) ||
+    !isFiniteNumber(value.limit) ||
+    !isFiniteNumber(value.offset)
+  ) {
+    throw invalidApiResponse("Invalid benchmark run summary list response");
+  }
+  return value as ApiBenchmarkRunSummaryListResponse;
 }
 
 function toJsonObjects<T extends object>(
@@ -133,6 +196,16 @@ function toBenchmarkRunList(data: ApiBenchmarkRunListResponse): BenchmarkRunList
   return {
     ...data,
     items: data.items.map(toSavedBenchmarkRun),
+  };
+}
+
+function toSavedBenchmarkRunSummary(
+  data: ApiBenchmarkRunSummaryResponse,
+): SavedBenchmarkRunSummary {
+  return {
+    ...data,
+    selectedMoleculeKeys: data.selectedMoleculeKeys ?? [],
+    selectedBackendName: data.selectedBackendName ?? null,
   };
 }
 
@@ -202,6 +275,42 @@ export async function listBenchmarkRuns(params?: {
 
   const response = parseBenchmarkRunListResponse(await request<unknown>(url, { method: "GET" }));
   return toBenchmarkRunList(response);
+}
+
+export interface BenchmarkRunSummaryListResponse {
+  items: SavedBenchmarkRunSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export async function listBenchmarkRunSummaries(params?: {
+  limit?: number;
+  offset?: number;
+  status?: SavedBenchmarkRunSummary["status"];
+  backend?: string;
+  sort?: "name" | "rows" | "backend" | "updated" | "status";
+  order?: "asc" | "desc";
+}): Promise<BenchmarkRunSummaryListResponse> {
+  const query = new URLSearchParams();
+  if (params?.limit !== undefined) query.append("limit", String(params.limit));
+  if (params?.offset !== undefined) query.append("offset", String(params.offset));
+  if (params?.status !== undefined) query.append("status", params.status);
+  if (params?.backend !== undefined) query.append("backend", params.backend);
+  if (params?.sort !== undefined) query.append("sort", params.sort);
+  if (params?.order !== undefined) query.append("order", params.order);
+  const queryString = query.toString();
+  const url =
+    queryString.length > 0
+      ? `${API_BASE}/api/benchmarks/summaries?${queryString}`
+      : `${API_BASE}/api/benchmarks/summaries`;
+  const response = parseBenchmarkRunSummaryListResponse(
+    await request<unknown>(url, { method: "GET" }),
+  );
+  return {
+    ...response,
+    items: response.items.map(toSavedBenchmarkRunSummary),
+  };
 }
 
 export async function getBenchmarkRun(id: UUID): Promise<SavedBenchmarkRun> {

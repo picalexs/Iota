@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createBenchmarkRun,
   listBenchmarkRuns,
+  listBenchmarkRunSummaries,
   parseBenchmarkRunListResponse,
+  parseBenchmarkRunSummaryListResponse,
   parseBenchmarkRunResponse,
   type BenchmarkRunCreate,
 } from "./benchmarks";
@@ -114,5 +116,61 @@ describe("benchmark API transport adapters", () => {
         offset: 0,
       }),
     ).toThrow("Invalid benchmark run list response");
+    expect(() =>
+      parseBenchmarkRunSummaryListResponse({
+        items: [{ ...benchmarkResponse, status: "unknown" }],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      }),
+    ).toThrow("Invalid benchmark run summary list response");
+  });
+
+  it("requests compact benchmark summaries with server-side list controls", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      mockResponse({
+        items: [
+          {
+            ...benchmarkResponse,
+            selectedMoleculeKeys: ["h2"],
+            selectedBackendName: null,
+            status: "running",
+            rowCount: 2,
+            completedCount: 1,
+            activeCount: 1,
+            pausedCount: 0,
+            failedCount: 0,
+            cancelledCount: 0,
+            plannedCount: 0,
+            excludedCount: 0,
+            associatedRunCount: 2,
+          },
+        ],
+        total: 1,
+        limit: 50,
+        offset: 50,
+      }),
+    );
+
+    const result = await listBenchmarkRunSummaries({
+      limit: 50,
+      offset: 50,
+      status: "running",
+      backend: "statevector",
+      sort: "updated",
+      order: "desc",
+    });
+
+    expect(result.items[0]).toMatchObject({
+      status: "running",
+      rowCount: 2,
+      activeCount: 1,
+    });
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/api/benchmarks/summaries?limit=50&offset=50&status=running&backend=statevector&sort=updated&order=desc",
+      ),
+      expect.objectContaining({ method: "GET" }),
+    );
   });
 });

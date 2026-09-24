@@ -72,6 +72,8 @@ export type ApiBenchmarkRunCreate = ApiSchema<"BenchmarkRunCreate">;
 export type ApiBenchmarkRunUpdate = ApiSchema<"BenchmarkRunUpdate">;
 export type ApiBenchmarkRunResponse = ApiSchema<"BenchmarkRunResponse">;
 export type ApiBenchmarkRunListResponse = ApiSchema<"BenchmarkRunListResponse">;
+export type ApiBenchmarkRunSummaryResponse = ApiSchema<"BenchmarkRunSummaryResponse">;
+export type ApiBenchmarkRunSummaryListResponse = ApiSchema<"BenchmarkRunSummaryListResponse">;
 
 export type ApiIbmCredentialProfileCreate = ApiSchema<"IbmCredentialProfileCreate">;
 export type ApiIbmCredentialProfileUpdate = ApiSchema<"IbmCredentialProfileUpdate">;

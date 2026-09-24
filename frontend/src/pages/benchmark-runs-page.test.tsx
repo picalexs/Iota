@@ -20,6 +20,7 @@ const cancelRun = vi.fn();
 const updateBenchmarkRun = vi.fn();
 const createBenchmarkRun = vi.fn();
 const deleteBenchmarkRun = vi.fn();
+const listBenchmarkRunSummaries = vi.fn();
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClient,
@@ -31,6 +32,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/hooks/use-query-hooks", () => ({
   useListBenchmarkRuns: (...args: unknown[]) => useListBenchmarkRuns(...args),
+  useListBenchmarkRunSummaries: (...args: unknown[]) => useListBenchmarkRuns(...args),
   invalidateBenchmarkRunQueries: (...args: unknown[]) => invalidateBenchmarkRunQueries(...args),
   invalidateRunsQueries: (...args: unknown[]) => invalidateRunsQueries(...args),
 }));
@@ -39,6 +41,7 @@ vi.mock("@/api/benchmarks", () => ({
   createBenchmarkRun: (...args: unknown[]) => createBenchmarkRun(...args),
   deleteBenchmarkRun: (...args: unknown[]) => deleteBenchmarkRun(...args),
   listBenchmarkRuns: vi.fn(),
+  listBenchmarkRunSummaries: (...args: unknown[]) => listBenchmarkRunSummaries(...args),
   updateBenchmarkRun: (...args: unknown[]) => updateBenchmarkRun(...args),
 }));
 
@@ -129,7 +132,7 @@ describe("BenchmarkRunsPage", () => {
     expect(screen.getByText("Benchmark 60")).toBeInTheDocument();
     expect(useListBenchmarkRuns).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ limit: 1000, offset: 0 }),
+      expect.objectContaining({ limit: 50, offset: 0 }),
     );
   });
 
