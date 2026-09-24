@@ -3381,9 +3381,9 @@ export interface operations {
                 /** @description Pagination offset */
                 offset?: number;
                 status?: ("draft" | "running" | "paused" | "finished" | "partial" | "failed" | "cancelled" | "planned" | "excluded") | null;
-                backend?: string | null;
-                sort?: string;
-                order?: string;
+                backend?: ("statevector" | "aer_simulator" | "aer_simulator_backend_noise" | "ibm_runtime") | null;
+                sort?: "name" | "rows" | "backend" | "updated" | "status";
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;

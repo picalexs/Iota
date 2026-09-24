@@ -11,11 +11,14 @@ from sqlalchemy.orm import Session
 from app.dependencies import ensure_local_operator_access, get_db, get_redis
 from app.models.enums import BackendTarget
 from app.schemas.benchmark import (
+    BenchmarkBackendMode,
     BenchmarkRegistrationCreate,
     BenchmarkRunCreate,
     BenchmarkRunHistoryStatus,
     BenchmarkRunListResponse,
     BenchmarkRunResponse,
+    BenchmarkRunSortField,
+    BenchmarkRunSortOrder,
     BenchmarkRunSummaryListResponse,
     BenchmarkRunUpdate,
 )
@@ -80,9 +83,9 @@ def list_benchmark_run_summaries(
     limit: Annotated[int, Query(ge=1, le=100, description="Maximum results")] = 50,
     offset: Annotated[int, Query(ge=0, description="Pagination offset")] = 0,
     summary_status: Annotated[BenchmarkRunHistoryStatus | None, Query(alias="status")] = None,
-    backend: Annotated[str | None, Query()] = None,
-    sort: Annotated[str, Query()] = "updated",
-    order: Annotated[str, Query()] = "desc",
+    backend: Annotated[BenchmarkBackendMode | None, Query()] = None,
+    sort: Annotated[BenchmarkRunSortField, Query()] = "updated",
+    order: Annotated[BenchmarkRunSortOrder, Query()] = "desc",
 ) -> BenchmarkRunSummaryListResponse:
     """List compact benchmark history rows with current run statuses."""
     service = BenchmarkRunService(db)

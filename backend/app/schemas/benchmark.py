@@ -27,6 +27,8 @@ BenchmarkRunHistoryStatus = Literal[
     "planned",
     "excluded",
 ]
+BenchmarkRunSortField = Literal["name", "rows", "backend", "updated", "status"]
+BenchmarkRunSortOrder = Literal["asc", "desc"]
 
 
 class BenchmarkRunBase(BaseModel):
