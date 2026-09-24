@@ -18,7 +18,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v4"
+EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v5"
 CANONICAL_FIELDS = (
     "benchmark_id",
     "benchmark_name",
@@ -88,6 +88,7 @@ CANONICAL_FIELDS = (
     "max_function_evaluations",
     "benchmark_eligible",
     "benchmark_exclusion_reason",
+    "eligibility_source",
     "error_message",
 )
 
@@ -419,10 +420,12 @@ def _config_seeds(config: Mapping[str, Any], algorithm: str | None) -> dict[str,
 def _benchmark_quality_fields(
     *,
     result: Mapping[str, Any] | None,
+    algorithm: str | None,
     status: str,
     final_energy: float | None,
     reference_energy: float | None,
     converged: bool | None,
+    recompute_eligibility: bool = False,
 ) -> dict[str, Any]:
     """Extract scientific eligibility without deleting diagnostic results."""
     result_record = _record(result)
@@ -516,8 +519,73 @@ def _benchmark_quality_fields(
     )
     reference_method = _text(_first(reference, "method", "reference_method", "referenceMethod"))
     reference_status = _text(_first(reference, "validity_status", "validityStatus"))
+    matrix_element_summary = _record(
+        _first(metrics, "matrix_element_summary", "matrixElementSummary")
+    )
+    basis_selection = _record(
+        _first(matrix_element_summary, "basis_selection", "basisSelection")
+    )
+    conditioning_summary = _record(
+        _first(metrics, "conditioning_summary", "conditioningSummary")
+    )
+    relative_residual = _number(
+        _first(
+            metrics,
+            "relative_residual",
+            "relativeResidual",
+            default=_first(convergence, "convergence_value", "convergenceValue"),
+        )
+    )
+    residual_threshold = _number(
+        _first(
+            metrics,
+            "convergence_threshold",
+            "convergenceThreshold",
+            default=_first(convergence, "convergence_threshold", "convergenceThreshold"),
+        )
+    )
+    basis_termination_reason = _text(
+        _first(
+            basis_selection,
+            "basis_termination_reason",
+            "basisTerminationReason",
+            default=_first(
+                conditioning_summary,
+                "basis_termination_reason",
+                "basisTerminationReason",
+            ),
+        )
+    )
+    qse_pool_exhausted = (
+        recompute_eligibility
+        and algorithm == "qse"
+        and status == "completed"
+        and converged is True
+        and _text(_first(metrics, "execution_mode", "executionMode"))
+        != "measured_matrix_elements"
+        and diagnostic is not True
+        and reported_valid is True
+        and scientific is None
+        and _boolean(
+            _first(convergence, "projected_solver_converged", "projectedSolverConverged")
+        )
+        is True
+        and _boolean(
+            _first(convergence, "projected_system_stable", "projectedSystemStable")
+        )
+        is True
+        and relative_residual is not None
+        and residual_threshold is not None
+        and relative_residual <= residual_threshold
+        and basis_termination_reason == "candidate_pool_exhausted"
+        and _boolean(
+            _first(basis_selection, "selected_specs_complete", "selectedSpecsComplete")
+        )
+        is True
+    )
 
     reason: str | None = None
+    eligibility_source = "persisted" if explicit_eligible is not None else "derived"
     if status != "completed":
         reason = f"status_{status}"
     elif final_energy is None or reference_energy is None:
@@ -532,7 +600,12 @@ def _benchmark_quality_fields(
         reason = "reference_provenance_invalid"
     elif reference_method is not None and reference_method.upper() != "CASCI":
         reason = "reference_method_unsupported"
-    if explicit_eligible is not None:
+    if qse_pool_exhausted:
+        scientific = True
+        failure_reason = None
+        reason = None
+        eligibility_source = "compatibility_recomputed"
+    elif explicit_eligible is not None:
         reason = None if explicit_eligible else explicit_exclusion_reason or reason
 
     return {
@@ -554,6 +627,7 @@ def _benchmark_quality_fields(
         "convergence_failure_reason": failure_reason,
         "benchmark_eligible": reason is None,
         "benchmark_exclusion_reason": reason,
+        "eligibility_source": eligibility_source,
     }
 
 
@@ -724,6 +798,7 @@ def normalize_api_row(
     benchmark: Mapping[str, Any],
     entry: Mapping[str, Any],
     run_export: Mapping[str, Any] | None,
+    recompute_eligibility: bool = False,
 ) -> tuple[dict[str, Any], str | None]:
     """Normalize one saved benchmark entry and optional run export."""
 
@@ -766,10 +841,12 @@ def normalize_api_row(
     converged = _boolean(_first(result, "converged"))
     quality_fields = _benchmark_quality_fields(
         result=result,
+        algorithm=algorithm,
         status=status,
         final_energy=final_energy,
         reference_energy=reference_energy,
         converged=converged,
+        recompute_eligibility=recompute_eligibility,
     )
     diagnostic_fields = _benchmark_algorithm_diagnostic_fields(result)
     seed_fields = _config_seeds(config, algorithm)
@@ -860,6 +937,7 @@ def normalize_folder_row(
     converged = _boolean(_first(source, "converged"))
     quality_fields = _benchmark_quality_fields(
         result=source,
+        algorithm=algorithm.lower() if algorithm else None,
         status=status,
         final_energy=final_energy,
         reference_energy=reference_energy,
@@ -877,6 +955,7 @@ def normalize_folder_row(
         "primary_energy_source",
         "convergence_failure_reason",
         "benchmark_exclusion_reason",
+        "eligibility_source",
     ):
         value = _text(source.get(field_name))
         if value is not None:
@@ -1318,6 +1397,7 @@ def load_api_source(
     base_url: str,
     client: QssApiClient | None = None,
     include_raw: bool = False,
+    recompute_eligibility: bool = False,
 ) -> SourceBundle:
     api = client or QssApiClient(base_url)
     raw_benchmark = api.get(f"/api/benchmarks/{benchmark_id}")
@@ -1343,6 +1423,7 @@ def load_api_source(
             benchmark=benchmark,
             entry=entry,
             run_export=run_export,
+            recompute_eligibility=recompute_eligibility,
         )
         if normalized["entry_id"] == "entry-unknown":
             normalized["entry_id"] = f"entry:{index:04d}"
@@ -1616,6 +1697,9 @@ def compact_manifest(bundle: SourceBundle, *, files: list[str]) -> dict[str, Any
         "actual_backend_names": actual_backends,
         "provenance_warnings": provenance_warnings,
         "source_signature": source_signature(bundle.rows),
+        "eligibility_sources": dict(
+            Counter(str(row.get("eligibility_source") or "unknown") for row in bundle.rows)
+        ),
         "files": sorted(files),
     }
 

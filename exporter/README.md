@@ -151,7 +151,7 @@ The exporter keeps only the fields needed for comparison and audit:
 - convergence termination, convergence value and threshold, basis rank,
   objective-evaluation budget, selected-CI fraction, and full-sector status;
 - scientific convergence, diagnostic status, reported energy source, exclusion
-  reason, execution generation, and restart parent.
+  reason, eligibility source, execution generation, and restart parent.
 
 The exporter keeps diagnostic rows for audit. It marks them with
 `benchmark_eligible: false`. Aggregate summaries and the general benchmark
@@ -177,6 +177,12 @@ The default output contains:
 
 The exporter does not include event streams or raw result payloads by default.
 Use `--include-raw` only when those API payloads are required for an audit.
+
+The exporter preserves persisted eligibility decisions by default. Use
+`--recompute-eligibility` with a benchmark-ID export only when you want the
+documented compatibility rules for legacy API results. The command records
+`eligibility_source: compatibility_recomputed` for each changed row. It does
+not change the saved benchmark or worker results.
 
 The API source uses QSS read endpoints. It does not connect to the database
 directly. This keeps API and database-backed exports consistent.

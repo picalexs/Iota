@@ -195,6 +195,119 @@ def test_api_normalization_excludes_projected_diagnostics_from_comparison() -> N
     assert row["benchmark_exclusion_reason"] == "projected_solve_diagnostic"
 
 
+def test_api_normalization_recomputes_legacy_qse_pool_eligibility_only_when_opted_in() -> None:
+    benchmark = _benchmark()
+    benchmark["entries"][0]["algorithm"] = "qse"
+    run_export = _run_export()
+    run_export["run"]["algorithm"] = "qse"
+    run_export["result"].update(
+        {
+            "final_energy": -1.2,
+            "reference_energy": -1.2,
+            "converged": True,
+        }
+    )
+    run_export["result"]["algorithm_metrics"].update(
+        {
+            "execution_mode": "sector_matrix_free",
+            "reference_provenance": {"method": "CASCI", "validity_status": "valid"},
+            "benchmark_provenance": {
+                "benchmark_eligible": False,
+                "benchmark_exclusion_reason": "scientific_convergence_not_established",
+                "energy": {
+                    "reported_energy_is_valid": True,
+                    "projected_solve_is_diagnostic": False,
+                    "scientific_converged": None,
+                },
+            },
+            "convergence": {
+                "scientific_converged": None,
+                "projected_solver_converged": True,
+                "projected_system_stable": True,
+                "convergence_value": 1e-12,
+                "convergence_threshold": 1e-8,
+                "convergence_failure_reason": "scientific_completeness_evidence_unavailable",
+            },
+            "relative_residual": 1e-12,
+            "convergence_threshold": 1e-8,
+            "conditioning_summary": {
+                "basis_termination_reason": "candidate_pool_exhausted"
+            },
+            "matrix_element_summary": {
+                "basis_selection": {
+                    "basis_termination_reason": "candidate_pool_exhausted",
+                    "selected_specs_complete": True,
+                }
+            },
+        }
+    )
+
+    persisted, _ = normalize_api_row(
+        benchmark=benchmark,
+        entry=benchmark["entries"][0],
+        run_export=run_export,
+    )
+    recomputed, _ = normalize_api_row(
+        benchmark=benchmark,
+        entry=benchmark["entries"][0],
+        run_export=run_export,
+        recompute_eligibility=True,
+    )
+
+    assert persisted["benchmark_eligible"] is False
+    assert persisted["eligibility_source"] == "persisted"
+    assert recomputed["benchmark_eligible"] is True
+    assert recomputed["scientific_converged"] is True
+    assert recomputed["convergence_failure_reason"] is None
+    assert recomputed["eligibility_source"] == "compatibility_recomputed"
+
+
+def test_api_normalization_does_not_recompute_measured_qse_pool() -> None:
+    benchmark = _benchmark()
+    benchmark["entries"][0]["algorithm"] = "qse"
+    run_export = _run_export()
+    run_export["run"]["algorithm"] = "qse"
+    run_export["result"]["converged"] = True
+    run_export["result"]["algorithm_metrics"].update(
+        {
+            "execution_mode": "measured_matrix_elements",
+            "reference_provenance": {"method": "CASCI", "validity_status": "valid"},
+            "benchmark_provenance": {
+                "benchmark_eligible": False,
+                "energy": {
+                    "reported_energy_is_valid": True,
+                    "projected_solve_is_diagnostic": True,
+                    "scientific_converged": False,
+                },
+            },
+            "convergence": {
+                "projected_solver_converged": True,
+                "projected_system_stable": True,
+                "convergence_value": 1e-12,
+                "convergence_threshold": 1e-8,
+            },
+            "relative_residual": 1e-12,
+            "convergence_threshold": 1e-8,
+            "matrix_element_summary": {
+                "basis_selection": {
+                    "basis_termination_reason": "candidate_pool_exhausted",
+                    "selected_specs_complete": True,
+                }
+            },
+        }
+    )
+
+    row, _ = normalize_api_row(
+        benchmark=benchmark,
+        entry=benchmark["entries"][0],
+        run_export=run_export,
+        recompute_eligibility=True,
+    )
+
+    assert row["benchmark_eligible"] is False
+    assert row["eligibility_source"] == "persisted"
+
+
 class FakeApi:
     def __init__(self, benchmark: dict, run_export: dict) -> None:
         self.benchmark = benchmark
