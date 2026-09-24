@@ -15,6 +15,7 @@ from app.schemas.benchmark import (
     BenchmarkRunCreate,
     BenchmarkRunListResponse,
     BenchmarkRunResponse,
+    BenchmarkRunSummaryListResponse,
     BenchmarkRunUpdate,
 )
 from app.services.benchmark import BenchmarkRunService
@@ -66,6 +67,23 @@ def list_benchmark_runs(
     benchmarks, total = service.list(limit=limit, offset=offset)
     return BenchmarkRunListResponse(
         items=[BenchmarkRunResponse.model_validate(benchmark) for benchmark in benchmarks],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/summaries")
+def list_benchmark_run_summaries(
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100, description="Maximum results")] = 50,
+    offset: Annotated[int, Query(ge=0, description="Pagination offset")] = 0,
+) -> BenchmarkRunSummaryListResponse:
+    """List compact benchmark history rows with current run statuses."""
+    service = BenchmarkRunService(db)
+    summaries, total = service.list_summaries(limit=limit, offset=offset)
+    return BenchmarkRunSummaryListResponse(
+        items=summaries,
         total=total,
         limit=limit,
         offset=offset,

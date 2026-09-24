@@ -147,6 +147,38 @@ def test_benchmark_list_is_paginated(client: ASGISyncTestClient) -> None:
     assert data["items"][0]["id"] in {first["id"], second["id"]}
 
 
+def test_benchmark_summary_list_is_compact_and_uses_current_run_status(
+    client: ASGISyncTestClient,
+    test_db,
+    sample_molecule,
+) -> None:
+    run = Run(
+        molecule_id=sample_molecule.id,
+        status=RunStatus.RUNNING,
+        backend_target="statevector",
+        config_json={"algorithm": "vqe", "backend_target": "statevector"},
+    )
+    test_db.add(run)
+    test_db.commit()
+    test_db.refresh(run)
+
+    payload = _benchmark_payload("Compact benchmark")
+    payload["entries"][0]["runId"] = str(run.id)
+    payload["entries"][0]["status"] = "completed"
+    created = client.post(BENCHMARKS_API, json=payload).json()
+
+    response = client.get(f"{BENCHMARKS_API}/summaries")
+
+    assert response.status_code == 200
+    summary = response.json()["items"][0]
+    assert summary["id"] == created["id"]
+    assert summary["rowCount"] == 1
+    assert summary["activeCount"] == 1
+    assert summary["completedCount"] == 0
+    assert summary["associatedRunCount"] == 1
+    assert "entries" not in summary
+
+
 def test_campaign_registration_is_idempotent_and_persists_metadata(
     client: ASGISyncTestClient,
 ) -> None:

@@ -13,9 +13,11 @@ from sqlalchemy.orm import Session
 
 from app.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models import BenchmarkRun, Run
+from app.models.enums import RunStatus
 from app.schemas.benchmark import (
     BenchmarkRegistrationCreate,
     BenchmarkRunCreate,
+    BenchmarkRunSummaryResponse,
     BenchmarkRunUpdate,
 )
 from app.services.run import RunService
@@ -113,6 +115,35 @@ class BenchmarkRunService:
         )
         return benchmarks, int(total)
 
+    def list_summaries(
+        self, *, limit: int = 50, offset: int = 0
+    ) -> tuple[list[BenchmarkRunSummaryResponse], int]:
+        """Return compact history rows with current associated run statuses."""
+        total = self.db.scalar(select(func.count()).select_from(BenchmarkRun)) or 0
+        benchmarks = list(
+            self.db.scalars(
+                select(BenchmarkRun)
+                .order_by(BenchmarkRun.updated_at.desc(), BenchmarkRun.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+        )
+        run_ids = {
+            run_id
+            for benchmark in benchmarks
+            for run_id in _extract_associated_run_ids(benchmark.entries or [])
+        }
+        run_statuses = {
+            run_id: status
+            for run_id, status in self.db.execute(
+                select(Run.id, Run.status).where(Run.id.in_(run_ids))
+            ).all()
+        } if run_ids else {}
+
+        return [_build_benchmark_summary(benchmark, run_statuses) for benchmark in benchmarks], int(
+            total
+        )
+
     def update(self, benchmark_id: UUID, data: BenchmarkRunUpdate) -> BenchmarkRun:
         benchmark = self.get_by_id(benchmark_id)
         update_data = data.model_dump(exclude_unset=True)
@@ -177,6 +208,77 @@ def _extract_associated_run_ids(entries: list[dict[str, Any]]) -> list[UUID]:
         run_ids.append(run_id)
 
     return run_ids
+
+
+_SUMMARY_ACTIVE_STATUSES = {"queued", "running", "pausing", "submitting", "acquiring_molecule"}
+
+
+def _entry_status_for_summary(
+    entry: dict[str, Any], run_statuses: dict[UUID, RunStatus]
+) -> str:
+    raw_run_id = entry.get("runId", entry.get("run_id"))
+    if raw_run_id not in (None, ""):
+        try:
+            run_id = raw_run_id if isinstance(raw_run_id, UUID) else UUIDFactory(str(raw_run_id))
+        except (TypeError, ValueError):
+            run_id = None
+        if run_id is not None and run_id in run_statuses:
+            return {
+                RunStatus.CREATED: "queued",
+                RunStatus.QUEUED: "queued",
+                RunStatus.SUBMITTED_TO_IBM: "queued",
+                RunStatus.RUNNING: "running",
+                RunStatus.PAUSING: "pausing",
+                RunStatus.PAUSED: "paused",
+                RunStatus.COMPLETED: "completed",
+                RunStatus.FAILED: "failed",
+                RunStatus.CANCELLED: "cancelled",
+                RunStatus.EXCLUDED: "excluded",
+            }.get(run_statuses[run_id], "planned")
+    return str(entry.get("status") or "planned").strip().lower()
+
+
+def _build_benchmark_summary(
+    benchmark: BenchmarkRun, run_statuses: dict[UUID, RunStatus]
+) -> BenchmarkRunSummaryResponse:
+    entries = [entry for entry in (benchmark.entries or []) if isinstance(entry, dict)]
+    status_counts = {
+        "completed": 0,
+        "active": 0,
+        "paused": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "planned": 0,
+        "excluded": 0,
+    }
+    for entry in entries:
+        status = _entry_status_for_summary(entry, run_statuses)
+        if status in _SUMMARY_ACTIVE_STATUSES:
+            status_counts["active"] += 1
+        elif status in status_counts:
+            status_counts[status] += 1
+        else:
+            status_counts["planned"] += 1
+
+    return BenchmarkRunSummaryResponse(
+        id=benchmark.id,
+        name=benchmark.name,
+        created_at=benchmark.created_at,
+        updated_at=benchmark.updated_at,
+        selected_molecule_keys=list(benchmark.selected_molecule_keys or []),
+        selected_basis=benchmark.selected_basis,
+        selected_backend_mode=benchmark.selected_backend_mode,
+        selected_backend_name=benchmark.selected_backend_name,
+        row_count=len(entries),
+        completed_count=status_counts["completed"],
+        active_count=status_counts["active"],
+        paused_count=status_counts["paused"],
+        failed_count=status_counts["failed"],
+        cancelled_count=status_counts["cancelled"],
+        planned_count=status_counts["planned"],
+        excluded_count=status_counts["excluded"],
+        associated_run_count=len(_extract_associated_run_ids(entries)),
+    )
 
 
 _REGISTERED_NO_RUN_STATUSES = {"planned", "excluded", "missing"}

@@ -230,3 +230,73 @@ class BenchmarkRunListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class BenchmarkRunSummaryResponse(BaseModel):
+    """Compact benchmark batch response for history lists."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: UUID
+    name: str
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+    selected_molecule_keys: list[str] = Field(
+        validation_alias=AliasChoices("selectedMoleculeKeys", "selected_molecule_keys"),
+        serialization_alias="selectedMoleculeKeys",
+    )
+    selected_basis: str = Field(
+        validation_alias=AliasChoices("selectedBasis", "selected_basis"),
+        serialization_alias="selectedBasis",
+    )
+    selected_backend_mode: BenchmarkBackendMode = Field(
+        validation_alias=AliasChoices("selectedBackendMode", "selected_backend_mode"),
+        serialization_alias="selectedBackendMode",
+    )
+    selected_backend_name: str | None = Field(
+        None,
+        validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
+        serialization_alias="selectedBackendName",
+    )
+    row_count: int = Field(validation_alias=AliasChoices("rowCount", "row_count"), serialization_alias="rowCount")
+    completed_count: int = Field(
+        validation_alias=AliasChoices("completedCount", "completed_count"),
+        serialization_alias="completedCount",
+    )
+    active_count: int = Field(
+        validation_alias=AliasChoices("activeCount", "active_count"),
+        serialization_alias="activeCount",
+    )
+    paused_count: int = Field(
+        validation_alias=AliasChoices("pausedCount", "paused_count"),
+        serialization_alias="pausedCount",
+    )
+    failed_count: int = Field(
+        validation_alias=AliasChoices("failedCount", "failed_count"),
+        serialization_alias="failedCount",
+    )
+    cancelled_count: int = Field(
+        validation_alias=AliasChoices("cancelledCount", "cancelled_count"),
+        serialization_alias="cancelledCount",
+    )
+    planned_count: int = Field(
+        validation_alias=AliasChoices("plannedCount", "planned_count"),
+        serialization_alias="plannedCount",
+    )
+    excluded_count: int = Field(
+        validation_alias=AliasChoices("excludedCount", "excluded_count"),
+        serialization_alias="excludedCount",
+    )
+    associated_run_count: int = Field(
+        validation_alias=AliasChoices("associatedRunCount", "associated_run_count"),
+        serialization_alias="associatedRunCount",
+    )
+
+
+class BenchmarkRunSummaryListResponse(BaseModel):
+    """Paginated compact benchmark batch response."""
+
+    items: list[BenchmarkRunSummaryResponse]
+    total: int
+    limit: int
+    offset: int
