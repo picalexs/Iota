@@ -567,10 +567,17 @@ def _benchmark_quality_fields(
         and algorithm == "qse"
         and status == "completed"
         and converged is True
+        and explicit_eligible is False
+        and explicit_exclusion_reason == "scientific_convergence_not_established"
         and _text(_first(metrics, "execution_mode", "executionMode"))
         != "measured_matrix_elements"
         and diagnostic is not True
         and reported_valid is True
+        and final_energy is not None
+        and reference_energy is not None
+        and reference_status == "valid"
+        and reference_method is not None
+        and reference_method.upper() == "CASCI"
         and scientific is None
         and _boolean(
             _first(convergence, "projected_solver_converged", "projectedSolverConverged")
@@ -1026,6 +1033,12 @@ def normalize_folder_row(
         ("basis_termination_reason", _text),
         ("basis_rank", _integer),
         ("requested_basis_rank", _integer),
+        ("full_space_dimension", _integer),
+        ("basis_complete", _boolean),
+        ("full_space_residual_available", _boolean),
+        ("completeness_evidence", _text),
+        ("projected_solver_converged", _boolean),
+        ("projected_system_stable", _boolean),
         ("selected_ci_fraction", _number),
         ("full_sector_recovered", _boolean),
         ("objective_evaluations", _integer),

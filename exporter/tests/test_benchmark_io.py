@@ -267,6 +267,33 @@ def test_api_normalization_recomputes_legacy_qse_pool_eligibility_only_when_opte
     assert recomputed["basis_complete"] is False
     assert recomputed["full_space_residual_available"] is True
 
+    run_export["result"]["algorithm_metrics"]["benchmark_provenance"][
+        "benchmark_exclusion_reason"
+    ] = "reported_energy_invalid"
+    unrelated, _ = normalize_api_row(
+        benchmark=benchmark,
+        entry=benchmark["entries"][0],
+        run_export=run_export,
+        recompute_eligibility=True,
+    )
+    assert unrelated["benchmark_eligible"] is False
+    assert unrelated["eligibility_source"] == "persisted"
+
+    run_export["result"]["algorithm_metrics"]["benchmark_provenance"][
+        "benchmark_exclusion_reason"
+    ] = "scientific_convergence_not_established"
+    run_export["result"]["algorithm_metrics"]["reference_provenance"][
+        "validity_status"
+    ] = "invalid"
+    invalid_reference, _ = normalize_api_row(
+        benchmark=benchmark,
+        entry=benchmark["entries"][0],
+        run_export=run_export,
+        recompute_eligibility=True,
+    )
+    assert invalid_reference["benchmark_eligible"] is False
+    assert invalid_reference["eligibility_source"] == "persisted"
+
 
 def test_api_normalization_does_not_recompute_measured_qse_pool() -> None:
     benchmark = _benchmark()

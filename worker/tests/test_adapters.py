@@ -1581,7 +1581,7 @@ def test_normalize_result_does_not_infer_scientific_convergence_from_one_project
 
 
 @pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
-def test_normalize_result_accepts_stable_full_space_residual_without_complete_basis(
+def test_normalize_result_keeps_incomplete_full_space_residual_unvalidated(
     algorithm: str,
 ) -> None:
     diagnostics = {
@@ -1624,9 +1624,11 @@ def test_normalize_result_accepts_stable_full_space_residual_without_complete_ba
 
     convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
 
-    assert convergence["scientific_converged"] is True
-    assert convergence["completeness_evidence"] == "full_space_ritz_residual"
-    assert convergence["convergence_criterion"] == "full_space_ritz_residual"
+    assert convergence["scientific_converged"] is None
+    assert "completeness_evidence" not in convergence
+    assert convergence["convergence_failure_reason"] == (
+        "scientific_completeness_evidence_unavailable"
+    )
 
 
 @pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
