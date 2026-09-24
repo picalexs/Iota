@@ -16,6 +16,7 @@ from app.models import BenchmarkRun, Run
 from app.models.enums import RunStatus
 from app.schemas.benchmark import (
     BenchmarkRegistrationCreate,
+    BenchmarkRunHistoryStatus,
     BenchmarkRunCreate,
     BenchmarkRunSummaryResponse,
     BenchmarkRunUpdate,
@@ -116,18 +117,46 @@ class BenchmarkRunService:
         return benchmarks, int(total)
 
     def list_summaries(
-        self, *, limit: int = 50, offset: int = 0
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        status: BenchmarkRunHistoryStatus | None = None,
+        backend: str | None = None,
+        sort: str = "updated",
+        order: str = "desc",
     ) -> tuple[list[BenchmarkRunSummaryResponse], int]:
         """Return compact history rows with current associated run statuses."""
-        total = self.db.scalar(select(func.count()).select_from(BenchmarkRun)) or 0
-        benchmarks = list(
-            self.db.scalars(
-                select(BenchmarkRun)
-                .order_by(BenchmarkRun.updated_at.desc(), BenchmarkRun.created_at.desc())
-                .offset(offset)
-                .limit(limit)
+        base_query = select(BenchmarkRun)
+        if backend is not None:
+            base_query = base_query.where(BenchmarkRun.selected_backend_mode == backend)
+
+        requires_python_sort = sort in {"rows", "status"} or status is not None
+        if requires_python_sort:
+            benchmarks = list(self.db.scalars(base_query))
+            total = 0
+        else:
+            total = self.db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
+            order_by = (
+                BenchmarkRun.name.asc()
+                if sort == "name" and order == "asc"
+                else BenchmarkRun.name.desc()
+                if sort == "name"
+                else BenchmarkRun.selected_backend_mode.asc()
+                if sort == "backend" and order == "asc"
+                else BenchmarkRun.selected_backend_mode.desc()
+                if sort == "backend"
+                else BenchmarkRun.updated_at.asc()
+                if order == "asc"
+                else BenchmarkRun.updated_at.desc()
             )
-        )
+            benchmarks = list(
+                self.db.scalars(
+                    base_query.order_by(order_by, BenchmarkRun.created_at.desc())
+                    .offset(offset)
+                    .limit(limit)
+                )
+            )
         run_ids = {
             run_id
             for benchmark in benchmarks
@@ -140,9 +169,23 @@ class BenchmarkRunService:
             ).all()
         } if run_ids else {}
 
-        return [_build_benchmark_summary(benchmark, run_statuses) for benchmark in benchmarks], int(
-            total
-        )
+        summaries = [_build_benchmark_summary(benchmark, run_statuses) for benchmark in benchmarks]
+        if requires_python_sort:
+            if status is not None:
+                summaries = [summary for summary in summaries if summary.status == status]
+            summaries.sort(
+                key={
+                    "name": lambda summary: summary.name.casefold(),
+                    "rows": lambda summary: summary.row_count,
+                    "backend": lambda summary: summary.selected_backend_mode,
+                    "status": lambda summary: summary.status,
+                    "updated": lambda summary: summary.updated_at,
+                }[sort],
+                reverse=order != "asc",
+            )
+            total = len(summaries)
+            summaries = summaries[offset : offset + limit]
+        return summaries, int(total)
 
     def update(self, benchmark_id: UUID, data: BenchmarkRunUpdate) -> BenchmarkRun:
         benchmark = self.get_by_id(benchmark_id)
@@ -260,6 +303,28 @@ def _build_benchmark_summary(
         else:
             status_counts["planned"] += 1
 
+    terminal_kinds = sum(
+        status_counts[key] > 0 for key in ("completed", "failed", "cancelled")
+    )
+    if status_counts["active"] > 0:
+        summary_status: BenchmarkRunHistoryStatus = "running"
+    elif status_counts["paused"] > 0:
+        summary_status = "paused"
+    elif terminal_kinds > 1:
+        summary_status = "partial"
+    elif status_counts["completed"] > 0:
+        summary_status = "finished"
+    elif status_counts["failed"] > 0:
+        summary_status = "failed"
+    elif status_counts["cancelled"] > 0:
+        summary_status = "cancelled"
+    elif status_counts["planned"] > 0:
+        summary_status = "planned"
+    elif status_counts["excluded"] > 0:
+        summary_status = "excluded"
+    else:
+        summary_status = "draft"
+
     return BenchmarkRunSummaryResponse(
         id=benchmark.id,
         name=benchmark.name,
@@ -269,6 +334,7 @@ def _build_benchmark_summary(
         selected_basis=benchmark.selected_basis,
         selected_backend_mode=benchmark.selected_backend_mode,
         selected_backend_name=benchmark.selected_backend_name,
+        status=summary_status,
         row_count=len(entries),
         completed_count=status_counts["completed"],
         active_count=status_counts["active"],

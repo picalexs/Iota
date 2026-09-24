@@ -175,6 +175,7 @@ def test_benchmark_summary_list_is_compact_and_uses_current_run_status(
     assert summary["rowCount"] == 1
     assert summary["activeCount"] == 1
     assert summary["completedCount"] == 0
+    assert summary["status"] == "running"
     assert summary["associatedRunCount"] == 1
     assert "entries" not in summary
 

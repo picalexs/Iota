@@ -16,6 +16,17 @@ BenchmarkBackendMode = Literal[
     "aer_simulator_backend_noise",
     "ibm_runtime",
 ]
+BenchmarkRunHistoryStatus = Literal[
+    "draft",
+    "running",
+    "paused",
+    "finished",
+    "partial",
+    "failed",
+    "cancelled",
+    "planned",
+    "excluded",
+]
 
 
 class BenchmarkRunBase(BaseModel):
@@ -258,6 +269,7 @@ class BenchmarkRunSummaryResponse(BaseModel):
         validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
         serialization_alias="selectedBackendName",
     )
+    status: BenchmarkRunHistoryStatus
     row_count: int = Field(validation_alias=AliasChoices("rowCount", "row_count"), serialization_alias="rowCount")
     completed_count: int = Field(
         validation_alias=AliasChoices("completedCount", "completed_count"),
