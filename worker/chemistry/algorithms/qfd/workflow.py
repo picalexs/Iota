@@ -553,6 +553,7 @@ def _solve_qfd_dense_path(
         time_grid_type=time_grid_type,
         progress_callback=progress_callback,
     )
+    effective_time_points = len(dense_states)
     states_matrix = np.column_stack(dense_states)
     overlap = build_overlap_matrix(dense_states)
     projected_hamiltonian = states_matrix.conj().T @ operator @ states_matrix
@@ -565,7 +566,8 @@ def _solve_qfd_dense_path(
         **overlap_metrics(overlap),
         **diagnostics,
         **grid_metadata,
-        "time_points": float(num_time_points),
+        "time_points": float(effective_time_points),
+        "requested_time_points": float(num_time_points),
         "max_time": max_time,
     }
     residual_diagnostics = projected_ritz_diagnostics(
@@ -585,6 +587,7 @@ def _solve_qfd_dense_path(
             "aer_pauli_lie_trotter" if plan.use_aer else "exact_matrix_evolution"
         ),
         "projected_dimension": len(dense_states),
+        "requested_time_points": num_time_points,
         "projected_matrix_element_count": 2 * len(dense_states) ** 2,
         "residual_kind": "projected_generalized_eigenpair",
         "convergence_basis": "projected_generalized_residual",
@@ -623,13 +626,13 @@ def _solve_qfd_dense_path(
         "relative_residual=%.2e elapsed=%.3fs",
         primary_energy,
         converged,
-        num_time_points,
+        effective_time_points,
         residual_diagnostics["relative_ritz_residual"],
         qfd_elapsed,
     )
     _emit_qfd_completion(
         progress_callback=progress_callback,
-        num_time_points=num_time_points,
+        num_time_points=effective_time_points,
         primary_energy=primary_energy,
         filter_eigenvalues=filter_eigenvalues,
         diagnostics=diagnostics,
@@ -644,7 +647,7 @@ def _solve_qfd_dense_path(
     return build_qfd_result(
         filter_eigenvalues=filter_eigenvalues,
         raw_filter_eigenvalues=filter_eigenvalues,
-        num_time_points=num_time_points,
+        num_time_points=effective_time_points,
         conditioning_summary=conditioning_summary,
         residual_diagnostics=residual_diagnostics,
         diagnostics=diagnostics,
