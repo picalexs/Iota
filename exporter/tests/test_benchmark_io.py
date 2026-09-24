@@ -83,10 +83,20 @@ def _run_export() -> dict:
 
 
 def test_api_normalization_selects_compact_result_and_seed_roles() -> None:
+    run_export = _run_export()
+    run_export["result"]["algorithm_metrics"]["convergence"] = {
+        "termination_reason": "max_function_evaluations",
+        "convergence_value": 0.25,
+        "convergence_threshold": 1e-8,
+    }
+    run_export["result"]["algorithm_metrics"]["optimizer_diagnostics"] = {
+        "objective_evaluations": 448,
+        "effective_max_function_evaluations": 448,
+    }
     row, runtime_source = normalize_api_row(
         benchmark=_benchmark(),
         entry=_benchmark()["entries"][0],
-        run_export=_run_export(),
+        run_export=run_export,
     )
 
     assert runtime_source == "execution_segments.duration_seconds"
@@ -103,6 +113,11 @@ def test_api_normalization_selects_compact_result_and_seed_roles() -> None:
     assert row["measurement_mode"] == "precision_sampled"
     assert row["noise_source"] == "backend_derived"
     assert row["actual_path_class"] == "aer_branch_estimator"
+    assert row["termination_reason"] == "max_function_evaluations"
+    assert row["convergence_value"] == 0.25
+    assert row["convergence_threshold"] == 1e-8
+    assert row["objective_evaluations"] == 448
+    assert row["max_function_evaluations"] == 448
     assert set(row) >= set(CANONICAL_FIELDS)
     assert "raw_result" not in row
     assert "execution_segments" not in row

@@ -18,7 +18,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v3"
+EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v4"
 CANONICAL_FIELDS = (
     "benchmark_id",
     "benchmark_name",
@@ -76,6 +76,16 @@ CANONICAL_FIELDS = (
     "scientific_converged",
     "primary_energy_source",
     "convergence_failure_reason",
+    "termination_reason",
+    "convergence_value",
+    "convergence_threshold",
+    "basis_termination_reason",
+    "basis_rank",
+    "requested_basis_rank",
+    "selected_ci_fraction",
+    "full_sector_recovered",
+    "objective_evaluations",
+    "max_function_evaluations",
     "benchmark_eligible",
     "benchmark_exclusion_reason",
     "error_message",
@@ -547,6 +557,126 @@ def _benchmark_quality_fields(
     }
 
 
+def _benchmark_algorithm_diagnostic_fields(
+    result: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Extract convergence and resource diagnostics without retaining raw payloads."""
+    result_record = _record(result)
+    metrics = _record(_first(result_record, "algorithm_metrics", "algorithmMetrics"))
+    convergence = _record(_first(metrics, "convergence"))
+    optimizer = _record(_first(metrics, "optimizer_diagnostics", "optimizerDiagnostics"))
+    stability = _record(_first(metrics, "stability_summary", "stabilitySummary"))
+    orthogonality = _record(_first(metrics, "orthogonality_metrics", "orthogonalityMetrics"))
+    conditioning = _record(_first(metrics, "conditioning_summary", "conditioningSummary"))
+    matrix_summary = _record(_first(metrics, "matrix_element_summary", "matrixElementSummary"))
+    basis_selection = _record(_first(matrix_summary, "basis_selection", "basisSelection"))
+    krylov = _record(
+        _first(metrics, "krylov_extension_diagnostics", "krylovExtensionDiagnostics")
+    )
+    verdict = _record(_first(krylov, "convergence_verdict", "convergenceVerdict"))
+    extension_cost = _record(_first(krylov, "extension_cost", "extensionCost"))
+    sci_package = _record(_first(metrics, "sci_result_package", "sciResultPackage"))
+    selected_ci = _record(
+        _first(
+            sci_package,
+            "best_selected_ci",
+            "bestSelectedCi",
+            default=_first(sci_package, "selected_ci", "selectedCi"),
+        )
+    )
+
+    termination_reason = _first(
+        convergence,
+        "termination_reason",
+        "terminationReason",
+        default=_first(
+            optimizer,
+            "termination_reason",
+            "terminationReason",
+            default=_first(
+                stability,
+                "termination_reason",
+                "terminationReason",
+                default=_first(conditioning, "termination_reason", "terminationReason"),
+            ),
+        ),
+    )
+    basis_rank = _first(
+        metrics,
+        "krylov_rank",
+        "basis_rank",
+        default=_first(
+            orthogonality,
+            "basis_rank",
+            default=_first(
+                matrix_summary,
+                "projected_dimension",
+                default=_first(conditioning, "basis_rank"),
+            ),
+        ),
+    )
+    requested_basis_rank = _first(
+        basis_selection,
+        "requested_dimension_cap",
+        "requestedDimensionCap",
+        default=_first(
+            matrix_summary,
+            "requested_time_points",
+            "requestedTimePoints",
+            default=_first(extension_cost, "requested_dimension", "requestedDimension"),
+        ),
+    )
+    selected_ci_fraction = _first(
+        verdict,
+        "selected_ci_fraction",
+        "selectedCiFraction",
+        default=_first(selected_ci, "selected_ci_fraction", "selectedCiFraction"),
+    )
+    full_sector_recovered = _first(
+        verdict,
+        "full_sector_recovered",
+        "fullSectorRecovered",
+    )
+    return {
+        "termination_reason": _text(termination_reason),
+        "convergence_value": _json_value(
+            _first(convergence, "convergence_value", "convergenceValue")
+        ),
+        "convergence_threshold": _json_value(
+            _first(convergence, "convergence_threshold", "convergenceThreshold")
+        ),
+        "basis_termination_reason": _text(
+            _first(
+                basis_selection,
+                "basis_termination_reason",
+                "basisTerminationReason",
+                default=_first(conditioning, "basis_termination_reason"),
+            )
+        ),
+        "basis_rank": _integer(basis_rank),
+        "requested_basis_rank": _integer(requested_basis_rank),
+        "selected_ci_fraction": _number(selected_ci_fraction),
+        "full_sector_recovered": _boolean(full_sector_recovered),
+        "objective_evaluations": _integer(
+            _first(
+                optimizer,
+                "objective_evaluations",
+                "objectiveEvaluations",
+                default=_first(metrics, "objective_evaluations", "objectiveEvaluations"),
+            )
+        ),
+        "max_function_evaluations": _integer(
+            _first(
+                optimizer,
+                "effective_max_function_evaluations",
+                "effectiveMaxFunctionEvaluations",
+                "max_function_evaluations",
+                "maxFunctionEvaluations",
+            )
+        ),
+    }
+
+
 def _runtime_seconds(
     run: Mapping[str, Any],
     result: Mapping[str, Any],
@@ -641,6 +771,7 @@ def normalize_api_row(
         reference_energy=reference_energy,
         converged=converged,
     )
+    diagnostic_fields = _benchmark_algorithm_diagnostic_fields(result)
     seed_fields = _config_seeds(config, algorithm)
 
     row = {
@@ -660,6 +791,7 @@ def normalize_api_row(
         "backend_target": _text(_first(run, "backend_target", "backendTarget")),
         "backend_name": _backend_name(config),
         **execution_fields,
+        **diagnostic_fields,
         **quality_fields,
         "seed": seed,
         "seed_roles": seed_roles,
@@ -771,6 +903,22 @@ def normalize_folder_row(
             seed_fields[field_name] = _integer(explicit_seed)
 
     execution_fields = _benchmark_execution_fields(result=source, config=source)
+    diagnostic_fields = _benchmark_algorithm_diagnostic_fields(source)
+    for field_name, parser in (
+        ("termination_reason", _text),
+        ("basis_termination_reason", _text),
+        ("basis_rank", _integer),
+        ("requested_basis_rank", _integer),
+        ("selected_ci_fraction", _number),
+        ("full_sector_recovered", _boolean),
+        ("objective_evaluations", _integer),
+        ("max_function_evaluations", _integer),
+    ):
+        if field_name in source:
+            diagnostic_fields[field_name] = parser(source.get(field_name))
+    for field_name in ("convergence_value", "convergence_threshold"):
+        if field_name in source:
+            diagnostic_fields[field_name] = _json_value(source.get(field_name))
     integer_execution_fields = {
         "requested_shots",
         "effective_shots",
@@ -825,6 +973,7 @@ def normalize_folder_row(
         "backend_target": _text(_first(source, "backend_target", "backendTarget")),
         "backend_name": _text(_first(source, "backend_name", "backendName")),
         **execution_fields,
+        **diagnostic_fields,
         **quality_fields,
         "seed": _integer(_first(source, "seed")),
         "seed_roles": _parse_seed_roles(_first(source, "seed_roles", "seedRoles")),

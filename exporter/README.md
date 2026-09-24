@@ -148,6 +148,8 @@ The exporter keeps only the fields needed for comparison and audit:
   noise provenance, and actual execution path.
 - reference method, solver path, basis, active space, validity status, and
   Hamiltonian hash;
+- convergence termination, convergence value and threshold, basis rank,
+  objective-evaluation budget, selected-CI fraction, and full-sector status;
 - scientific convergence, diagnostic status, reported energy source, exclusion
   reason, execution generation, and restart parent.
 
