@@ -82,6 +82,12 @@ CANONICAL_FIELDS = (
     "basis_termination_reason",
     "basis_rank",
     "requested_basis_rank",
+    "full_space_dimension",
+    "basis_complete",
+    "full_space_residual_available",
+    "completeness_evidence",
+    "projected_solver_converged",
+    "projected_system_stable",
     "selected_ci_fraction",
     "full_sector_recovered",
     "objective_evaluations",
@@ -700,6 +706,32 @@ def _benchmark_algorithm_diagnostic_fields(
             default=_first(extension_cost, "requested_dimension", "requestedDimension"),
         ),
     )
+    full_space_dimension = _first(
+        matrix_summary,
+        "full_space_dimension",
+        "fullSpaceDimension",
+    )
+    basis_complete = _first(matrix_summary, "basis_complete", "basisComplete")
+    full_space_residual_available = _first(
+        matrix_summary,
+        "full_space_residual_available",
+        "fullSpaceResidualAvailable",
+    )
+    completeness_evidence = _first(
+        convergence,
+        "completeness_evidence",
+        "completenessEvidence",
+    )
+    projected_solver_converged = _first(
+        convergence,
+        "projected_solver_converged",
+        "projectedSolverConverged",
+    )
+    projected_system_stable = _first(
+        convergence,
+        "projected_system_stable",
+        "projectedSystemStable",
+    )
     selected_ci_fraction = _first(
         verdict,
         "selected_ci_fraction",
@@ -729,6 +761,12 @@ def _benchmark_algorithm_diagnostic_fields(
         ),
         "basis_rank": _integer(basis_rank),
         "requested_basis_rank": _integer(requested_basis_rank),
+        "full_space_dimension": _integer(full_space_dimension),
+        "basis_complete": _boolean(basis_complete),
+        "full_space_residual_available": _boolean(full_space_residual_available),
+        "completeness_evidence": _text(completeness_evidence),
+        "projected_solver_converged": _boolean(projected_solver_converged),
+        "projected_system_stable": _boolean(projected_system_stable),
         "selected_ci_fraction": _number(selected_ci_fraction),
         "full_sector_recovered": _boolean(full_sector_recovered),
         "objective_evaluations": _integer(

@@ -234,6 +234,9 @@ def test_api_normalization_recomputes_legacy_qse_pool_eligibility_only_when_opte
                 "basis_termination_reason": "candidate_pool_exhausted"
             },
             "matrix_element_summary": {
+                "full_space_dimension": 4,
+                "basis_complete": False,
+                "full_space_residual_available": True,
                 "basis_selection": {
                     "basis_termination_reason": "candidate_pool_exhausted",
                     "selected_specs_complete": True,
@@ -260,6 +263,9 @@ def test_api_normalization_recomputes_legacy_qse_pool_eligibility_only_when_opte
     assert recomputed["scientific_converged"] is True
     assert recomputed["convergence_failure_reason"] is None
     assert recomputed["eligibility_source"] == "compatibility_recomputed"
+    assert recomputed["full_space_dimension"] == 4
+    assert recomputed["basis_complete"] is False
+    assert recomputed["full_space_residual_available"] is True
 
 
 def test_api_normalization_does_not_recompute_measured_qse_pool() -> None:
