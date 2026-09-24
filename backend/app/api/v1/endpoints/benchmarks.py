@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from app.dependencies import ensure_local_operator_access, get_db, get_redis
 from app.models.enums import BackendTarget
 from app.schemas.benchmark import (
-    BenchmarkRunHistoryStatus,
     BenchmarkRegistrationCreate,
     BenchmarkRunCreate,
+    BenchmarkRunHistoryStatus,
     BenchmarkRunListResponse,
     BenchmarkRunResponse,
     BenchmarkRunSummaryListResponse,

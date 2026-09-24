@@ -16,8 +16,8 @@ from app.models import BenchmarkRun, Run
 from app.models.enums import RunStatus
 from app.schemas.benchmark import (
     BenchmarkRegistrationCreate,
-    BenchmarkRunHistoryStatus,
     BenchmarkRunCreate,
+    BenchmarkRunHistoryStatus,
     BenchmarkRunSummaryResponse,
     BenchmarkRunUpdate,
 )
