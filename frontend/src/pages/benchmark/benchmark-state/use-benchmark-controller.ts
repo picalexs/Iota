@@ -295,7 +295,7 @@ export function useBenchmarkController(options: { benchmarkId?: string | null } 
     ],
   );
 
-  useSavedBenchmarkCatalog(setSavedBenchmarkRuns);
+  useSavedBenchmarkCatalog(setSavedBenchmarkRuns, benchmarkId === null);
   useBenchmarkRouteReset({
     benchmarkId,
     runGenerationRef,

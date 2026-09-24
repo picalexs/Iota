@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type MouseEvent } from "react";
+import { memo, type KeyboardEvent, type MouseEvent, useCallback } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2, Clock, Loader2, Pause, XCircle } from "lucide-react";
 import {
@@ -326,7 +326,7 @@ function isRowInteractiveTarget(target: EventTarget | null): boolean {
   );
 }
 
-function BenchmarkResultRow({
+const BenchmarkResultRow = memo(function BenchmarkResultRow({
   entry,
   chemicalAccuracyHa,
   pendingAction = null,
@@ -425,7 +425,7 @@ function BenchmarkResultRow({
       </TableCell>
     </TableRow>
   );
-}
+});
 
 function BenchmarkResultGroup({
   preset,
@@ -518,10 +518,10 @@ export function BenchmarkResultsTable({
   onBeforeOpenRun,
 }: BenchmarkResultsTableProps) {
   const navigate = useNavigate();
-  const openRun: OpenRunHandler = (runId) => {
+  const openRun = useCallback<OpenRunHandler>((runId) => {
     onBeforeOpenRun?.();
     void navigate({ to: "/runs/$runId", params: { runId } });
-  };
+  }, [navigate, onBeforeOpenRun]);
 
   if (grouped.length === 0) {
     return (

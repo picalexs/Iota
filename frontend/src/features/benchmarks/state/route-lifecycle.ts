@@ -174,7 +174,7 @@ export function useBenchmarkRouteHydration({
 
         const refreshedRun = await reconcileSavedBenchmarkRun(savedRun, {
           refreshActiveRows: restorableCachedWorkspaceSnapshot !== null,
-          refreshCompletedRows: true,
+          refreshIncompleteCompletedRows: true,
         });
         if (isCancelledOrStale()) return;
 

@@ -457,7 +457,7 @@ export function applyEntryUpdates(
         continue;
       }
 
-      map.set(id, {
+      const nextEntry = {
         ...existing,
         status,
         energy,
@@ -468,7 +468,21 @@ export function applyEntryUpdates(
         elapsedSeconds,
         executionMetadata: update.value.executionMetadata,
         latestEventSequence: Math.max(existing.latestEventSequence, latestEventSequence),
-      });
+      };
+      if (
+        existing.status === nextEntry.status &&
+        existing.energy === nextEntry.energy &&
+        existing.currentEnergy === nextEntry.currentEnergy &&
+        existing.converged === nextEntry.converged &&
+        existing.errorMessage === nextEntry.errorMessage &&
+        existing.elapsedSeconds === nextEntry.elapsedSeconds &&
+        existing.latestEventSequence === nextEntry.latestEventSequence &&
+        JSON.stringify(existing.classicalRefs) === JSON.stringify(nextEntry.classicalRefs) &&
+        JSON.stringify(existing.executionMetadata) === JSON.stringify(nextEntry.executionMetadata)
+      ) {
+        continue;
+      }
+      map.set(id, nextEntry);
     }
   }
   return Array.from(map.values());
