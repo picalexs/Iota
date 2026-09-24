@@ -25,6 +25,7 @@ backend properties but does not submit an IBM quantum job.
 | `aer-noisy-phoenix-2m.json` | Phoenix-derived noisy Aer | H2/LiH, 6 algorithms | 60 |
 | `seed-role-study.json` | statevector | H2/LiH, five explicit seed-role variants | 50 |
 | `resource-ablation.json` | statevector | H2/LiH/BeH2, SQD and SKQD budget variants | 90 |
+| `recovery-pilot-h2.json` | statevector | H2, one seed, all six algorithm paths | 6 |
 
 The balanced four-molecule results are intentionally present in both the
 10-molecule campaign and the preset comparison. The first campaign provides
