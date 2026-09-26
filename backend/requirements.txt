@@ -70,7 +70,7 @@ mako==1.3.12
     # via alembic
 markupsafe==3.0.3
     # via mako
-numpy==1.26.4
+numpy==2.5.3
     # via
     #   -r backend/requirements.in
     #   ibm-quantum-schemas
