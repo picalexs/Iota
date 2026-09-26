@@ -655,8 +655,8 @@ def _plot_heatmap(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> 
         data.append(row_values)
         labels.append(row_labels)
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 3.65))
-    cmap = plt.get_cmap("Greys").copy()
-    cmap.set_bad("#f7f7f7")
+    cmap = plt.get_cmap("cividis").copy()
+    cmap.set_bad("#e8e8e8")
     finite_values = [value for row in data for value in row if not math.isnan(value)]
     log_floor = 0.001
     plot_data = [
@@ -680,8 +680,12 @@ def _plot_heatmap(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> 
     for i, row in enumerate(labels):
         for j, label in enumerate(row):
             value = data[i][j]
-            normalized = float(norm(max(log_floor, value))) if not math.isnan(value) else 0.0
-            text_color = "white" if normalized > 0.55 else "black"
+            if math.isnan(value):
+                text_color = "black"
+            else:
+                red, green, blue, _ = cmap(norm(max(log_floor, value)))
+                luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                text_color = "black" if luminance > 0.55 else "white"
             ax.text(j, i, label, ha="center", va="center", fontsize=7, color=text_color)
     colorbar = fig.colorbar(image, ax=ax, shrink=0.84)
     colorbar.set_label("Median finite observed error (mHa; log scale)")
