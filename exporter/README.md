@@ -223,32 +223,59 @@ Rows without a finite result are excluded from the relevant plot. The counts
 are reported in `plot_manifest.json`.
 Signed error plots use a symlog error axis so negative errors remain visible.
 
-## 4. Create the paper report
+## 4. Export the paper data bundle
 
-Generate one reproducible report from several campaign folders:
+After the campaigns finish, export every paper campaign and all report
+artifacts to `exporter/output`:
 
 ```sh
-.venv/bin/python -m exporter.paper_report \
-  output/paper-statevector-balanced-10m \
-  output/paper-aer-ideal-balanced-10m \
-  output/paper-preset-comparison-4m \
-  output/paper-aer-noisy-core-2m \
-  output/paper-aer-noisy-phoenix-2m \
-  output/paper-seed-role-study \
-  output/paper-resource-ablation \
-  --output-dir output/paper-report --format both
+.venv/bin/python -m exporter.export_paper_data \
+  --source-root output \
+  --output-dir exporter/output \
+  --format both
 ```
 
-The report writes `statistics.json`, CSV summaries, LaTeX table fragments, and
-PDF/PNG figures for terminal results, accuracy versus runtime, presets, backend
-and noise conditions, seed sensitivity, molecule coverage, resources, and
-execution paths. Every completed row with a finite terminal result contributes
-to the report. Non-converged finite rows remain visible as terminal results.
-Rows without a completed finite result are counted as incomplete. The report
-manifest defines these populations. The report also writes
-`field_presence.csv`, which distinguishes unavailable measurements from lost
-export fields. Convergence and diagnostic fields remain in `rows.csv` for
-provenance and budget analysis.
+The command writes this structure:
+
+```text
+exporter/output/
+├── manifest.json
+├── campaigns/<campaign-id>/
+│   ├── benchmark.json
+│   ├── runs.json
+│   ├── runs.csv
+│   ├── summaries/
+│   └── plots/
+└── paper-report/
+    ├── statistics.json
+    ├── rows.csv
+    ├── *.tex
+    └── plots/
+```
+
+The campaign folders contain the complete compact export for each campaign.
+The campaign `plots/` folders contain the generic plots. The
+`paper-report/` folder contains the combined statistics, LaTeX fragments,
+and all figures used by the manuscript. `manifest.json` records every
+campaign, row count, and report path.
+
+Every completed row with a finite terminal result contributes to the report.
+Non-converged finite rows remain visible as terminal results. Rows without a
+completed finite result are counted as incomplete. Convergence and diagnostic
+fields remain in the exported rows as provenance and budget information.
+
+For a previous combined paper report that contains `rows.csv`, use the
+migration input once:
+
+```sh
+.venv/bin/python -m exporter.export_paper_data \
+  --combined-report-dir /path/to/old/paper-report \
+  --output-dir exporter/output \
+  --format both
+```
+
+The lower-level `paper_report.py` command remains available for generating
+only the combined report from already exported campaign folders.
 
 ## Tests
 
@@ -269,6 +296,8 @@ The tests use fake API clients and local rows. They do not submit QSS runs.
 - `benchmark_io.py`: shared row normalization, API access, summaries, and
   manifest helpers. It defines the export eligibility contract;
 - `benchmark_plots.py`: layout-safe Matplotlib plot builders;
+- `export_paper_data.py`: export all paper campaigns and report artifacts
+  under `exporter/output`;
 - `paper_report.py`: multi-campaign statistics, LaTeX fragments, and
   publication figures;
 - `tests/`: focused exporter tests;

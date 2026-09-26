@@ -44,9 +44,18 @@ python3 -m exporter.create_benchmark exporter/campaigns/statevector-balanced-10m
 
 Repeat for each manifest. Do not pass `--wait`; the API and workers keep the
 runs queued or running. Use the matching `output/paper-*/submission.json` files
-to resume interrupted submission. Export completed data later with
-`exporter/export_benchmark.py` and create plots with
-`exporter/plot_benchmark.py`.
+to resume interrupted submission. Export all campaigns and their plots later with:
+
+```bash
+python3 -m exporter.export_paper_data \
+  --source-root output \
+  --output-dir exporter/output \
+  --format both
+```
+
+This command writes one compact export and generic plots for each campaign.
+It also writes the combined paper report and publication figures under
+`exporter/output/paper-report`.
 
 To resume all campaigns with one command, run:
 
