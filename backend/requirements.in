@@ -31,6 +31,6 @@ redis>=5,<9
 rq==2.12.0
 rustworkx>=0.18.1
 sqlalchemy==2.0.54
-sse-starlette>=2,<3
+sse-starlette>=3.4.11,<4
 starlette==1.6.0
 uvicorn==0.53.0

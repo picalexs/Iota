@@ -161,7 +161,7 @@ sqlalchemy==2.0.54
     # via
     #   -r backend/requirements.in
     #   alembic
-sse-starlette==2.4.1
+sse-starlette==3.4.11
     # via -r backend/requirements.in
 starlette==1.6.0
     # via
