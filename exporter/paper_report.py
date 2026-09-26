@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover - direct script execution
     from benchmark_io import ExporterError, load_folder_source
 
 
-REPORT_SCHEMA_VERSION = "qss-paper-report.v5"
+REPORT_SCHEMA_VERSION = "qss-paper-report.v6"
 FIGURE_WIDTH_IN = 6.85
 ALGORITHM_MARKERS = {
     "VQE": "o",
@@ -224,6 +224,73 @@ def _algorithm_patch_handles(algorithms: Iterable[str]) -> list[Patch]:
     ]
 
 
+def _iqr_errorbar_legend_handle() -> Line2D:
+    return Line2D(
+        [0, 0],
+        [0, 1],
+        color="#222222",
+        linewidth=0.8,
+        marker="_",
+        markersize=6,
+        label="IQR (Q1–Q3)",
+    )
+
+
+def _iqr_band_legend_handle() -> Patch:
+    return Patch(
+        facecolor="#777777",
+        edgecolor="none",
+        alpha=0.2,
+        label="IQR (Q1–Q3)",
+    )
+
+
+def _iqr_bounds(
+    item: Mapping[str, Any],
+    value_key: str,
+    q1_key: str,
+    q3_key: str,
+) -> tuple[float, float, float] | None:
+    value = _number(item.get(value_key))
+    q1 = _number(item.get(q1_key))
+    q3 = _number(item.get(q3_key))
+    if value is None or q1 is None or q3 is None:
+        return None
+    return value, max(0.0, value - q1), max(0.0, q3 - value)
+
+
+def _stat_or_nan(item: Mapping[str, Any], key: str) -> float:
+    value = _number(item.get(key))
+    return value if value is not None else math.nan
+
+
+def _add_iqr_errorbar(
+    ax: Any,
+    x: float,
+    item: Mapping[str, Any],
+    *,
+    value_key: str,
+    q1_key: str,
+    q3_key: str,
+) -> bool:
+    bounds = _iqr_bounds(item, value_key, q1_key, q3_key)
+    if bounds is None:
+        return False
+    value, lower, upper = bounds
+    ax.errorbar(
+        [x],
+        [value],
+        yerr=[[lower], [upper]],
+        fmt="none",
+        ecolor="#222222",
+        elinewidth=1.0,
+        capsize=3.0,
+        capthick=1.0,
+        zorder=5,
+    )
+    return True
+
+
 def _variant_label(row: Mapping[str, Any]) -> str:
     return str(row.get("variant_label") or row.get("variant_id") or _algorithm_label(row.get("algorithm")))
 
@@ -298,6 +365,8 @@ def _group_stats(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> li
                 "q1_observed_absolute_error_mHa": _quantile(observed_errors, 0.25),
                 "q3_observed_absolute_error_mHa": _quantile(observed_errors, 0.75),
                 "median_observed_runtime_seconds": statistics.median(observed_runtimes) if observed_runtimes else None,
+                "q1_observed_runtime_seconds": _quantile(observed_runtimes, 0.25),
+                "q3_observed_runtime_seconds": _quantile(observed_runtimes, 0.75),
                 "incomplete_count": len(group_rows) - len(observed),
             }
         )
@@ -473,7 +542,7 @@ def _plot_population(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
             linewidth=0.5,
         )
         bottom = [left + value for left, value in zip(bottom, values)]
-    ax.set_ylabel("Rows")
+    ax.set_ylabel("Runs")
     ax.set_xticks(positions, labels)
     ax.legend(
         ncol=1,
@@ -503,15 +572,32 @@ def _plot_preset(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> l
     for index, algorithm in enumerate(algorithms):
         values = []
         runtimes = []
+        records = []
         for variant in variants:
             item = next((record for record in groups if record["plot_variant"] == variant and str(record["algorithm"]).lower() == algorithm), None)
+            records.append(item)
             values.append(item["median_observed_absolute_error_mHa"] if item else math.nan)
             runtimes.append(item["median_observed_runtime_seconds"] if item else math.nan)
         positions = [value - 0.39 + width / 2 + index * width for value in x]
         label = algorithm.upper()
         color = PALETTE.get(label, "#555555")
         hatch = _algorithm_hatch(label)
-        for ax, data in ((axes[0], values), (axes[1], runtimes)):
+        for ax, data, value_key, q1_key, q3_key in (
+            (
+                axes[0],
+                values,
+                "median_observed_absolute_error_mHa",
+                "q1_observed_absolute_error_mHa",
+                "q3_observed_absolute_error_mHa",
+            ),
+            (
+                axes[1],
+                runtimes,
+                "median_observed_runtime_seconds",
+                "q1_observed_runtime_seconds",
+                "q3_observed_runtime_seconds",
+            ),
+        ):
             ax.bar(
                 positions,
                 data,
@@ -522,6 +608,16 @@ def _plot_preset(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> l
                 edgecolor="#222222",
                 linewidth=0.5,
             )
+            for position, item in zip(positions, records):
+                if item is not None:
+                    _add_iqr_errorbar(
+                        ax,
+                        position,
+                        item,
+                        value_key=value_key,
+                        q1_key=q1_key,
+                        q3_key=q3_key,
+                    )
     axes[0].set_ylabel("Median absolute error (mHa)")
     axes[1].set_ylabel("Median runtime (s)")
     for index, ax in enumerate(axes):
@@ -533,10 +629,10 @@ def _plot_preset(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> l
     axes[1].set_yscale("log")
     fig.subplots_adjust(left=0.10, right=0.98, bottom=0.25, top=0.90, wspace=0.32)
     fig.legend(
-        handles=_algorithm_patch_handles(algorithms),
+        handles=_algorithm_patch_handles(algorithms) + [_iqr_errorbar_legend_handle()],
         loc="lower center",
         bbox_to_anchor=(0.5, 0.01),
-        ncol=3,
+        ncol=4,
         frameon=False,
     )
     return _save(fig, output_dir, "preset_tradeoff", fmt)
@@ -546,7 +642,7 @@ def _plot_seed_sensitivity(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
     selected = [row for row in rows if row.get("campaign_id") == "paper-seed-role-study" and _observed(row) and _number(row.get("seed")) is not None]
     if not selected:
         return _save(_empty("No finite seed-role observations."), output_dir, "seed_sensitivity", fmt)
-    fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 3.7))
+    fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 2.55))
     algorithms = sorted({str(row.get("algorithm") or "").lower() for row in selected})
     seeds = sorted({_number(row.get("seed")) for row in selected})
     offsets = {
@@ -599,8 +695,10 @@ def _plot_conditions(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
     x = list(range(len(conditions)))
     for index, algorithm in enumerate(algorithms):
         values = []
+        records = []
         for condition in conditions:
             item = next((record for record in groups if record["campaign_label"] == condition and str(record["algorithm"]).lower() == algorithm), None)
+            records.append(item)
             values.append(item["median_observed_absolute_error_mHa"] if item else math.nan)
         positions = [value - 0.39 + width / 2 + index * width for value in x]
         label = algorithm.upper()
@@ -615,6 +713,16 @@ def _plot_conditions(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
             edgecolor="#222222",
             linewidth=0.5,
         )
+        for position, item in zip(positions, records):
+            if item is not None:
+                _add_iqr_errorbar(
+                    ax,
+                    position,
+                    item,
+                    value_key="median_observed_absolute_error_mHa",
+                    q1_key="q1_observed_absolute_error_mHa",
+                    q3_key="q3_observed_absolute_error_mHa",
+                )
     ax.set_xticks(x, [_wrap_label(condition, 12) for condition in conditions])
     ax.set_ylabel("Median absolute error (mHa)")
     ax.set_yscale("symlog", linthresh=0.01)
@@ -622,10 +730,10 @@ def _plot_conditions(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
     ax.grid(axis="y", alpha=0.25)
     fig.subplots_adjust(left=0.10, right=0.98, bottom=0.28, top=0.98)
     fig.legend(
-        handles=_algorithm_patch_handles(algorithms),
+        handles=_algorithm_patch_handles(algorithms) + [_iqr_errorbar_legend_handle()],
         loc="lower center",
         bbox_to_anchor=(0.5, 0.01),
-        ncol=3,
+        ncol=4,
         frameon=False,
         title="Algorithm",
     )
@@ -651,7 +759,7 @@ def _plot_heatmap(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> 
             if value is None or not item or item["observed_count"] == 0:
                 row_labels.append("—")
             else:
-                row_labels.append(f"{value:.2f}\nn={item['observed_count']}")
+                row_labels.append(f"{value:.2f}")
         data.append(row_values)
         labels.append(row_labels)
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 3.65))
@@ -720,14 +828,48 @@ def _plot_resource(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) ->
             item["median_observed_absolute_error_mHa"] if item["observed_count"] else math.nan
             for item in algorithm_groups
         ]
+        error_q1 = [
+            _stat_or_nan(item, "q1_observed_absolute_error_mHa") if item["observed_count"] else math.nan
+            for item in algorithm_groups
+        ]
+        error_q3 = [
+            _stat_or_nan(item, "q3_observed_absolute_error_mHa") if item["observed_count"] else math.nan
+            for item in algorithm_groups
+        ]
         observed_runtimes = [
-            item["median_observed_runtime_seconds"] if item["observed_count"] else math.nan
+            _stat_or_nan(item, "median_observed_runtime_seconds") if item["observed_count"] else math.nan
+            for item in algorithm_groups
+        ]
+        runtime_q1 = [
+            _stat_or_nan(item, "q1_observed_runtime_seconds") if item["observed_count"] else math.nan
+            for item in algorithm_groups
+        ]
+        runtime_q3 = [
+            _stat_or_nan(item, "q3_observed_runtime_seconds") if item["observed_count"] else math.nan
             for item in algorithm_groups
         ]
         color = PALETTE.get(algorithm.upper(), "#555555")
         error_ax, runtime_ax = axes[row_index]
         marker = _algorithm_marker(algorithm)
         linestyle = _algorithm_linestyle(algorithm)
+        error_ax.fill_between(
+            budgets,
+            error_q1,
+            error_q3,
+            color=color,
+            alpha=0.18,
+            linewidth=0,
+            zorder=1,
+        )
+        runtime_ax.fill_between(
+            budgets,
+            runtime_q1,
+            runtime_q3,
+            color=color,
+            alpha=0.18,
+            linewidth=0,
+            zorder=1,
+        )
         error_ax.plot(
             budgets,
             observed_values,
@@ -761,18 +903,18 @@ def _plot_resource(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) ->
         error_ax.set_ylim(bottom=0)
         runtime_ax.set_yscale("log")
     fig.legend(
-        handles=_algorithm_handles(algorithms),
-        loc="lower center",
+        handles=_algorithm_handles(algorithms) + [_iqr_band_legend_handle()],
+        loc="upper center",
         ncol=min(3, max(1, len(algorithms))),
         frameon=False,
-        bbox_to_anchor=(0.5, 0.01),
+        bbox_to_anchor=(0.5, 0.99),
     )
     fig.subplots_adjust(
         left=0.10,
         right=0.98,
-        bottom=0.16,
-        top=0.90,
-        hspace=0.52,
+        bottom=0.13,
+        top=0.82,
+        hspace=0.42,
         wspace=0.32,
     )
     return _save(fig, output_dir, "resource_ablation", fmt)
@@ -861,7 +1003,7 @@ def _plot_paths(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> li
             linewidth=0.5,
         )
         bottom = [left + value for left, value in zip(bottom, values)]
-    ax.set_ylabel("Rows")
+    ax.set_ylabel("Runs")
     ax.set_xticks(positions, [_wrap_label(key, 11) for key, _ in grouped])
     fig.subplots_adjust(left=0.10, right=0.98, bottom=0.33, top=0.98)
     fig.legend(
@@ -907,26 +1049,41 @@ def _write_latex_fragments(stats: Mapping[str, Any], output_dir: Path) -> None:
     rows.append("\\end{tabular}")
     (output_dir / "algorithm_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
+    preset_items = [
+        item
+        for item in stats["by_campaign_variant_algorithm"]
+        if item["campaign_id"] == "paper-preset-comparison-4m"
+    ]
+    preset_variants = _ordered_preset_labels(
+        {_variant_display(item) for item in preset_items}
+    )
     rows = [
-        r"\begin{tabular}{@{}llrrr@{}}",
-        r"Variant & Algorithm & Rows & Observed & Median error (mHa) \\",
+        r"\begin{tabular}{@{}lrrrr@{}}",
+        r"Algorithm & Fastest & Balanced & Best accuracy & Custom deep \\",
         "\\hline",
     ]
-    for item in stats["by_campaign_variant_algorithm"]:
-        if item["campaign_id"] != "paper-preset-comparison-4m":
-            continue
-        median = item["median_observed_absolute_error_mHa"]
-        value = f"{median:.3f}" if median is not None else "N/A"
-        rows.append(
-            f"{_latex_escape(item['variant_label'])} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {value} "
-            + r"\\"
-        )
+    algorithm_order = ("VQE", "SQD", "KQD", "QFD", "QSE", "SKQD")
+    for algorithm in algorithm_order:
+        cells = []
+        for variant in preset_variants:
+            item = next(
+                (
+                    candidate
+                    for candidate in preset_items
+                    if _algorithm_label(candidate["algorithm"]) == algorithm
+                    and _variant_display(candidate) == variant
+                ),
+                None,
+            )
+            median = item["median_observed_absolute_error_mHa"] if item else None
+            cells.append(f"{median:.3f}" if median is not None else "N/A")
+        rows.append(f"{algorithm} & " + " & ".join(cells) + r" \\")
     rows.append("\\end{tabular}")
     (output_dir / "preset_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     rows = [
-        r"\begin{tabular}{@{}lrrr@{}}",
-        r"Algorithm & Rows & Observed & Median error (mHa) \\",
+        r"\begin{tabular}{@{}lr@{}}",
+        r"Algorithm & Median error (mHa) \\",
         "\\hline",
     ]
     for item in stats["by_campaign_algorithm"]:
@@ -934,10 +1091,7 @@ def _write_latex_fragments(stats: Mapping[str, Any], output_dir: Path) -> None:
             continue
         median = item["median_observed_absolute_error_mHa"]
         value = f"{median:.3f}" if median is not None else "N/A"
-        rows.append(
-            f"{_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {value} "
-            + r"\\"
-        )
+        rows.append(f"{_latex_escape(_algorithm_label(item['algorithm']))} & {value} " + r"\\")
     rows.append("\\end{tabular}")
     (output_dir / "statevector_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
