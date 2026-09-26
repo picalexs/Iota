@@ -9,7 +9,7 @@ fastapi==0.135.3
 httpx==0.28.1
 
 # Data processing
-numpy>=1.24,<2.0
+numpy>=2.5.3,<3.0
 
 # Database and ORM
 psycopg2-binary==2.9.11
