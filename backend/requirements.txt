@@ -163,7 +163,7 @@ sqlalchemy==2.0.54
     #   alembic
 sse-starlette==3.4.11
     # via -r backend/requirements.in
-starlette==1.6.0
+starlette==1.7.0
     # via
     #   -r backend/requirements.in
     #   fastapi
