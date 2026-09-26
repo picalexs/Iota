@@ -218,6 +218,7 @@ worker/.local/
 
 .scannerwork/
 *.sarif
+output/
 audit-report.json
 audit-status.json
 *:Zone.Identifier

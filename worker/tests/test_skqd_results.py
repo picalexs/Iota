@@ -31,6 +31,25 @@ def test_build_sqd_core_summary_preserves_nested_result_contract() -> None:
     }
 
 
+def test_build_sqd_core_summary_promotes_algorithm_work_ledger() -> None:
+    result = SimpleNamespace(
+        algorithm="sqd",
+        primary_energy=-1.2,
+        primary_iterations=3,
+        converged=True,
+        sci_result_package={"work_ledger": {"sampler_requested_shots_total": 24}},
+        circuit_artifact_policy={},
+        postselection_summary={"selected_configurations": 4},
+        subsampling_summary={"total_samples": 24},
+    )
+
+    summary = build_sqd_core_summary(result)
+
+    assert summary["work_ledger"] == {"sampler_requested_shots_total": 24}
+    assert summary["postselection_summary"] == {"selected_configurations": 4}
+    assert summary["subsampling_summary"] == {"total_samples": 24}
+
+
 @pytest.mark.parametrize(
     ("sqd_energy", "extension_energy", "extension_converged", "expected"),
     [

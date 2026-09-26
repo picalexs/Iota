@@ -29,6 +29,11 @@ export function BenchmarkRunsPage() {
     resumableCount,
     restartableCount,
     cancellableCount,
+    page,
+    pageSize,
+    total,
+    canGoPrevious,
+    canGoNext,
     confirmingBulkAction,
     confirmingRowAction,
     pendingBulkAction,
@@ -62,6 +67,8 @@ export function BenchmarkRunsPage() {
     handleDeleteSelectionOpenChange,
     setDeleteAssociatedRuns,
     deleteSelectedBenchmarks,
+    goToPreviousPage,
+    goToNextPage,
   } = useBenchmarkHistoryController();
 
   return (
@@ -112,6 +119,11 @@ export function BenchmarkRunsPage() {
         resumableCount={resumableCount}
         restartableCount={restartableCount}
         cancellableCount={cancellableCount}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        canGoPrevious={canGoPrevious}
+        canGoNext={canGoNext}
         clearFilters={clearFilters}
         onUpdateSort={updateSort}
         onSelectStatus={setStatusFilter}
@@ -129,6 +141,8 @@ export function BenchmarkRunsPage() {
         onConfirmRestartSelection={confirmRestartSelection}
         onConfirmCancelSelection={confirmCancelSelection}
         onOpenDeleteSelection={openDeleteSelection}
+        onGoPreviousPage={goToPreviousPage}
+        onGoNextPage={goToNextPage}
       />
 
       <BenchmarkHistoryActionDialogs

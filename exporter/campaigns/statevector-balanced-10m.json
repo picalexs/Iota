@@ -1,0 +1,28 @@
+{
+  "name": "Paper statevector balanced 10 molecules",
+  "campaign_id": "paper-statevector-balanced-10m",
+  "molecules": [
+    {"id": "ce9bda97-c4fd-4949-9783-8f0d8b3c3983", "name": "Hydrogen", "key": "h2"},
+    {"id": "ce815871-d15c-463a-a101-40b3e4fcc2d1", "name": "Lithium Hydride", "key": "lih"},
+    {"id": "a01b77de-789e-46cc-bae3-9e989e3eee73", "name": "Hydrogen Fluoride", "key": "hf"},
+    {"id": "f90dc530-44db-4677-80c4-35b902437610", "name": "Hydrogen Chloride", "key": "hcl"},
+    {"id": "5c577aac-42a0-410b-b109-a2ff63877aa6", "name": "Sodium Hydride", "key": "nah"},
+    {"id": "6be25a9c-afc9-40f6-991f-0acef841d1e1", "name": "Water", "key": "h2o"},
+    {"id": "66338bed-c3c3-470d-bb3c-914586b158d2", "name": "Beryllium Hydride", "key": "beh2"},
+    {"id": "acac4275-5628-4050-a329-e326c4089fa5", "name": "Hydrogen Sulfide", "key": "h2s"},
+    {"id": "115fe559-aa67-4fe2-bcba-f4ddbdcf52b9", "name": "Magnesium Hydride", "key": "mgh2"},
+    {"id": "01722a44-bfa6-4aaa-900c-ed2d871c31d7", "name": "Nitrogen", "key": "n2"}
+  ],
+  "algorithms": [
+    {"id": "vqe-balanced", "label": "VQE balanced", "algorithm": "vqe", "mode": "advanced", "advanced_config": {"algorithm": "vqe", "ansatz_name": "NumberPreserving", "optimizer_name": "COBYLA", "max_iterations": 448, "max_function_evaluations": 448, "reps": 2, "initial_point_strategy": "zero_plus_seeded_random", "initial_point_candidates": 2, "seed": null}},
+    {"id": "qse-balanced", "label": "QSE balanced", "algorithm": "qse", "mode": "advanced", "advanced_config": {"algorithm": "qse", "reference_method": "hf", "excitation_level": "singles_doubles", "max_subspace_dim": 8, "regularization": 1e-7, "overlap_threshold": 1e-5, "residual_tolerance": 1e-8}},
+    {"id": "kqd-balanced", "label": "KQD balanced", "algorithm": "kqd", "mode": "advanced", "advanced_config": {"algorithm": "kqd", "krylov_dim": 8, "time_step": 0.35, "evolution_method": "exact", "trotter_steps": 1, "residual_tolerance": 1e-8}},
+    {"id": "qfd-balanced", "label": "QFD balanced", "algorithm": "qfd", "mode": "advanced", "advanced_config": {"algorithm": "qfd", "num_time_points": 8, "max_time": 2.5, "time_grid_type": "linear", "qfd_variant": "qfd_chemistry_forward", "kappa": 1.0, "trotter_steps": 1, "residual_tolerance": 1e-6}},
+    {"id": "sqd-balanced", "label": "SQD balanced", "algorithm": "sqd", "mode": "advanced", "seed_roles": ["algorithm", "sampling"], "advanced_config": {"algorithm": "sqd", "samples_per_batch": 512, "num_batches": 8, "max_iterations": 8, "sampling_state_source": "vqe", "sampling_vqe_ansatz_name": "NumberPreserving", "sampling_vqe_optimizer_name": "COBYLA", "sampling_vqe_max_iterations": 448, "sampling_vqe_reps": 2, "sampling_vqe_seed": null, "energy_tol": 7.5e-5, "occupancies_tol": 7.5e-5, "min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "carryover_threshold": null, "max_dim": 32, "spin_sq_target": null}},
+    {"id": "skqd-balanced", "label": "SKQD balanced", "algorithm": "skqd", "mode": "advanced", "advanced_config": {"algorithm": "skqd", "samples_per_state": 1024, "base_sampling_options": {"min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 32, "spin_sq_target": null}, "krylov_extension_dim": 4, "sampling_mode": "sample_union_exact", "time_step": 0.22, "trotter_steps": 1, "residual_tolerance": 1e-6}}
+  ],
+  "seeds": [11, 17, 23, 29, 41],
+  "basis_set": "sto-3g",
+  "backend": {"target": "statevector", "options": {"aer_method": "statevector", "optimization_level": 1}},
+  "metadata": {"paper_section": "full_molecule_panel", "noise": "none", "seed_policy": "algorithm_and_sampling_where_exposed"}
+}

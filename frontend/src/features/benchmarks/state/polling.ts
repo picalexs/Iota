@@ -43,6 +43,33 @@ type PolledEntryState = Pick<
   | "latestEventSequence"
 >;
 
+const MAX_CONCURRENT_BENCHMARK_POLLS = 8;
+
+async function pollWithConcurrency<T>(
+  entries: readonly BenchmarkEntryWithRunId[],
+  poll: (entry: BenchmarkEntryWithRunId) => Promise<T>,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = [];
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < entries.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        results[index] = { status: "fulfilled", value: await poll(entries[index]!) };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(MAX_CONCURRENT_BENCHMARK_POLLS, entries.length) }, worker),
+  );
+  return results;
+}
+
 async function syncBenchmarkEntryEvents(
   entry: BenchmarkEntryWithRunId,
   run: Awaited<ReturnType<typeof getRun>>,
@@ -158,7 +185,11 @@ export async function buildBenchmarkEntryUpdate(
 
 export async function reconcileSavedBenchmarkEntries(
   entries: BenchmarkEntry[],
-  options: { refreshActiveRows?: boolean; refreshCompletedRows?: boolean } = {},
+  options: {
+    refreshActiveRows?: boolean;
+    refreshCompletedRows?: boolean;
+    refreshIncompleteCompletedRows?: boolean;
+  } = {},
 ): Promise<BenchmarkEntry[]> {
   const normalizedEntries = entries.map(normalizeStoredEntry);
   const refreshableEntries = normalizedEntries.filter(
@@ -166,6 +197,9 @@ export async function reconcileSavedBenchmarkEntries(
       entry.runId !== null &&
       (entry.status === "failed" ||
         ((options.refreshCompletedRows ?? false) && entry.status === "completed") ||
+        ((options.refreshIncompleteCompletedRows ?? false) &&
+          entry.status === "completed" &&
+          (entry.energy === null || entry.classicalRefs === null)) ||
         ((options.refreshActiveRows ?? false) && shouldPollEntry(entry))),
   );
 
@@ -173,7 +207,7 @@ export async function reconcileSavedBenchmarkEntries(
     return normalizedEntries;
   }
 
-  const updates = await Promise.allSettled(refreshableEntries.map(buildBenchmarkEntryUpdate));
+  const updates = await pollWithConcurrency(refreshableEntries, buildBenchmarkEntryUpdate);
   return applyEntryUpdates(normalizedEntries, updates);
 }
 
@@ -224,7 +258,7 @@ export function useBenchmarkPollingController({
         const dueEntries = active.filter((entry) => shouldPollBenchmarkEntryNow(entry, pollCycle));
         if (dueEntries.length === 0) return;
 
-        const updates = await Promise.allSettled(dueEntries.map(buildBenchmarkEntryUpdate));
+        const updates = await pollWithConcurrency(dueEntries, buildBenchmarkEntryUpdate);
 
         setEntries((previous) =>
           runGenerationRef.current === generation ? applyEntryUpdates(previous, updates) : previous,

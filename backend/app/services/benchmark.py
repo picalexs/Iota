@@ -13,9 +13,12 @@ from sqlalchemy.orm import Session
 
 from app.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models import BenchmarkRun, Run
+from app.models.enums import RunStatus
 from app.schemas.benchmark import (
     BenchmarkRegistrationCreate,
     BenchmarkRunCreate,
+    BenchmarkRunHistoryStatus,
+    BenchmarkRunSummaryResponse,
     BenchmarkRunUpdate,
 )
 from app.services.run import RunService
@@ -45,6 +48,11 @@ class BenchmarkRunService:
             selected_basis=data.selected_basis,
             selected_backend_mode=data.selected_backend_mode,
             selected_backend_name=data.selected_backend_name,
+            shots=data.shots,
+            optimization_level=data.optimization_level,
+            seed_transpiler=data.seed_transpiler,
+            dynamical_decoupling=data.dynamical_decoupling,
+            twirling=data.twirling,
             chemical_accuracy_ha=data.chemical_accuracy_ha,
             custom_molecules=custom_molecules,
             entries=list(data.entries),
@@ -107,6 +115,77 @@ class BenchmarkRunService:
             )
         )
         return benchmarks, int(total)
+
+    def list_summaries(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        status: BenchmarkRunHistoryStatus | None = None,
+        backend: str | None = None,
+        sort: str = "updated",
+        order: str = "desc",
+    ) -> tuple[list[BenchmarkRunSummaryResponse], int]:
+        """Return compact history rows with current associated run statuses."""
+        base_query = select(BenchmarkRun)
+        if backend is not None:
+            base_query = base_query.where(BenchmarkRun.selected_backend_mode == backend)
+
+        requires_python_sort = sort in {"rows", "status"} or status is not None
+        if requires_python_sort:
+            benchmarks = list(self.db.scalars(base_query))
+            total = 0
+        else:
+            total = self.db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
+            order_by = (
+                BenchmarkRun.name.asc()
+                if sort == "name" and order == "asc"
+                else BenchmarkRun.name.desc()
+                if sort == "name"
+                else BenchmarkRun.selected_backend_mode.asc()
+                if sort == "backend" and order == "asc"
+                else BenchmarkRun.selected_backend_mode.desc()
+                if sort == "backend"
+                else BenchmarkRun.updated_at.asc()
+                if order == "asc"
+                else BenchmarkRun.updated_at.desc()
+            )
+            benchmarks = list(
+                self.db.scalars(
+                    base_query.order_by(order_by, BenchmarkRun.created_at.desc())
+                    .offset(offset)
+                    .limit(limit)
+                )
+            )
+        run_ids = {
+            run_id
+            for benchmark in benchmarks
+            for run_id in _extract_associated_run_ids(benchmark.entries or [])
+        }
+        run_statuses = {
+            run_id: status
+            for run_id, status in self.db.execute(
+                select(Run.id, Run.status).where(Run.id.in_(run_ids))
+            ).all()
+        } if run_ids else {}
+
+        summaries = [_build_benchmark_summary(benchmark, run_statuses) for benchmark in benchmarks]
+        if requires_python_sort:
+            if status is not None:
+                summaries = [summary for summary in summaries if summary.status == status]
+            summaries.sort(
+                key={
+                    "name": lambda summary: summary.name.casefold(),
+                    "rows": lambda summary: summary.row_count,
+                    "backend": lambda summary: summary.selected_backend_mode,
+                    "status": lambda summary: summary.status,
+                    "updated": lambda summary: summary.updated_at,
+                }[sort],
+                reverse=order != "asc",
+            )
+            total = len(summaries)
+            summaries = summaries[offset : offset + limit]
+        return summaries, int(total)
 
     def update(self, benchmark_id: UUID, data: BenchmarkRunUpdate) -> BenchmarkRun:
         benchmark = self.get_by_id(benchmark_id)
@@ -172,6 +251,100 @@ def _extract_associated_run_ids(entries: list[dict[str, Any]]) -> list[UUID]:
         run_ids.append(run_id)
 
     return run_ids
+
+
+_SUMMARY_ACTIVE_STATUSES = {"queued", "running", "pausing", "submitting", "acquiring_molecule"}
+
+
+def _entry_status_for_summary(
+    entry: dict[str, Any], run_statuses: dict[UUID, RunStatus]
+) -> str:
+    raw_run_id = entry.get("runId", entry.get("run_id"))
+    if raw_run_id not in (None, ""):
+        try:
+            run_id = raw_run_id if isinstance(raw_run_id, UUID) else UUIDFactory(str(raw_run_id))
+        except (TypeError, ValueError):
+            run_id = None
+        if run_id is not None and run_id in run_statuses:
+            return {
+                RunStatus.CREATED: "queued",
+                RunStatus.QUEUED: "queued",
+                RunStatus.SUBMITTED_TO_IBM: "queued",
+                RunStatus.RUNNING: "running",
+                RunStatus.PAUSING: "pausing",
+                RunStatus.PAUSED: "paused",
+                RunStatus.COMPLETED: "completed",
+                RunStatus.FAILED: "failed",
+                RunStatus.CANCELLED: "cancelled",
+                RunStatus.EXCLUDED: "excluded",
+            }.get(run_statuses[run_id], "planned")
+    return str(entry.get("status") or "planned").strip().lower()
+
+
+def _build_benchmark_summary(
+    benchmark: BenchmarkRun, run_statuses: dict[UUID, RunStatus]
+) -> BenchmarkRunSummaryResponse:
+    entries = [entry for entry in (benchmark.entries or []) if isinstance(entry, dict)]
+    status_counts = {
+        "completed": 0,
+        "active": 0,
+        "paused": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "planned": 0,
+        "excluded": 0,
+    }
+    for entry in entries:
+        status = _entry_status_for_summary(entry, run_statuses)
+        if status in _SUMMARY_ACTIVE_STATUSES:
+            status_counts["active"] += 1
+        elif status in status_counts:
+            status_counts[status] += 1
+        else:
+            status_counts["planned"] += 1
+
+    terminal_kinds = sum(
+        status_counts[key] > 0 for key in ("completed", "failed", "cancelled")
+    )
+    if status_counts["active"] > 0:
+        summary_status: BenchmarkRunHistoryStatus = "running"
+    elif status_counts["paused"] > 0:
+        summary_status = "paused"
+    elif terminal_kinds > 1:
+        summary_status = "partial"
+    elif status_counts["completed"] > 0:
+        summary_status = "finished"
+    elif status_counts["failed"] > 0:
+        summary_status = "failed"
+    elif status_counts["cancelled"] > 0:
+        summary_status = "cancelled"
+    elif status_counts["planned"] > 0:
+        summary_status = "planned"
+    elif status_counts["excluded"] > 0:
+        summary_status = "excluded"
+    else:
+        summary_status = "draft"
+
+    return BenchmarkRunSummaryResponse(
+        id=benchmark.id,
+        name=benchmark.name,
+        created_at=benchmark.created_at,
+        updated_at=benchmark.updated_at,
+        selected_molecule_keys=list(benchmark.selected_molecule_keys or []),
+        selected_basis=benchmark.selected_basis,
+        selected_backend_mode=benchmark.selected_backend_mode,
+        selected_backend_name=benchmark.selected_backend_name,
+        status=summary_status,
+        row_count=len(entries),
+        completed_count=status_counts["completed"],
+        active_count=status_counts["active"],
+        paused_count=status_counts["paused"],
+        failed_count=status_counts["failed"],
+        cancelled_count=status_counts["cancelled"],
+        planned_count=status_counts["planned"],
+        excluded_count=status_counts["excluded"],
+        associated_run_count=len(_extract_associated_run_ids(entries)),
+    )
 
 
 _REGISTERED_NO_RUN_STATUSES = {"planned", "excluded", "missing"}

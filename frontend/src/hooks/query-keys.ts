@@ -26,6 +26,8 @@ export const benchmarkKeys = {
   all: ["benchmarks"] as const,
   listPrefix: ["benchmarks", "list"] as const,
   list: (params?: { limit?: number; offset?: number }) => ["benchmarks", "list", params] as const,
+  summaryListPrefix: ["benchmarks", "summaries"] as const,
+  summaryList: (params?: object) => ["benchmarks", "summaries", params] as const,
 };
 
 export const profileKeys = {

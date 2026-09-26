@@ -197,6 +197,27 @@ describe("benchmark polling", () => {
     expect(mockedGetRun).toHaveBeenCalledWith("run-id");
   });
 
+  it("limits concurrent active-row polling", async () => {
+    let activePolls = 0;
+    let maximumActivePolls = 0;
+    mockedGetRun.mockImplementation(async (runId) => {
+      activePolls += 1;
+      maximumActivePolls = Math.max(maximumActivePolls, activePolls);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      activePolls -= 1;
+      return { ...makeRun("QUEUED"), id: runId };
+    });
+
+    const entries = Array.from({ length: 16 }, (_, index) =>
+      makeEntry({ id: `active-${index}`, runId: `run-${index}`, status: "queued" }),
+    );
+
+    await reconcileSavedBenchmarkEntries(entries, { refreshActiveRows: true });
+
+    expect(maximumActivePolls).toBeLessThanOrEqual(8);
+    expect(mockedGetRun).toHaveBeenCalledTimes(entries.length);
+  });
+
   it("refreshes completed saved rows when route hydration asks for it", async () => {
     const completedEntry = makeEntry({ status: "completed", classicalRefs: null });
     mockedGetRun.mockResolvedValueOnce(makeRun("COMPLETED"));
@@ -221,6 +242,36 @@ describe("benchmark polling", () => {
 
     expect(refreshed[0]).toMatchObject({
       status: "completed",
+      classicalRefs: { hf: -1.116, fci: -1.137 },
+    });
+  });
+
+  it("refreshes only incomplete completed rows when route hydration asks for it", async () => {
+    const completeEntry = makeEntry({
+      id: "complete",
+      status: "completed",
+      energy: -1.137,
+      classicalRefs: { hf: -1.116, fci: -1.137 },
+    });
+    const incompleteEntry = makeEntry({
+      id: "incomplete",
+      status: "completed",
+      runId: "run-2",
+      energy: -1.137,
+      classicalRefs: null,
+    });
+    mockedGetRun.mockResolvedValueOnce({ ...makeRun("COMPLETED"), id: "run-2" });
+    mockedGetRunResult.mockResolvedValueOnce(makeResult({ run_id: "run-2" }));
+
+    const refreshed = await reconcileSavedBenchmarkEntries([completeEntry, incompleteEntry], {
+      refreshIncompleteCompletedRows: true,
+    });
+
+    expect(mockedGetRun).toHaveBeenCalledTimes(1);
+    expect(mockedGetRun).toHaveBeenCalledWith("run-2");
+    expect(refreshed[0]).toEqual(completeEntry);
+    expect(refreshed[1]).toMatchObject({
+      id: "incomplete",
       classicalRefs: { hf: -1.116, fci: -1.137 },
     });
   });

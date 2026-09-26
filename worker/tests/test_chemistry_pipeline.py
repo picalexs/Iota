@@ -213,9 +213,9 @@ def test_chemistry_selector_and_solver_paths_remain_deterministic() -> None:
         },
     )
     assert qfd_result.algorithm == "qfd"
-    assert qfd_result.primary_iterations == 5
-    assert 1 <= len(qfd_result.filter_eigenvalues) <= 5
-    assert qfd_result.conditioning_summary["time_points"] == pytest.approx(5.0)
+    assert qfd_result.primary_iterations == qfd_result.conditioning_summary["time_points"]
+    assert 1 <= len(qfd_result.filter_eigenvalues) <= qfd_result.primary_iterations
+    assert qfd_result.conditioning_summary["requested_time_points"] == pytest.approx(5.0)
 
     qse_result = run_qse(
         hamiltonian=bundle,

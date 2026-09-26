@@ -72,4 +72,30 @@ describe("benchmark-run-config", () => {
       reference_backend: "ibm_kyiv",
     });
   });
+
+  it("sends IBM Runtime policy controls only to IBM Runtime", () => {
+    const execution = {
+      mode: "ibm_runtime" as const,
+      backendName: "ibm_brisbane",
+      dynamicalDecoupling: true,
+      twirling: true,
+    };
+
+    const ibmConfig = buildSimpleBenchmarkRunConfig("vqe", "sto-3g", execution, "balanced");
+    expect(ibmConfig.backend_options).toMatchObject({
+      dynamical_decoupling: true,
+      twirling: true,
+    });
+
+    const aerConfig = buildSimpleBenchmarkRunConfig(
+      "vqe",
+      "sto-3g",
+      { ...execution, mode: "aer_simulator_backend_noise", backendName: "ibm_kyiv" },
+      "balanced",
+    );
+    expect(aerConfig.backend_options).toMatchObject({
+      dynamical_decoupling: false,
+      twirling: false,
+    });
+  });
 });

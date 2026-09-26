@@ -32,8 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { SavedBenchmarkRun } from "./benchmark-storage";
-import { getAssociatedBenchmarkRunIds } from "./benchmark-utils";
+import type { BenchmarkHistoryRun } from "@/features/benchmarks/state/history";
 import {
   BENCHMARK_HISTORY_BACKEND_LABELS,
   BENCHMARK_HISTORY_STATUS_LABELS,
@@ -55,7 +54,7 @@ type DeleteBenchmarkOptions = {
 type BenchmarkSavedRunAction = "pause" | "resume" | "restart" | "cancel";
 
 interface BenchmarkSavedRunsListProps {
-  readonly savedBenchmarkRuns: readonly SavedBenchmarkRun[];
+  readonly savedBenchmarkRuns: readonly BenchmarkHistoryRun[];
   readonly selectedSavedBenchmarkId: string | null;
   readonly sortField?: BenchmarkSortField;
   readonly sortOrder?: BenchmarkSortOrder;
@@ -68,7 +67,7 @@ interface BenchmarkSavedRunsListProps {
   readonly onLoad: (savedRunId: string) => void | Promise<void>;
   readonly onDelete: (savedRunId: string, options: DeleteBenchmarkOptions) => void | Promise<void>;
   readonly onRunAction?: (
-    run: SavedBenchmarkRun,
+    run: BenchmarkHistoryRun,
     action: BenchmarkSavedRunAction,
   ) => void | Promise<void>;
   readonly onToggleSelected?: (savedRunId: string) => void;
@@ -114,7 +113,7 @@ function SortHeader({ label, field, sortField, sortOrder, onSort }: SortHeaderPr
   );
 }
 
-function statusBadge(run: SavedBenchmarkRun) {
+function statusBadge(run: BenchmarkHistoryRun) {
   const status = getSavedBenchmarkStatus(run);
   if (status === "running") {
     return <Badge variant="info">{BENCHMARK_HISTORY_STATUS_LABELS[status]}</Badge>;
@@ -147,13 +146,13 @@ function BenchmarkSavedRunActions({
   onRunAction,
   onDelete,
 }: {
-  readonly run: SavedBenchmarkRun;
+  readonly run: BenchmarkHistoryRun;
   readonly disabled: boolean;
   readonly onRunAction?: (
-    run: SavedBenchmarkRun,
+    run: BenchmarkHistoryRun,
     action: BenchmarkSavedRunAction,
   ) => void | Promise<void>;
-  readonly onDelete: (run: SavedBenchmarkRun) => void;
+  readonly onDelete: (run: BenchmarkHistoryRun) => void;
 }) {
   const [open, setOpen] = useState(false);
   const actionButtonClassName =
@@ -287,10 +286,12 @@ export function BenchmarkSavedRunsList({
   onToggleSelected,
   onSort,
 }: Readonly<BenchmarkSavedRunsListProps>) {
-  const [deleteTarget, setDeleteTarget] = useState<SavedBenchmarkRun | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BenchmarkHistoryRun | null>(null);
   const [deleteAssociatedRuns, setDeleteAssociatedRuns] = useState(false);
   const associatedRunCount = deleteTarget
-    ? getAssociatedBenchmarkRunIds(deleteTarget.entries).length
+    ? "rowCount" in deleteTarget
+      ? deleteTarget.associatedRunCount
+      : new Set(deleteTarget.entries.flatMap((entry) => (entry.runId ? [entry.runId] : []))).size
     : 0;
   let deleteDescription: string | undefined;
   if (deleteTarget) {
@@ -420,8 +421,8 @@ export function BenchmarkSavedRunsList({
                           <div className="flex min-w-0 flex-col gap-1">
                             <span className="font-medium">{run.name}</span>
                             <span className="text-xs text-muted-foreground">
-                              {run.selectedMoleculeKeys.length} molecules · {run.entries.length}{" "}
-                              rows · {run.selectedBasis}
+                              {run.selectedMoleculeKeys.length} molecules · {summary.total} rows ·{" "}
+                              {run.selectedBasis}
                             </span>
                           </div>
                         </TableCell>

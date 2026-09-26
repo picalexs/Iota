@@ -31,7 +31,11 @@ export type ReportBenchmarkActionError = (scope: string, title: string, error: u
 
 export async function reconcileSavedBenchmarkRun(
   savedRun: SavedBenchmarkRun,
-  options: { refreshActiveRows?: boolean; refreshCompletedRows?: boolean } = {},
+  options: {
+    refreshActiveRows?: boolean;
+    refreshCompletedRows?: boolean;
+    refreshIncompleteCompletedRows?: boolean;
+  } = {},
 ): Promise<SavedBenchmarkRun> {
   const refreshedEntries = await reconcileSavedBenchmarkEntries(savedRun.entries, options);
   if (!benchmarkEntriesChanged(savedRun.entries, refreshedEntries)) {
@@ -52,8 +56,12 @@ export async function reconcileSavedBenchmarkRun(
   }
 }
 
-export function useSavedBenchmarkCatalog(setSavedBenchmarkRuns: SavedBenchmarkRunsSetter) {
+export function useSavedBenchmarkCatalog(
+  setSavedBenchmarkRuns: SavedBenchmarkRunsSetter,
+  enabled = true,
+) {
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     void listBenchmarkRuns({ limit: SAVED_BENCHMARK_LIST_LIMIT, offset: 0 })
@@ -71,7 +79,7 @@ export function useSavedBenchmarkCatalog(setSavedBenchmarkRuns: SavedBenchmarkRu
     return () => {
       cancelled = true;
     };
-  }, [setSavedBenchmarkRuns]);
+  }, [enabled, setSavedBenchmarkRuns]);
 }
 
 export function useSavedBenchmarkActions({
@@ -120,7 +128,7 @@ export function useSavedBenchmarkActions({
 
         void reconcileSavedBenchmarkRun(savedRun, {
           refreshActiveRows: restorableCachedWorkspaceSnapshot !== null,
-          refreshCompletedRows: true,
+          refreshIncompleteCompletedRows: true,
         }).then((refreshedRun) => {
           const refreshedSnapshot = buildBenchmarkWorkspaceSnapshotFromSavedRun(refreshedRun);
           const shouldHydrateRefreshedRun =

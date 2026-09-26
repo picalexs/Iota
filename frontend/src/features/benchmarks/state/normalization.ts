@@ -1,6 +1,7 @@
 /** Pure benchmark state normalization and in-memory view-cache helpers. */
 
 import type { MoleculeResponse, RunEventResponse, RunRestartResponse, UUID } from "@/types/run";
+import { BENCHMARK_MOLECULE_PRESETS } from "@/lib/benchmark-presets";
 import type {
   BenchmarkWorkspaceStateSnapshot,
   SavedBenchmarkRun,
@@ -48,6 +49,11 @@ function cloneBenchmarkWorkspaceSnapshot(
     selectedBasis: snapshot.selectedBasis,
     selectedBackendMode: snapshot.selectedBackendMode,
     selectedBackendName: snapshot.selectedBackendName,
+    shots: snapshot.shots ?? 4096,
+    optimizationLevel: snapshot.optimizationLevel ?? 1,
+    seedTranspiler: snapshot.seedTranspiler ?? null,
+    dynamicalDecoupling: snapshot.dynamicalDecoupling ?? false,
+    twirling: snapshot.twirling ?? false,
     chemicalAccuracyHa: snapshot.chemicalAccuracyHa,
     customMolecules: [...snapshot.customMolecules],
     entries: snapshot.entries.map(normalizeStoredEntry),
@@ -88,12 +94,16 @@ export function clearBenchmarkWorkspaceViewCache(): void {
 export function buildBenchmarkWorkspaceSnapshotFromSavedRun(
   savedRun: SavedBenchmarkRun,
 ): BenchmarkWorkspaceStateSnapshot {
-  const normalizedEntries = savedRun.entries.map(normalizeStoredEntry);
+  const normalizedEntries = savedRun.entries
+    .map(normalizeStoredEntry)
+    .map(normalizeSavedEntryMoleculeKey);
   const recoveredBenchmarkMode = normalizedEntries.some((entry) => entry.mode === "advanced")
     ? "advanced"
     : "simple";
   const entrySelectedMoleculeKeys = deriveSelectedMoleculeKeysFromEntries(normalizedEntries);
-  const savedSelectedMoleculeKeys = Array.from(savedRun.selectedMoleculeKeys);
+  const savedSelectedMoleculeKeys = Array.from(savedRun.selectedMoleculeKeys).filter(
+    (key) => isKnownBenchmarkMoleculeKey(key) || key.startsWith("custom:"),
+  );
   const missingEntryMoleculeKeys = entrySelectedMoleculeKeys.filter(
     (key) => !savedSelectedMoleculeKeys.includes(key),
   );
@@ -131,10 +141,45 @@ export function buildBenchmarkWorkspaceSnapshotFromSavedRun(
     selectedBasis: savedRun.selectedBasis,
     selectedBackendMode: savedRun.selectedBackendMode,
     selectedBackendName: savedRun.selectedBackendName,
+    shots: savedRun.shots ?? 4096,
+    optimizationLevel: savedRun.optimizationLevel ?? 1,
+    seedTranspiler: savedRun.seedTranspiler ?? null,
+    dynamicalDecoupling: savedRun.dynamicalDecoupling ?? false,
+    twirling: savedRun.twirling ?? false,
     chemicalAccuracyHa: savedRun.chemicalAccuracyHa,
     customMolecules: recoveredCustomMolecules,
     entries: normalizedEntries,
   };
+}
+
+function normalizeSavedEntryMoleculeKey(entry: BenchmarkEntry): BenchmarkEntry {
+  const key = resolveSavedMoleculeKey(entry.preset.key, entry.preset.name, entry.preset.formula);
+  if (key === entry.preset.key) return entry;
+  return {
+    ...entry,
+    preset: { ...entry.preset, key },
+  };
+}
+
+function resolveSavedMoleculeKey(key: string, name: string, formula: string | null): string {
+  if (isKnownBenchmarkMoleculeKey(key) || key.startsWith("custom:")) return key;
+
+  const normalizedName = normalizeMoleculeLabel(name);
+  const normalizedFormula = normalizeMoleculeLabel(formula ?? "");
+  const matchingPreset = BENCHMARK_MOLECULE_PRESETS.find(
+    (preset) =>
+      normalizeMoleculeLabel(preset.name) === normalizedName ||
+      normalizeMoleculeLabel(preset.formula) === normalizedFormula,
+  );
+  return matchingPreset?.key ?? key;
+}
+
+function normalizeMoleculeLabel(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function isKnownBenchmarkMoleculeKey(key: string): boolean {
+  return BENCHMARK_MOLECULE_PRESETS.some((preset) => preset.key === key);
 }
 
 function deriveSelectedMoleculeKeysFromEntries(entries: readonly BenchmarkEntry[]): string[] {

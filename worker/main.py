@@ -14,6 +14,7 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 from rq import Queue, Worker
 
 from worker.config import get_settings
+from worker.db import dispose_worker_db_engine
 from worker.jobs.recovery import recover_interrupted_runs
 
 
@@ -166,6 +167,8 @@ def run_worker() -> None:
             logger.info("Recovered %d interrupted run(s)", recovered)
     except Exception:
         logger.exception("Failed to recover interrupted runs before worker startup")
+    # Do not let RQ child processes inherit the recovery engine or its pool.
+    dispose_worker_db_engine()
     worker = ResilientWorker(
         [settings.queue_name],
         connection=connection,

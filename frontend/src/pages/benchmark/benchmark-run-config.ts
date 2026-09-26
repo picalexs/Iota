@@ -26,14 +26,21 @@ function resolveBackendName(
   return execution.backendName;
 }
 
-function buildBackendOptions(backendName: string | null): BackendOptions {
+function buildBackendOptions(
+  execution: BenchmarkExecutionSettings,
+  backendName: string | null,
+): BackendOptions {
+  const ibmRuntimeSelected = execution.mode === "ibm_runtime";
+
   return {
     selection_policy: "manual",
     backend_name: backendName,
-    shots: 4096,
-    optimization_level: 1,
+    shots: execution.shots ?? 4096,
+    optimization_level: execution.optimizationLevel ?? 1,
+    dynamical_decoupling: ibmRuntimeSelected && (execution.dynamicalDecoupling ?? false),
+    twirling: ibmRuntimeSelected && (execution.twirling ?? false),
     seed_simulator: null,
-    seed_transpiler: null,
+    seed_transpiler: execution.seedTranspiler ?? null,
     aer_method: "automatic",
   };
 }
@@ -66,7 +73,7 @@ function buildBaseRunConfig(
     algorithm,
     mode: "easy",
     backend_target: backendTarget,
-    backend_options: buildBackendOptions(backendName),
+    backend_options: buildBackendOptions(execution, backendName),
     basis_set_override: basis,
     noise_profile: buildNoiseProfile(execution),
     ibm_runtime_confirmed: options.ibmRuntimeConfirmed ?? false,

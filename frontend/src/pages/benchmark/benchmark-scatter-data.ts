@@ -1,7 +1,10 @@
 import type { ChartTooltipSection } from "@/components/results/charts/chart-tooltip";
 import type { MoleculePreset } from "@/lib/benchmark-presets";
-import type { AccuracyVerdict } from "@/lib/results/accuracy";
-import { assessBenchmarkEntry, benchmarkEntryDisplayLabel } from "./benchmark-utils";
+import {
+  assessChemicalAccuracy,
+  type AccuracyVerdict,
+} from "@/lib/results/accuracy";
+import { benchmarkEntryDisplayLabel, effectiveRefs } from "./benchmark-utils";
 import type { BenchmarkEntry } from "./benchmark-utils";
 import { buildBenchmarkTooltipLines } from "./benchmark-scatter-tooltips";
 
@@ -46,11 +49,11 @@ function isScatterLabelSeparator(char: string): boolean {
   );
 }
 
-function normalizeScatterLabel(value: string): string {
+function normalizeScatterLabel(value: string | null | undefined): string {
   let normalized = "";
   let pendingSpace = false;
 
-  for (const char of value.trim()) {
+  for (const char of (value ?? "").trim()) {
     if (isWhitespace(char)) {
       pendingSpace = normalized.length > 0;
       continue;
@@ -86,7 +89,10 @@ function compactScatterLabel(value: string, maxChars = 10): string {
   return base + "…";
 }
 
-function shortMoleculeScatterLabel(formula: string, name: string): string {
+function shortMoleculeScatterLabel(
+  formula: string | null | undefined,
+  name: string | null | undefined,
+): string {
   const candidates = [formula, name].map(normalizeScatterLabel).filter(Boolean);
   if (candidates.length === 0) return "Molecule";
   const shortest = [...candidates].sort((left, right) => left.length - right.length)[0];
@@ -104,7 +110,14 @@ export function buildCompletedPoints(
         return [];
       }
 
-      const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
+      const refs = effectiveRefs(entry);
+      const assessment = assessChemicalAccuracy({
+        energy: entry.energy,
+        hf: refs.hf,
+        fci: refs.fci,
+        thresholdHa: chemicalAccuracyHa,
+        converged: entry.converged,
+      });
       if (assessment.absErrorMha == null) return [];
 
       return [

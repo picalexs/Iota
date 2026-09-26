@@ -237,6 +237,10 @@ def _solve_qfd_branch_path(
         "time_grid_type": time_grid_type,
         "implemented_evolution_method": "pauli_lie_trotter",
         "projected_dimension": num_time_points,
+        "requested_time_points": num_time_points,
+        "full_space_dimension": None,
+        "basis_complete": False,
+        "full_space_residual_available": False,
         "projected_matrix_element_count": 2 * num_time_points**2,
         "reference_state_source": reference_source,
         "reference_descriptor": reference_descriptor,
@@ -369,6 +373,7 @@ def _solve_qfd_sector_path(
         **diagnostics,
         **grid_metadata,
         "time_points": float(len(states)),
+        "requested_time_points": float(len(time_grid)),
         "max_time": max_time,
         "sector_dimension": float(sector_action.dimension),
     }
@@ -387,6 +392,10 @@ def _solve_qfd_sector_path(
         "sector_dimension": sector_action.dimension,
         "num_spatial_orbitals": sector_action.norb,
         "projected_dimension": len(states),
+        "requested_time_points": len(time_grid),
+        "full_space_dimension": sector_action.dimension,
+        "basis_complete": len(states) >= sector_action.dimension,
+        "full_space_residual_available": True,
         "projected_matrix_element_count": 2 * len(states) ** 2,
         "reference_state_source": "hartree_fock",
         "reference_descriptor": reference_descriptor,
@@ -553,6 +562,7 @@ def _solve_qfd_dense_path(
         time_grid_type=time_grid_type,
         progress_callback=progress_callback,
     )
+    effective_time_points = len(dense_states)
     states_matrix = np.column_stack(dense_states)
     overlap = build_overlap_matrix(dense_states)
     projected_hamiltonian = states_matrix.conj().T @ operator @ states_matrix
@@ -565,7 +575,8 @@ def _solve_qfd_dense_path(
         **overlap_metrics(overlap),
         **diagnostics,
         **grid_metadata,
-        "time_points": float(num_time_points),
+        "time_points": float(effective_time_points),
+        "requested_time_points": float(num_time_points),
         "max_time": max_time,
     }
     residual_diagnostics = projected_ritz_diagnostics(
@@ -585,6 +596,10 @@ def _solve_qfd_dense_path(
             "aer_pauli_lie_trotter" if plan.use_aer else "exact_matrix_evolution"
         ),
         "projected_dimension": len(dense_states),
+        "full_space_dimension": operator.shape[0],
+        "basis_complete": residual_diagnostics["basis_numerical_rank"] >= operator.shape[0],
+        "full_space_residual_available": True,
+        "requested_time_points": num_time_points,
         "projected_matrix_element_count": 2 * len(dense_states) ** 2,
         "residual_kind": "projected_generalized_eigenpair",
         "convergence_basis": "projected_generalized_residual",
@@ -623,13 +638,13 @@ def _solve_qfd_dense_path(
         "relative_residual=%.2e elapsed=%.3fs",
         primary_energy,
         converged,
-        num_time_points,
+        effective_time_points,
         residual_diagnostics["relative_ritz_residual"],
         qfd_elapsed,
     )
     _emit_qfd_completion(
         progress_callback=progress_callback,
-        num_time_points=num_time_points,
+        num_time_points=effective_time_points,
         primary_energy=primary_energy,
         filter_eigenvalues=filter_eigenvalues,
         diagnostics=diagnostics,
@@ -644,7 +659,7 @@ def _solve_qfd_dense_path(
     return build_qfd_result(
         filter_eigenvalues=filter_eigenvalues,
         raw_filter_eigenvalues=filter_eigenvalues,
-        num_time_points=num_time_points,
+        num_time_points=effective_time_points,
         conditioning_summary=conditioning_summary,
         residual_diagnostics=residual_diagnostics,
         diagnostics=diagnostics,

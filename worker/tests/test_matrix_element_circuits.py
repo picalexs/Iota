@@ -3,12 +3,15 @@ from types import SimpleNamespace
 import pytest
 from qiskit.quantum_info import SparsePauliOp
 
+from worker.adapters.base import BackendExecutionContext
+from worker.chemistry.ansatz_registry import build_ansatz
 from worker.chemistry.matrix_element_circuits import (
     aer_simulator_options,
     augment_system_observable,
     backend_option_int,
     build_branch_state_circuit,
     optimization_level,
+    transpile_aer_circuit,
 )
 
 
@@ -82,6 +85,32 @@ def test_aer_simulator_options_forwards_acceleration_and_thread_controls() -> No
         "batched_shots_gpu": True,
         "runtime_parameter_bind_enable": True,
         "max_parallel_threads": 1024,
+    }
+
+
+def test_transpile_aer_circuit_handles_number_preserving_evolution_at_level_three() -> None:
+    circuit = build_ansatz(
+        ansatz_name="NumberPreserving",
+        num_qubits=4,
+        reps=2,
+        num_electrons_alpha=1,
+        num_electrons_beta=1,
+    )
+
+    transpiled = transpile_aer_circuit(
+        circuit,
+        context=BackendExecutionContext(
+            backend_target="aer_simulator",
+            backend_options={"method": "automatic"},
+            optimization_level=3,
+        ),
+    )
+
+    assert {instruction.operation.name for instruction in transpiled.data} <= {
+        "cx",
+        "rz",
+        "sx",
+        "x",
     }
 
 

@@ -35,6 +35,11 @@ export function hydrateSavedBenchmarkState({
   setSelectedBasis,
   setSelectedBackendMode,
   setSelectedBackendName,
+  setShots,
+  setOptimizationLevel,
+  setSeedTranspiler,
+  setDynamicalDecoupling,
+  setTwirling,
   setChemicalAccuracyHa,
   setCustomMolecules,
   setEntries,
@@ -51,6 +56,11 @@ export function hydrateSavedBenchmarkState({
   setSelectedBasis: Dispatch<SetStateAction<string>>;
   setSelectedBackendMode: Dispatch<SetStateAction<BenchmarkBackendMode>>;
   setSelectedBackendName: Dispatch<SetStateAction<string | null>>;
+  setShots?: Dispatch<SetStateAction<number>>;
+  setOptimizationLevel?: Dispatch<SetStateAction<0 | 1 | 2 | 3>>;
+  setSeedTranspiler?: Dispatch<SetStateAction<number | null>>;
+  setDynamicalDecoupling?: Dispatch<SetStateAction<boolean>>;
+  setTwirling?: Dispatch<SetStateAction<boolean>>;
   setChemicalAccuracyHa: Dispatch<SetStateAction<number>>;
   setCustomMolecules: Dispatch<SetStateAction<MoleculeResponse[]>>;
   setEntries: BenchmarkEntriesSetter;
@@ -66,6 +76,11 @@ export function hydrateSavedBenchmarkState({
   setSelectedBasis(snapshot.selectedBasis);
   setSelectedBackendMode(snapshot.selectedBackendMode);
   setSelectedBackendName(snapshot.selectedBackendName);
+  setShots?.(snapshot.shots ?? 4096);
+  setOptimizationLevel?.(snapshot.optimizationLevel ?? 1);
+  setSeedTranspiler?.(snapshot.seedTranspiler ?? null);
+  setDynamicalDecoupling?.(snapshot.dynamicalDecoupling ?? false);
+  setTwirling?.(snapshot.twirling ?? false);
   setChemicalAccuracyHa(snapshot.chemicalAccuracyHa);
   setCustomMolecules((current) => mergeCustomMolecules(current, snapshot.customMolecules));
 
@@ -94,6 +109,11 @@ export function resetBenchmarkWorkspaceState({
   setSelectedBasis,
   setSelectedBackendMode,
   setSelectedBackendName,
+  setShots,
+  setOptimizationLevel,
+  setSeedTranspiler,
+  setDynamicalDecoupling,
+  setTwirling,
   setChemicalAccuracyHa,
   setCustomMolecules,
 }: {
@@ -110,6 +130,11 @@ export function resetBenchmarkWorkspaceState({
   setSelectedBasis: Dispatch<SetStateAction<string>>;
   setSelectedBackendMode: Dispatch<SetStateAction<BenchmarkBackendMode>>;
   setSelectedBackendName: Dispatch<SetStateAction<string | null>>;
+  setShots?: Dispatch<SetStateAction<number>>;
+  setOptimizationLevel?: Dispatch<SetStateAction<0 | 1 | 2 | 3>>;
+  setSeedTranspiler?: Dispatch<SetStateAction<number | null>>;
+  setDynamicalDecoupling?: Dispatch<SetStateAction<boolean>>;
+  setTwirling?: Dispatch<SetStateAction<boolean>>;
   setChemicalAccuracyHa: Dispatch<SetStateAction<number>>;
   setCustomMolecules: Dispatch<SetStateAction<MoleculeResponse[]>>;
 }): void {
@@ -126,6 +151,11 @@ export function resetBenchmarkWorkspaceState({
   setSelectedBasis(DEFAULT_BENCHMARK_BASIS);
   setSelectedBackendMode("statevector");
   setSelectedBackendName(null);
+  setShots?.(4096);
+  setOptimizationLevel?.(1);
+  setSeedTranspiler?.(null);
+  setDynamicalDecoupling?.(false);
+  setTwirling?.(false);
   setChemicalAccuracyHa(DEFAULT_CHEMICAL_ACCURACY_HA);
   setCustomMolecules([]);
 }

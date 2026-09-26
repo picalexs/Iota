@@ -126,7 +126,7 @@ function makeDefaultProps(overrides: Partial<ComponentProps<typeof BenchmarkCont
 }
 
 describe("BenchmarkControls", () => {
-  it("uses the server-provided chemical-accuracy target labels", async () => {
+  it("uses the server-provided chemical-accuracy target threshold", async () => {
     render(
       <BenchmarkControls
         {...makeDefaultProps({
@@ -139,8 +139,39 @@ describe("BenchmarkControls", () => {
 
     await flushBasisSetLoad();
 
-    expect(screen.getByRole("button", { name: "Server quick target" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Editable chemical accuracy target")).toHaveValue(1.6);
     expect(screen.queryByRole("button", { name: "0.5 mHa" })).not.toBeInTheDocument();
+  });
+
+  it("shows a custom accuracy placeholder and a bright selected preset", async () => {
+    render(<BenchmarkControls {...makeDefaultProps()} />);
+
+    await flushBasisSetLoad();
+
+    expect(screen.getByLabelText("Editable chemical accuracy target")).toHaveValue(null);
+    expect(screen.getByLabelText("Editable chemical accuracy target")).toHaveAttribute(
+      "placeholder",
+      "5.0",
+    );
+    expect(screen.getByRole("button", { name: "1.6 mHa" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "1.6 mHa" })).toHaveClass("bg-interactive-selected");
+  });
+
+  it("allows shots to be cleared before entering a new value", async () => {
+    const user = userEvent.setup();
+    const onShotsChange = vi.fn();
+    const props = makeDefaultProps({ onShotsChange });
+    render(<BenchmarkControls {...props} />);
+
+    await flushBasisSetLoad();
+
+    const shotsInput = screen.getByLabelText("Backend shots");
+    await user.clear(shotsInput);
+    expect(shotsInput).toHaveValue(null);
+
+    await user.type(shotsInput, "1000");
+    expect(shotsInput).toHaveValue(1000);
+    expect(onShotsChange).toHaveBeenLastCalledWith(1000);
   });
 
   it("shows a remove button for built-in molecules and removes them from the benchmark", async () => {
@@ -214,6 +245,36 @@ describe("BenchmarkControls", () => {
 
     const addFromLibrary = await screen.findByRole("button", { name: /add from library/i });
     expect(addFromLibrary.className).toContain("bg-surface-raised");
+  });
+
+  it("locks execution controls after a completed benchmark", async () => {
+    render(
+      <BenchmarkControls
+        {...makeDefaultProps({
+          total: 1,
+          done: 1,
+          selectedBackendMode: "ibm_runtime",
+        })}
+      />,
+    );
+
+    await screen.findByLabelText("Backend shots");
+
+    expect(screen.getByLabelText("Backend shots")).toBeDisabled();
+    expect(screen.getByLabelText("Transpiler seed")).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Dynamical decoupling" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Twirling" })).toBeDisabled();
+  });
+
+  it("hides IBM Runtime policy controls for local backends", async () => {
+    render(<BenchmarkControls {...makeDefaultProps()} />);
+
+    await screen.findByLabelText("Backend shots");
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Dynamical decoupling" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Twirling" })).not.toBeInTheDocument();
   });
 
   it("renders unselected benchmark option cards with the raised surface", async () => {
@@ -486,7 +547,7 @@ describe("BenchmarkControls", () => {
     expect(screen.getByRole("button", { name: /delete benchmark/i })).toBeInTheDocument();
   });
 
-  it("keeps backend selectors on wider responsive columns when IBM selection is required", async () => {
+  it("keeps backend, basis, and accuracy controls grouped when a backend is required", async () => {
     render(
       <BenchmarkControls
         {...makeDefaultProps({
@@ -508,12 +569,10 @@ describe("BenchmarkControls", () => {
     );
 
     const executionSettings = await screen.findByTestId("benchmark-execution-settings");
-    expect(executionSettings.className).toContain(
-      "xl:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_minmax(0,1fr)_auto]",
-    );
-    expect(executionSettings.className).not.toContain(
-      "lg:grid-cols-[minmax(0,10rem)_minmax(0,14rem)_minmax(0,14rem)_minmax(0,1fr)]",
-    );
+    expect(executionSettings.className).toContain("border-t");
+    expect(screen.getByRole("combobox", { name: "Backend" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Basis set" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Editable chemical accuracy target")).toBeInTheDocument();
     expect(screen.getByText("Noise reference backend")).toBeInTheDocument();
   });
 

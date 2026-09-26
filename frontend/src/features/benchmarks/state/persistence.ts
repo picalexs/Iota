@@ -138,6 +138,11 @@ export function useBenchmarkWorkspaceCacheSync({
   selectedBasis,
   selectedBackendMode,
   selectedBackendName,
+  shots,
+  optimizationLevel,
+  seedTranspiler,
+  dynamicalDecoupling,
+  twirling,
   chemicalAccuracyHa,
   customMolecules,
   entries,
@@ -150,6 +155,11 @@ export function useBenchmarkWorkspaceCacheSync({
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   selectedBackendName: string | null;
+  shots?: number;
+  optimizationLevel?: 0 | 1 | 2 | 3;
+  seedTranspiler?: number | null;
+  dynamicalDecoupling?: boolean;
+  twirling?: boolean;
   chemicalAccuracyHa: number;
   customMolecules: MoleculeResponse[];
   entries: BenchmarkEntry[];
@@ -165,6 +175,11 @@ export function useBenchmarkWorkspaceCacheSync({
       selectedBasis,
       selectedBackendMode,
       selectedBackendName,
+      shots: shots ?? 4096,
+      optimizationLevel: optimizationLevel ?? 1,
+      seedTranspiler: seedTranspiler ?? null,
+      dynamicalDecoupling: dynamicalDecoupling ?? false,
+      twirling: twirling ?? false,
       chemicalAccuracyHa,
       customMolecules,
       entries,
@@ -179,6 +194,11 @@ export function useBenchmarkWorkspaceCacheSync({
     selectedAlgorithms,
     selectedBackendMode,
     selectedBackendName,
+    shots,
+    optimizationLevel,
+    seedTranspiler,
+    dynamicalDecoupling,
+    twirling,
     selectedBasis,
     selectedMoleculeKeys,
   ]);

@@ -192,3 +192,46 @@ def test_build_krylov_basis_rejects_zero_reference() -> None:
             trotter_steps=1,
             progress_callback=None,
         )
+
+
+def test_build_krylov_basis_filters_dependent_evolved_states() -> None:
+    reference = np.array([1.0, 0.0], dtype=complex)
+
+    basis = build_krylov_basis(
+        object(),
+        np.diag([0.0, 1.0]).astype(complex),
+        reference,
+        target_rank=3,
+        evolution_method="exact",
+        time_step=0.0,
+        trotter_steps=1,
+        progress_callback=None,
+    )
+
+    assert len(basis) == 1
+    assert basis[0] == pytest.approx(reference)
+
+
+def test_build_sector_krylov_basis_filters_dependent_evolved_states() -> None:
+    class _Action:
+        dimension = 2
+
+        def time_evolve(self, state: np.ndarray, *, time_point: float) -> np.ndarray:
+            del time_point
+            return state
+
+        def project(self, basis: np.ndarray) -> np.ndarray:
+            return basis.conj().T @ basis
+
+    reference = np.array([1.0, 0.0], dtype=complex)
+    basis = build_sector_krylov_basis(
+        _Action(),
+        reference,
+        target_rank=3,
+        evolution_method="exact",
+        time_step=0.2,
+        trotter_steps=1,
+        progress_callback=None,
+    )
+
+    assert len(basis) == 1

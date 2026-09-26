@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -22,6 +23,7 @@ except ImportError:  # pragma: no cover - direct script execution
 SUPPORTED_ALGORITHMS = {"vqe", "qse", "kqd", "qfd", "sqd", "skqd"}
 SUPPORTED_BACKENDS = {"statevector", "aer_simulator", "ibm_runtime"}
 ALGORITHM_SEED_ALGORITHMS = {"vqe", "sqd", "skqd"}
+SEED_ROLES = {"algorithm", "sampling", "reference", "simulator", "transpiler"}
 DEFAULT_BASE_URL = "http://localhost:18000"
 
 
@@ -105,6 +107,19 @@ def _normalize_variants(value: Any) -> list[dict[str, Any]]:
     return result
 
 
+def _variant_key(variant: Mapping[str, Any]) -> str:
+    """Return the stable manifest key used to distinguish configuration variants."""
+
+    algorithm = _text(variant.get("algorithm")) or "algorithm"
+    explicit = _text(
+        variant.get("id", variant.get("variant_id", variant.get("variantId")))
+    )
+    if explicit is not None:
+        return _slug(explicit)
+    mode = _text(variant.get("mode")) or ("advanced" if variant.get("advanced_config") else "easy")
+    return _slug(f"{algorithm}-{mode}")
+
+
 def validate_campaign(manifest: Mapping[str, Any]) -> dict[str, Any]:
     """Validate and normalize the user-facing campaign manifest."""
 
@@ -124,6 +139,9 @@ def validate_campaign(manifest: Mapping[str, Any]) -> dict[str, Any]:
     backend_options = dict(backend.get("options") or manifest.get("backend_options") or {})
     if backend.get("name") is not None:
         backend_options.setdefault("backend_name", backend["name"])
+    noise_profile = manifest.get("noise_profile")
+    if noise_profile is not None and not isinstance(noise_profile, Mapping):
+        raise ExporterError("Campaign noise_profile must be an object")
 
     for variant in variants:
         algorithm = str(variant["algorithm"]).lower()
@@ -134,6 +152,17 @@ def validate_campaign(manifest: Mapping[str, Any]) -> dict[str, Any]:
             raise ExporterError(f"Unsupported mode for {algorithm}: {mode}")
         variant["algorithm"] = algorithm
         variant["mode"] = mode
+        if "noise_profile" not in variant and noise_profile is not None:
+            variant["noise_profile"] = dict(noise_profile)
+        _seed_roles(algorithm, variant, target)
+
+    variant_keys = [_variant_key(variant) for variant in variants]
+    duplicates = sorted({key for key in variant_keys if variant_keys.count(key) > 1})
+    if duplicates:
+        raise ExporterError(
+            "Algorithm variants need unique id values when repeated: "
+            + ", ".join(duplicates)
+        )
 
     return {
         "name": name,
@@ -194,11 +223,26 @@ def _seed_roles(algorithm: str, variant: Mapping[str, Any], backend_target: str)
     if roles is not None:
         if not isinstance(roles, list) or not all(isinstance(item, str) for item in roles):
             raise ExporterError(f"seed_roles for {algorithm} must be a list of strings")
-        return [item for item in roles if item]
+        normalized = [item.strip().lower() for item in roles if item.strip()]
+        unknown = sorted(set(normalized) - SEED_ROLES)
+        if unknown:
+            raise ExporterError(
+                f"Unsupported seed role(s) for {algorithm}: {', '.join(unknown)}"
+            )
+        if len(normalized) != len(set(normalized)):
+            raise ExporterError(f"Duplicate seed role for {algorithm}")
+        return normalized
     if algorithm in ALGORITHM_SEED_ALGORITHMS and variant.get("mode") == "advanced":
         return ["algorithm"]
     if backend_target == "ibm_runtime":
         return ["transpiler"]
+    if (
+        algorithm == "qse"
+        and variant.get("mode") == "advanced"
+        and str((variant.get("advanced_config") or {}).get("reference_method", "")).lower()
+        == "vqe"
+    ):
+        return ["reference"]
     return ["simulator", "transpiler"]
 
 
@@ -222,6 +266,28 @@ def _build_seeded_config(
         raise ExporterError(
             f"{algorithm} algorithm seeds require mode=advanced with advanced_config"
         )
+    if (
+        any(role in roles for role in {"sampling", "reference"})
+        and variant.get("mode") != "advanced"
+    ):
+        raise ExporterError(
+            f"{algorithm} sampling and reference seeds require mode=advanced with advanced_config"
+        )
+    advanced_variant = dict(variant.get("advanced_config") or {})
+    if "sampling" in roles:
+        if algorithm != "sqd":
+            raise ExporterError(f"{algorithm} has no exposed nested sampling seed field")
+        if str(advanced_variant.get("sampling_state_source", "hf")).lower() != "vqe":
+            raise ExporterError(
+                "SQD sampling seed requires advanced_config.sampling_state_source='vqe'"
+            )
+    if "reference" in roles:
+        if algorithm != "qse":
+            raise ExporterError(f"{algorithm} has no exposed reference seed field")
+        if str(advanced_variant.get("reference_method", "")).lower() != "vqe":
+            raise ExporterError(
+                "QSE reference seed requires advanced_config.reference_method='vqe'"
+            )
 
     backend_options = {
         "selection_policy": "manual",
@@ -254,7 +320,7 @@ def _build_seeded_config(
     if config["mode"] == "easy":
         config["easy_options"] = dict(variant.get("easy_options") or {"goal": "balanced"})
     else:
-        advanced = dict(variant.get("advanced_config") or {})
+        advanced = advanced_variant
         advanced.setdefault("algorithm", algorithm)
         if "algorithm" in roles:
             if algorithm == "skqd":
@@ -263,6 +329,10 @@ def _build_seeded_config(
                 advanced["base_sampling_options"] = sampling
             else:
                 advanced["seed"] = seed
+        if "sampling" in roles:
+            advanced["sampling_vqe_seed"] = seed
+        if "reference" in roles:
+            advanced["vqe_reference_seed"] = seed
         config["advanced_config"] = advanced
 
     if variant.get("noise_profile") is not None:
@@ -270,8 +340,10 @@ def _build_seeded_config(
     return config, roles
 
 
-def _entry_id(molecule: Mapping[str, Any], algorithm: str, seed: int) -> str:
-    return f"{_slug(_molecule_key(molecule))}:{algorithm}:seed={seed}"
+def _entry_id(
+    molecule: Mapping[str, Any], variant: Mapping[str, Any], seed: int
+) -> str:
+    return f"{_slug(_molecule_key(molecule))}:{_variant_key(variant)}:seed={seed}"
 
 
 def _entry_snapshot(
@@ -285,6 +357,8 @@ def _entry_snapshot(
     run_id: str | None = None,
     error_message: str | None = None,
 ) -> dict[str, Any]:
+    variant_key = _variant_key(variant)
+    variant_label = _text(variant.get("label")) or variant_key
     return {
         "id": entry_id,
         "preset": {
@@ -293,8 +367,8 @@ def _entry_snapshot(
             "formula": _text(molecule.get("formula")),
         },
         "algorithm": variant["algorithm"],
-        "variantId": f"{variant['algorithm']}:seed={seed}",
-        "variantLabel": f"{variant['algorithm'].upper()} seed={seed}",
+        "variantId": f"{variant_key}:seed={seed}",
+        "variantLabel": f"{variant_label} seed={seed}",
         "mode": variant.get("mode", "easy"),
         "status": status,
         "moleculeId": molecule.get("id"),
@@ -316,7 +390,7 @@ def _campaign_entries(campaign: Mapping[str, Any], molecules: list[dict[str, Any
             for seed in campaign["seeds"]:
                 algorithm = str(variant["algorithm"])
                 roles = _seed_roles(algorithm, variant, campaign["backend"]["target"])
-                entry_id = _entry_id(molecule, algorithm, seed)
+                entry_id = _entry_id(molecule, variant, seed)
                 entries.append(
                     {
                         "entry_id": entry_id,
@@ -422,6 +496,7 @@ def create_campaign(
     wait_timeout: float = 3600.0,
     poll_seconds: float = 5.0,
     allow_ibm: bool = False,
+    operator_token: str | None = None,
     client: QssApiClient | None = None,
 ) -> dict[str, Any]:
     campaign = validate_campaign(manifest)
@@ -430,7 +505,11 @@ def create_campaign(
             "IBM Runtime submission is disabled. Pass --allow-ibm only for an explicitly approved workload."
         )
 
-    api = client or QssApiClient(base_url, timeout=timeout)
+    api = client or QssApiClient(
+        base_url,
+        timeout=timeout,
+        operator_token=operator_token,
+    )
     output_dir = output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = output_dir / "submission.json"
@@ -571,6 +650,10 @@ def main(argv: list[str] | None = None) -> int:
             wait_timeout=max(0.1, args.wait_timeout),
             poll_seconds=max(0.1, args.poll_seconds),
             allow_ibm=args.allow_ibm,
+            operator_token=(
+                os.environ.get("QSS_LOCAL_OPERATOR_TOKEN")
+                or os.environ.get("LOCAL_OPERATOR_TOKEN")
+            ),
         )
     except ExporterError as exc:
         print(f"error: {exc}", file=sys.stderr)

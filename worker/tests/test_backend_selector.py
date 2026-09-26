@@ -98,3 +98,24 @@ def test_backend_context_rejects_invalid_noise_profile() -> None:
                 "strength": 2.0,
             },
         )
+
+
+def test_backend_context_preserves_ibm_suppression_variants() -> None:
+    context = build_backend_execution_context(
+        backend_target="ibm_runtime",
+        backend_options={
+            "dynamical_decoupling": True,
+            "twirling": True,
+        },
+    )
+
+    assert context.backend_options["dynamical_decoupling"] is True
+    assert context.backend_options["twirling"] is True
+
+
+def test_backend_context_rejects_suppression_variants_for_local_targets() -> None:
+    with pytest.raises(BackendError, match="dynamical_decoupling.*ibm_runtime"):
+        build_backend_execution_context(
+            backend_target="aer_simulator",
+            backend_options={"dynamical_decoupling": True},
+        )

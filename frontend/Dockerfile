@@ -15,7 +15,10 @@ RUN chmod +x /app/docker-entrypoint.sh
 
 USER appuser
 
-RUN npm ci --legacy-peer-deps \
+RUN npm ci --legacy-peer-deps --ignore-scripts
+
+# Run esbuild's native-binary installer after npm finishes writing dependencies.
+RUN node node_modules/esbuild/install.js \
     && lock_hash="$(sha256sum package-lock.json)" \
     && printf '%s' "${lock_hash%% *}" > node_modules/.package-lock.sha256
 

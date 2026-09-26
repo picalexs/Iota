@@ -4,7 +4,7 @@ import type {
   BenchmarkDeleteProgress,
   BenchmarkExecutableAction,
 } from "@/features/benchmarks/state/history-actions";
-import type { SavedBenchmarkRun } from "./benchmark-storage";
+import type { BenchmarkHistoryRun } from "@/features/benchmarks/state/history";
 import { runAsyncPageAction } from "./benchmark-history-toolbar";
 
 type ConfirmableBenchmarkAction = Extract<
@@ -14,7 +14,7 @@ type ConfirmableBenchmarkAction = Extract<
 
 type ConfirmingRowBenchmarkAction = {
   readonly action: ConfirmableBenchmarkAction;
-  readonly run: SavedBenchmarkRun;
+  readonly run: BenchmarkHistoryRun;
 };
 
 function getDeleteBenchmarksTitle(selectedCount: number): string {
@@ -112,7 +112,7 @@ type BenchmarkActionConfirmDialogProps = {
   readonly disabled: boolean;
   readonly onClose: () => void;
   readonly onConfirmBulk: () => void | Promise<void>;
-  readonly onConfirmRow: (run: SavedBenchmarkRun) => void | Promise<void>;
+  readonly onConfirmRow: (run: BenchmarkHistoryRun) => void | Promise<void>;
 };
 
 export function BenchmarkActionConfirmDialog({

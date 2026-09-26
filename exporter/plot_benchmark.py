@@ -57,9 +57,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--format",
         dest="output_format",
-        choices=("png", "svg", "both"),
+        choices=("png", "svg", "pdf", "both"),
         default="png",
-        help="Plot file format. Default: png.",
+        help="Plot file format. Use pdf for manuscript figures or both for PNG and SVG.",
     )
     parser.add_argument("--timeout", type=float, default=30.0, help="HTTP timeout in seconds.")
     return parser.parse_args(argv)
