@@ -223,8 +223,6 @@ function ChemicalAccuracyCell({
   }
   const assessment = assessDisplayedAccuracy(entry, chemicalAccuracyHa);
   if (!assessment.isScorable) {
-    const eligibility = getBenchmarkEligibility(entry);
-    const message = benchmarkEligibilityMessage(eligibility.reason);
     return (
       <div className="flex items-center gap-3">
         <StatusIndicator
