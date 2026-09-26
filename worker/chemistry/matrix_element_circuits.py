@@ -22,6 +22,7 @@ _AER_INTEGER_OPTIONS = {
     "max_parallel_experiments",
     "max_parallel_shots",
 }
+_AER_EVOLUTION_BASIS_GATES = ("rz", "sx", "x", "cx")
 
 
 def build_branch_state_circuit(
@@ -99,15 +100,29 @@ def transpile_aer_circuit(
 ) -> Any:
     """Transpile a circuit to the local Aer simulator instruction set."""
     from qiskit import transpile
+
     simulator_options = dict(noise_options or {})
     if noise_model is not None:
         simulator_options["noise_model"] = noise_model
     simulator = build_aer_simulator(context, extra_options=simulator_options)
-    transpile_options: dict[str, Any] = {"optimization_level": optimization_level(context)}
+    level = optimization_level(context)
+    transpile_options: dict[str, Any] = {"optimization_level": level}
     seed_transpiler = backend_option_int(context, "seed_transpiler")
     if seed_transpiler is not None:
         transpile_options["seed_transpiler"] = seed_transpiler
+    if level >= 2 and _contains_pauli_evolution(circuit):
+        transpile_options["basis_gates"] = list(_AER_EVOLUTION_BASIS_GATES)
+        return transpile(circuit, **transpile_options)
     return transpile(circuit, simulator, **transpile_options)
+
+
+def _contains_pauli_evolution(circuit: Any) -> bool:
+    """Return whether a circuit contains a PauliEvolution instruction."""
+    return any(
+        getattr(getattr(instruction, "operation", instruction), "name", None)
+        == "PauliEvolution"
+        for instruction in getattr(circuit, "data", ())
+    )
 
 
 def build_aer_simulator(

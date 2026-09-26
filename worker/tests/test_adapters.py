@@ -514,6 +514,12 @@ def test_ibm_adapter_uses_runtime_primitives_and_tracks_job_ids() -> None:
 
     assert estimator_calls[0]["mode"] is backend
     assert estimator_calls[0]["options"]["default_shots"] == 512
+    assert estimator_calls[0]["options"]["resilience_level"] == 0
+    assert estimator_calls[0]["options"]["dynamical_decoupling"] == {"enable": False}
+    assert estimator_calls[0]["options"]["twirling"] == {
+        "enable_gates": False,
+        "enable_measure": False,
+    }
     assert "default_precision" not in estimator_calls[0]["options"]
     assert metadata["effective_estimator_precision"] == pytest.approx(1 / math.sqrt(512))
     assert metadata["measurement_mode"] == "precision_sampled"
@@ -572,6 +578,20 @@ def test_ibm_adapter_runtime_contract_caps_and_failure_payloads() -> None:
     metadata = adapter.execution_metadata(context)
     assert metadata["job_ids"] == ["runtime-job-123"]
     assert metadata["ibm_job_id"] == "runtime-job-123"
+    assert metadata["runtime_accounting"] == {
+        "submitted_jobs": 1,
+        "failed_submissions": 2,
+        "provider_observed_jobs": 1,
+        "successful_submissions": 1,
+        "submitted_pubs": 1,
+        "requested_shots_total": 512,
+        "failed_pub_count": 130,
+    }
+    assert [record["status"] for record in metadata["runtime_submission_ledger"]] == [
+        "provider_observed",
+        "failed",
+        "failed",
+    ]
     assert metadata["runtime_failure_payloads"] == [
         {"stage": "submission", "error_type": "RuntimeError", "pub_count": 1, "shots": 512},
         {"stage": "submission", "error_type": "BackendError", "pub_count": 129, "shots": 512},
@@ -667,10 +687,188 @@ def test_ibm_adapter_uses_estimator_precision_only_for_estimator() -> None:
     sampler = adapter.create_sampler(context)
 
     assert estimator_calls == [
-        {"mode": backend, "options": {"default_precision": 0.125}}
+        {
+            "mode": backend,
+            "options": {
+                "resilience_level": 0,
+                "dynamical_decoupling": {"enable": False},
+                "twirling": {"enable_gates": False, "enable_measure": False},
+                "default_precision": 0.125,
+            },
+        }
     ]
-    assert sampler_calls == [{"mode": backend, "options": {"default_shots": 512}}]
+    assert sampler_calls == [
+        {
+            "mode": backend,
+            "options": {
+                "resilience_level": 0,
+                "dynamical_decoupling": {"enable": False},
+                "twirling": {"enable_gates": False, "enable_measure": False},
+                "default_shots": 512,
+            },
+        }
+    ]
     assert sampler.allow_sampler_submission_retries is False
+
+
+def test_ibm_adapter_records_each_pub_and_isa_gate_metrics(monkeypatch) -> None:
+    backend = SimpleNamespace(name="ibm_brisbane", simulator=False)
+    service = SimpleNamespace(backend=lambda _name: backend)
+    job = SimpleNamespace(job_id=lambda: "runtime-job-123")
+    primitive = SimpleNamespace(run=lambda *args, **kwargs: job)
+
+    class PassManager:
+        def run(self, circuit):
+            return circuit.copy()
+
+    monkeypatch.setattr(
+        "qiskit.transpiler.preset_passmanagers.generate_preset_pass_manager",
+        lambda **_kwargs: PassManager(),
+    )
+    circuit = QuantumCircuit(2)
+    circuit.h(0)
+    circuit.cx(0, 1)
+    second_circuit = QuantumCircuit(2)
+    second_circuit.cx(0, 1)
+
+    adapter = IBMAdapter(
+        service_factory=lambda **_: service,
+        estimator_factory=lambda **_: primitive,
+    )
+    context = BackendExecutionContext(
+        backend_target="ibm_runtime",
+        backend_options={
+            "backend_name": "ibm_brisbane",
+            "token": "fake-token",
+            "instance": "fake-instance",
+            "seed_transpiler": 17,
+        },
+        shots=512,
+        optimization_level=2,
+    )
+
+    adapter.create_estimator(context).run(
+        [(circuit, object()), (second_circuit, object())]
+    )
+    metadata = adapter.execution_metadata(context)
+
+    records = metadata["transpilation_records"]
+    assert len(records) == 2
+    assert [record["provenance_class"] for record in records] == [
+        "qss_submitted_isa",
+        "qss_submitted_isa",
+    ]
+    assert all(record["provider_final_compilation"] == "unknown" for record in records)
+    assert records[0]["metrics"]["optimization_level"] == 2
+    assert records[0]["metrics"]["transpiler_seed"] == 17
+    assert records[0]["metrics"]["one_qubit_gate_count"] == 1
+    assert records[0]["metrics"]["two_qubit_gate_count"] == 1
+    assert records[1]["metrics"]["two_qubit_gate_count"] == 1
+    assert metadata["runtime_submission_ledger"][0]["pub_records"] == [
+        {**record, "submission_index": 1} for record in records
+    ]
+
+
+def test_ibm_adapter_attributes_transpilation_records_to_each_submission(monkeypatch) -> None:
+    backend = SimpleNamespace(name="ibm_brisbane", simulator=False)
+    service = SimpleNamespace(backend=lambda _name: backend)
+    jobs = iter(
+        SimpleNamespace(job_id=lambda job_id=job_id: job_id)
+        for job_id in ("runtime-job-1", "runtime-job-2")
+    )
+
+    class PassManager:
+        def run(self, circuit):
+            return circuit.copy()
+
+    monkeypatch.setattr(
+        "qiskit.transpiler.preset_passmanagers.generate_preset_pass_manager",
+        lambda **_kwargs: PassManager(),
+    )
+    primitive = SimpleNamespace(run=lambda *args, **kwargs: next(jobs))
+    circuits = [QuantumCircuit(1), QuantumCircuit(1), QuantumCircuit(1)]
+    circuits[0].x(0)
+    circuits[1].h(0)
+    circuits[2].z(0)
+
+    adapter = IBMAdapter(
+        service_factory=lambda **_: service,
+        estimator_factory=lambda **_: primitive,
+    )
+    context = BackendExecutionContext(
+        backend_target="ibm_runtime",
+        backend_options={
+            "backend_name": "ibm_brisbane",
+            "token": "fake-token",
+            "instance": "fake-instance",
+        },
+        shots=256,
+    )
+
+    estimator = adapter.create_estimator(context)
+    estimator.run([(circuits[0], object())])
+    estimator.run([(circuits[1], object()), (circuits[2], object())])
+    metadata = adapter.execution_metadata(context)
+
+    ledger = metadata["runtime_submission_ledger"]
+    assert [entry["submission_index"] for entry in ledger] == [1, 2]
+    assert [entry["pub_count"] for entry in ledger] == [1, 2]
+    assert [record["submission_index"] for record in ledger[0]["pub_records"]] == [1]
+    assert [record["submission_index"] for record in ledger[1]["pub_records"]] == [2, 2]
+    assert [record["pub_index"] for record in ledger[1]["pub_records"]] == [0, 1]
+    assert metadata["runtime_accounting"]["submitted_pubs"] == 3
+
+
+@pytest.mark.parametrize(
+    ("dynamical_decoupling", "twirling", "policy_name"),
+    [
+        (False, False, "raw"),
+        (True, False, "dynamical_decoupling"),
+        (False, True, "twirling"),
+        (True, True, "dynamical_decoupling+twirling"),
+    ],
+)
+def test_ibm_adapter_records_explicit_execution_policy(
+    dynamical_decoupling: bool,
+    twirling: bool,
+    policy_name: str,
+) -> None:
+    backend = SimpleNamespace(name="ibm_brisbane", simulator=False)
+    service = SimpleNamespace(backend=lambda _name: backend)
+    calls: list[dict[str, object]] = []
+
+    adapter = IBMAdapter(
+        service_factory=lambda **_: service,
+        estimator_factory=lambda **kwargs: calls.append(kwargs) or object(),
+    )
+    context = BackendExecutionContext(
+        backend_target="ibm_runtime",
+        backend_options={
+            "backend_name": "ibm_brisbane",
+            "token": "fake-token",
+            "instance": "fake-instance",
+            "dynamical_decoupling": dynamical_decoupling,
+            "twirling": twirling,
+        },
+        shots=512,
+    )
+
+    adapter.create_estimator(context)
+    options = calls[0]["options"]
+    assert options["resilience_level"] == 0
+    assert options["dynamical_decoupling"] == {"enable": dynamical_decoupling}
+    assert options["twirling"] == {
+        "enable_gates": twirling,
+        "enable_measure": twirling,
+    }
+    assert adapter.execution_metadata(context)["runtime_policy"] == {
+        "name": policy_name,
+        "resilience_level": 0,
+        "dynamical_decoupling": {"enable": dynamical_decoupling},
+        "twirling": {"enable_gates": twirling, "enable_measure": twirling},
+        "provider_observed": "unknown",
+        "status": "configured_not_provider_observed",
+    }
 
 
 def test_ibm_adapter_records_named_backend_mismatch_as_fallback() -> None:
@@ -1146,6 +1344,12 @@ def test_normalize_result_for_kqd_dataclass() -> None:
     assert normalized["algorithm_metrics"]["krylov_rank"] == 4
     assert normalized["algorithm_metrics"]["ritz_values"] == [-1.0, -0.97, -0.94, -0.92]
     assert normalized["algorithm_metrics"]["raw_ritz_values"] == []
+    assert normalized["algorithm_metrics"]["matrix_element_summary"] == {
+        "projected_dimension": 4,
+        "projected_matrix_element_count": 32,
+        "projected_matrix_element_count_scope": "logical_hamiltonian_and_overlap_entries",
+        "projected_matrix_element_count_source": "derived_from_projected_dimension",
+    }
 
 
 def test_normalize_result_for_qfd_dataclass() -> None:
@@ -1171,6 +1375,12 @@ def test_normalize_result_for_qfd_dataclass() -> None:
         -0.88,
     ]
     assert normalized["algorithm_metrics"]["raw_filter_eigenvalues"] == []
+    assert normalized["algorithm_metrics"]["matrix_element_summary"] == {
+        "projected_dimension": 5,
+        "projected_matrix_element_count": 50,
+        "projected_matrix_element_count_scope": "logical_hamiltonian_and_overlap_entries",
+        "projected_matrix_element_count_source": "derived_from_projected_dimension",
+    }
 
 
 def test_normalize_result_rejects_stabilized_branch_projected_spectra() -> None:
@@ -1370,6 +1580,106 @@ def test_normalize_result_does_not_infer_scientific_convergence_from_one_project
     )
 
 
+@pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
+def test_normalize_result_keeps_incomplete_full_space_residual_unvalidated(
+    algorithm: str,
+) -> None:
+    diagnostics = {
+        "stability_state": "stable",
+        "overlap_condition": 1.0,
+        "overlap_min_eigenvalue": 1.0,
+        "relative_ritz_residual": 1e-12,
+        "residual_convergence_threshold": 1e-8,
+    }
+    matrix_summary = {
+        "matrix_element_strategy": "sector_matrix_free",
+        "full_space_dimension": 4,
+        "basis_complete": False,
+        "full_space_residual_available": True,
+        "projected_dimension": 2,
+    }
+    if algorithm == "kqd":
+        result = KQDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            ritz_values=[-1.0],
+            krylov_rank=2,
+            orthogonality_metrics=diagnostics,
+            matrix_element_summary=matrix_summary,
+            stability_summary=diagnostics,
+        )
+    else:
+        result = QFDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            filter_eigenvalues=[-1.0],
+            conditioning_summary=diagnostics,
+            matrix_element_summary=matrix_summary,
+            stability_summary=diagnostics,
+        )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["scientific_converged"] is None
+    assert "completeness_evidence" not in convergence
+    assert convergence["convergence_failure_reason"] == (
+        "scientific_completeness_evidence_unavailable"
+    )
+
+
+@pytest.mark.parametrize("algorithm", ["kqd", "qfd"])
+def test_normalize_result_accepts_complete_local_projected_basis(algorithm: str) -> None:
+    diagnostics = {
+        "stability_state": "stable",
+        "overlap_condition": 1.0,
+        "overlap_min_eigenvalue": 1.0,
+        "relative_ritz_residual": 1e-12,
+        "residual_convergence_threshold": 1e-8,
+    }
+    matrix_summary = {
+        "matrix_element_strategy": "sector_matrix_free",
+        "full_space_dimension": 2,
+        "basis_complete": True,
+        "full_space_residual_available": True,
+        "projected_dimension": 2,
+    }
+    if algorithm == "kqd":
+        result = KQDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            ritz_values=[-1.0],
+            krylov_rank=2,
+            orthogonality_metrics=diagnostics,
+            matrix_element_summary=matrix_summary,
+            stability_summary=diagnostics,
+        )
+    else:
+        result = QFDResult(
+            algorithm=algorithm,
+            primary_energy=-1.0,
+            primary_iterations=2,
+            converged=True,
+            filter_eigenvalues=[-1.0],
+            conditioning_summary=diagnostics,
+            matrix_element_summary=matrix_summary,
+            stability_summary=diagnostics,
+        )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["scientific_converged"] is True
+    assert convergence["completeness_evidence"] == "complete_full_space_basis"
+    assert convergence["convergence_criterion"] == (
+        "full_space_ritz_residual_and_complete_basis"
+    )
+
+
 def test_normalize_result_keeps_qse_scientific_status_indeterminate_without_hierarchy_evidence() -> None:
     result = QSEResult(
         algorithm="qse",
@@ -1395,6 +1705,36 @@ def test_normalize_result_keeps_qse_scientific_status_indeterminate_without_hier
     assert convergence["convergence_failure_reason"] == (
         "scientific_completeness_evidence_unavailable"
     )
+
+
+def test_normalize_result_accepts_qse_when_full_pool_is_exhausted() -> None:
+    result = QSEResult(
+        algorithm="qse",
+        primary_energy=-1.0,
+        primary_iterations=2,
+        converged=True,
+        eigenvalues=[-1.0],
+        overlap_condition=1.0,
+        reference_state_energy=-0.9,
+        relative_residual=1e-12,
+        convergence_threshold=1e-8,
+        execution_mode="dense_exact_emulation",
+        conditioning_summary={
+            "stability_state": "stable",
+            "overlap_min_eigenvalue": 1.0,
+        },
+        matrix_element_summary={
+            "basis_selection": {
+                "basis_termination_reason": "candidate_pool_exhausted",
+            }
+        },
+    )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["scientific_converged"] is True
+    assert convergence["completeness_evidence"] == "configured_excitation_pool_exhausted"
+    assert convergence["convergence_failure_reason"] is None
 
 
 def test_normalize_result_rejects_unstable_projected_convergence() -> None:
@@ -1540,6 +1880,30 @@ def test_normalize_result_for_qse_dataclass() -> None:
     assert normalized["iterations"] == 2
     assert normalized["algorithm_metrics"]["eigenvalues"] == [-0.9, -0.84]
     assert normalized["algorithm_metrics"]["reference_state_energy"] == -0.82
+    assert normalized["algorithm_metrics"]["matrix_element_summary"][
+        "projected_matrix_element_count_source"
+    ] == "derived_from_projected_dimension"
+
+
+def test_normalize_result_preserves_projected_termination_reason() -> None:
+    result = KQDResult(
+        algorithm="kqd",
+        primary_energy=-1.0,
+        primary_iterations=2,
+        converged=False,
+        ritz_values=[-1.0],
+        krylov_rank=2,
+        orthogonality_metrics={
+            "stability_state": "stable",
+            "relative_ritz_residual": 0.2,
+            "residual_convergence_threshold": 1e-6,
+        },
+        stability_summary={"termination_reason": "projected_metric_rank_reduced"},
+    )
+
+    convergence = normalize_result(result)["algorithm_metrics"]["convergence"]
+
+    assert convergence["termination_reason"] == "projected_metric_rank_reduced"
 
 
 @pytest.mark.parametrize(
@@ -1627,6 +1991,27 @@ def test_normalize_result_promotes_skqd_work_ledger() -> None:
         "ledger_version": 1,
         "sampler_run_attempts": 2,
         "sampler_returned_raw_sample_rows": 16,
+    }
+
+
+def test_normalize_result_promotes_skqd_core_work_ledger() -> None:
+    result = SKQDResult(
+        algorithm="skqd",
+        primary_energy=-0.81,
+        primary_iterations=2,
+        converged=False,
+        sqd_core={
+            "sci_result_package": {
+                "work_ledger": {"sampler_requested_shots_total": 24}
+            }
+        },
+        krylov_extension_diagnostics={},
+    )
+
+    normalized = normalize_result(result)
+
+    assert normalized["algorithm_metrics"]["work_ledger"] == {
+        "sampler_requested_shots_total": 24
     }
 
 

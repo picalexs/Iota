@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { containerSurfaceClassName } from "@/lib/interactive-styles";
-import { type AccuracyVerdict } from "@/lib/results/accuracy";
+import { assessChemicalAccuracy, type AccuracyAssessment, type AccuracyVerdict } from "@/lib/results/accuracy";
 import { cn } from "@/lib/utils";
 import type { MoleculePreset } from "@/lib/benchmark-presets";
 import type { BenchmarkEntry } from "./benchmark-utils";
-import { assessBenchmarkEntry, benchmarkEntryDisplayLabel } from "./benchmark-utils";
+import { benchmarkEntryDisplayLabel, effectiveRefs } from "./benchmark-utils";
 import { ExpandPanelButton } from "./benchmark-panel-expand-button";
 import { formatMetric } from "./benchmark-insights-formatters";
 
@@ -30,7 +30,7 @@ function formatMatrixStatusLabel(status: BenchmarkEntry["status"]): string {
 
 function buildMatrixDetailLabel(
   entry: Pick<BenchmarkEntry, "status" | "elapsedSeconds" | "errorMessage">,
-  assessment: ReturnType<typeof assessBenchmarkEntry> | null,
+  assessment: AccuracyAssessment | null,
 ): string | null {
   if (assessment?.absErrorMha != null) {
     return formatMatrixStatusLabel(entry.status);
@@ -42,6 +42,17 @@ function buildMatrixDetailLabel(
     return "Needs attention";
   }
   return null;
+}
+
+function assessDisplayedAccuracy(entry: BenchmarkEntry, chemicalAccuracyHa: number) {
+  const refs = effectiveRefs(entry);
+  return assessChemicalAccuracy({
+    energy: entry.energy,
+    hf: refs.hf,
+    fci: refs.fci,
+    thresholdHa: chemicalAccuracyHa,
+    converged: entry.converged,
+  });
 }
 
 function verdictTone(verdict: AccuracyVerdict): string {
@@ -57,7 +68,7 @@ function verdictTone(verdict: AccuracyVerdict): string {
 
 function statusTone(entry: BenchmarkEntry, chemicalAccuracyHa: number): string {
   if (entry.status === "completed" && entry.energy !== null) {
-    return verdictTone(assessBenchmarkEntry(entry, chemicalAccuracyHa).verdict);
+    return verdictTone(assessDisplayedAccuracy(entry, chemicalAccuracyHa).verdict);
   }
   if (entry.status === "failed") return "border-destructive/40 bg-destructive/10 text-destructive";
   if (entry.status === "cancelled") return "border-border bg-muted/45 text-muted-foreground";
@@ -133,7 +144,7 @@ export function AccuracyMatrix({
                 const header = splitMatrixHeaderLabel(displayLabel);
                 const assessment =
                   entry.status === "completed" && entry.energy !== null
-                    ? assessBenchmarkEntry(entry, chemicalAccuracyHa)
+                    ? assessDisplayedAccuracy(entry, chemicalAccuracyHa)
                     : null;
                 const metricLabel =
                   assessment?.absErrorMha != null

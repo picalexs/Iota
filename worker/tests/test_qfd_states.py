@@ -133,8 +133,10 @@ def test_qfd_dense_and_sector_evolution_preserve_analytic_complex_phase() -> Non
         progress_callback=None,
     )
 
-    assert np.column_stack(dense_states) == pytest.approx(expected)
-    assert np.column_stack(sector_states) == pytest.approx(expected)
+    assert len(dense_states) == 2
+    assert len(sector_states) == 2
+    assert np.column_stack(dense_states) == pytest.approx(expected[:, :2])
+    assert np.column_stack(sector_states) == pytest.approx(expected[:, :2])
 
 
 def test_qfd_aer_evolution_preserves_analytic_complex_phase() -> None:
@@ -289,3 +291,34 @@ def test_aer_evolves_small_nonzero_time_with_large_hamiltonian() -> None:
     ) / np.sqrt(2.0)
 
     assert evolved == pytest.approx(expected)
+
+
+def test_qfd_state_builders_filter_dependent_time_states() -> None:
+    reference = np.array([1.0, 0.0], dtype=complex)
+    context = SimpleNamespace(
+        hamiltonian=object(),
+        operator=np.diag([0.0, 1.0]).astype(complex),
+        reference_state=reference,
+        use_aer=False,
+        trotter_steps=1,
+        eigenvalues=np.array([0.0, 1.0]),
+        eigenvectors=np.eye(2, dtype=complex),
+        reference_projection=reference,
+        backend_context=None,
+    )
+
+    def evolve_state_fn(**_kwargs: object) -> np.ndarray:
+        return reference.copy()
+
+    states = build_dense_qfd_states(
+        evolution_context=context,
+        time_grid=np.array([0.0, 0.1, 0.2]),
+        num_time_points=3,
+        max_time=0.2,
+        time_grid_type="linear",
+        progress_callback=None,
+        evolve_state_fn=evolve_state_fn,
+    )
+
+    assert len(states) == 1
+    assert states[0] == pytest.approx(reference)

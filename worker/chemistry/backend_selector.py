@@ -95,6 +95,12 @@ def build_backend_execution_context(
     ):
         raise BackendError("Aer device must be 'CPU' or 'GPU'")
     selection_policy = str(options.pop("selection_policy", selection_policy) or selection_policy)
+    for key in ("dynamical_decoupling", "twirling"):
+        value = options.get(key, False)
+        if not isinstance(value, bool):
+            raise BackendError(f"{key} must be a boolean")
+        if value and backend_target != "ibm_runtime":
+            raise BackendError(f"{key} is only supported for backend_target 'ibm_runtime'")
     for key in ("seed_simulator", "seed_transpiler"):
         seed_value = options.get(key)
         if isinstance(seed_value, bool) or not isinstance(seed_value, (int, float)):

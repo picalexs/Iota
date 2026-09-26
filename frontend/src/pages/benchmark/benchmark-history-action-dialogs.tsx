@@ -6,7 +6,7 @@ import {
   BenchmarkActionConfirmDialog,
   BenchmarkDeleteSelectionDialog,
 } from "./benchmark-history-dialogs";
-import type { SavedBenchmarkRun } from "./benchmark-storage";
+import type { BenchmarkHistoryRun } from "@/features/benchmarks/state/history";
 
 export type BenchmarkBulkAction = "pause" | "resume" | "restart" | "cancel" | "delete" | null;
 export type BenchmarkConfirmableAction = Extract<
@@ -16,7 +16,7 @@ export type BenchmarkConfirmableAction = Extract<
 
 export type BenchmarkConfirmingRowAction = {
   readonly action: BenchmarkConfirmableAction;
-  readonly run: SavedBenchmarkRun;
+  readonly run: BenchmarkHistoryRun;
 };
 
 type BenchmarkHistoryActionDialogsProps = Readonly<{
@@ -35,7 +35,7 @@ type BenchmarkHistoryActionDialogsProps = Readonly<{
   deletingSelection: boolean;
   onCloseAction: () => void;
   onConfirmBulkAction: (action: BenchmarkConfirmableAction) => void;
-  onConfirmRowAction: (run: SavedBenchmarkRun, action: BenchmarkConfirmableAction) => void;
+  onConfirmRowAction: (run: BenchmarkHistoryRun, action: BenchmarkConfirmableAction) => void;
   onDeleteSelectionOpenChange: (open: boolean) => void;
   onDeleteAssociatedRunsChange: (value: boolean) => void;
   onConfirmDelete: () => void | Promise<void>;

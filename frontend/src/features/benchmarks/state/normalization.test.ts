@@ -59,6 +59,26 @@ describe("benchmark state normalization", () => {
     expect(snapshot.entries).toHaveLength(1);
   });
 
+  it("maps exporter molecule UUIDs to built-in preset keys", () => {
+    const baseEntry = savedBenchmarkRun().entries[0];
+    if (!baseEntry) throw new Error("Expected a benchmark entry");
+    const savedRun = {
+      ...savedBenchmarkRun(),
+      selectedMoleculeKeys: ["molecule-h2"],
+      entries: [
+        {
+          ...baseEntry,
+          preset: { ...baseEntry.preset, key: "molecule-h2", name: "Hydrogen (H₂)" },
+        },
+      ],
+    };
+
+    const snapshot = buildBenchmarkWorkspaceSnapshotFromSavedRun(savedRun);
+
+    expect(snapshot.selectedMoleculeKeys).toEqual(["h2"]);
+    expect(snapshot.entries[0]?.preset.key).toBe("h2");
+  });
+
   it("preserves an exact KQD config when restoring an IBM benchmark row", () => {
     const savedRun = {
       ...savedBenchmarkRun(),

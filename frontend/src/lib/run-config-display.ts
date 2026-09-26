@@ -242,7 +242,7 @@ function appendBackendRows(rows: ConfigRow[], config: Record<string, unknown>, r
     formatEnumNode,
   );
   pushRow(rows, "Backend", "Backend name", config.backend_options.backend_name);
-  pushRow(rows, "Backend", "Shots", config.backend_options.shots);
+  pushRow(rows, "Backend", "Backend shots", config.backend_options.shots);
   pushRow(rows, "Backend", "Optimization level", config.backend_options.optimization_level);
   pushRow(rows, "Backend", "Aer method", config.backend_options.aer_method, formatEnumNode);
 }

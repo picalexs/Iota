@@ -205,8 +205,8 @@ export function RuntimeScatterEmptyState({
     <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-md border border-dashed px-4 text-center text-sm text-muted-foreground">
       <p>
         {totalPoints === 0
-          ? "No completed scored rows yet"
-          : "No completed scored rows match the current chart filters."}
+          ? "No completed rows yet"
+          : "No completed rows match the current chart filters."}
       </p>
       {hasActiveFilters && totalPoints > 0 ? (
         <ClearFiltersButton

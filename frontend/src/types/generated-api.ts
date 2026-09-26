@@ -148,6 +148,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/benchmarks/summaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Benchmark Run Summaries
+         * @description List compact benchmark history rows with current run statuses.
+         */
+        get: operations["list_benchmark_run_summaries_api_benchmarks_summaries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/benchmarks/{benchmark_id}": {
         parameters: {
             query?: never;
@@ -986,6 +1006,12 @@ export interface components {
              */
             device?: ("CPU" | "GPU") | null;
             /**
+             * Dynamical Decoupling
+             * @description Enable IBM Runtime dynamical decoupling. This is an explicit execution variant and does not enable Runtime resilience.
+             * @default false
+             */
+            dynamical_decoupling: boolean;
+            /**
              * Estimator Precision
              * @description Estimator standard-error budget. Omit or set null to derive 1/sqrt(shots) for noisy Aer. Zero requests exact estimator values.
              */
@@ -1031,6 +1057,12 @@ export interface components {
              * @default 4096
              */
             shots: number;
+            /**
+             * Twirling
+             * @description Enable IBM Runtime gate and measurement twirling. This is an explicit execution variant and does not enable Runtime resilience.
+             * @default false
+             */
+            twirling: boolean;
         };
         /**
          * BackendProcessorType
@@ -1185,14 +1217,26 @@ export interface components {
             customMolecules?: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Dynamicaldecoupling
+             * @default false
+             */
+            dynamicalDecoupling: boolean;
             /** Entries */
             entries?: {
                 [key: string]: unknown;
             }[];
             /** Name */
             name: string;
+            /**
+             * Optimizationlevel
+             * @default 1
+             */
+            optimizationLevel: number;
             /** Registrationdigest */
             registrationDigest: string;
+            /** Seedtranspiler */
+            seedTranspiler?: number | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1210,6 +1254,16 @@ export interface components {
             selectedBasis: string;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 4096
+             */
+            shots: number;
+            /**
+             * Twirling
+             * @default false
+             */
+            twirling: boolean;
         };
         /**
          * BenchmarkRunCreate
@@ -1231,14 +1285,26 @@ export interface components {
             customMolecules?: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Dynamicaldecoupling
+             * @default false
+             */
+            dynamicalDecoupling: boolean;
             /** Entries */
             entries?: {
                 [key: string]: unknown;
             }[];
             /** Name */
             name: string;
+            /**
+             * Optimizationlevel
+             * @default 1
+             */
+            optimizationLevel: number;
             /** Registrationdigest */
             registrationDigest?: string | null;
+            /** Seedtranspiler */
+            seedTranspiler?: number | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1256,6 +1322,16 @@ export interface components {
             selectedBasis: string;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 4096
+             */
+            shots: number;
+            /**
+             * Twirling
+             * @default false
+             */
+            twirling: boolean;
         };
         /**
          * BenchmarkRunListResponse
@@ -1296,6 +1372,11 @@ export interface components {
             customMolecules?: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Dynamicaldecoupling
+             * @default false
+             */
+            dynamicalDecoupling: boolean;
             /** Entries */
             entries?: {
                 [key: string]: unknown;
@@ -1307,8 +1388,15 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /**
+             * Optimizationlevel
+             * @default 1
+             */
+            optimizationLevel: number;
             /** Registrationdigest */
             registrationDigest?: string | null;
+            /** Seedtranspiler */
+            seedTranspiler?: number | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][];
             /**
@@ -1326,6 +1414,87 @@ export interface components {
             selectedBasis: string;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[];
+            /**
+             * Shots
+             * @default 4096
+             */
+            shots: number;
+            /**
+             * Twirling
+             * @default false
+             */
+            twirling: boolean;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /**
+         * BenchmarkRunSummaryListResponse
+         * @description Paginated compact benchmark batch response.
+         */
+        BenchmarkRunSummaryListResponse: {
+            /** Items */
+            items: components["schemas"]["BenchmarkRunSummaryResponse"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /**
+         * BenchmarkRunSummaryResponse
+         * @description Compact benchmark batch response for history lists.
+         */
+        BenchmarkRunSummaryResponse: {
+            /** Activecount */
+            activeCount: number;
+            /** Associatedruncount */
+            associatedRunCount: number;
+            /** Cancelledcount */
+            cancelledCount: number;
+            /** Completedcount */
+            completedCount: number;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Excludedcount */
+            excludedCount: number;
+            /** Failedcount */
+            failedCount: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Pausedcount */
+            pausedCount: number;
+            /** Plannedcount */
+            plannedCount: number;
+            /** Rowcount */
+            rowCount: number;
+            /**
+             * Selectedbackendmode
+             * @enum {string}
+             */
+            selectedBackendMode: "statevector" | "aer_simulator" | "aer_simulator_backend_noise" | "ibm_runtime";
+            /** Selectedbackendname */
+            selectedBackendName?: string | null;
+            /** Selectedbasis */
+            selectedBasis: string;
+            /** Selectedmoleculekeys */
+            selectedMoleculeKeys: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "running" | "paused" | "finished" | "partial" | "failed" | "cancelled" | "planned" | "excluded";
             /**
              * Updatedat
              * Format: date-time
@@ -1347,12 +1516,18 @@ export interface components {
             customMolecules?: {
                 [key: string]: unknown;
             }[] | null;
+            /** Dynamicaldecoupling */
+            dynamicalDecoupling?: boolean | null;
             /** Entries */
             entries?: {
                 [key: string]: unknown;
             }[] | null;
             /** Name */
             name?: string | null;
+            /** Optimizationlevel */
+            optimizationLevel?: number | null;
+            /** Seedtranspiler */
+            seedTranspiler?: number | null;
             /** Selectedalgorithms */
             selectedAlgorithms?: components["schemas"]["RunAlgorithm"][] | null;
             /** Selectedbackendmode */
@@ -1363,6 +1538,10 @@ export interface components {
             selectedBasis?: string | null;
             /** Selectedmoleculekeys */
             selectedMoleculeKeys?: string[] | null;
+            /** Shots */
+            shots?: number | null;
+            /** Twirling */
+            twirling?: boolean | null;
         };
         /**
          * ConfigChoiceMetadata
@@ -2025,6 +2204,8 @@ export interface components {
             vqe_reference_optimizer_name?: string | null;
             /** Vqe Reference Reps */
             vqe_reference_reps?: number | null;
+            /** Vqe Reference Seed */
+            vqe_reference_seed?: number | null;
         };
         /**
          * QSEComplexAmplitude
@@ -3179,6 +3360,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BenchmarkRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_benchmark_run_summaries_api_benchmarks_summaries_get: {
+        parameters: {
+            query?: {
+                /** @description Maximum results */
+                limit?: number;
+                /** @description Pagination offset */
+                offset?: number;
+                status?: ("draft" | "running" | "paused" | "finished" | "partial" | "failed" | "cancelled" | "planned" | "excluded") | null;
+                backend?: ("statevector" | "aer_simulator" | "aer_simulator_backend_noise" | "ibm_runtime") | null;
+                sort?: "name" | "rows" | "backend" | "updated" | "status";
+                order?: "asc" | "desc";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BenchmarkRunSummaryListResponse"];
                 };
             };
             /** @description Validation Error */

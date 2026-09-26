@@ -12,6 +12,11 @@ export interface BenchmarkPayloadContext {
   selectedBasis: string;
   selectedBackendMode: BenchmarkRunCreate["selectedBackendMode"];
   selectedBackendName: string | null;
+  shots?: number;
+  optimizationLevel?: 0 | 1 | 2 | 3;
+  seedTranspiler?: number | null;
+  dynamicalDecoupling?: boolean;
+  twirling?: boolean;
   chemicalAccuracyHa: number;
   customMolecules: readonly MoleculeResponse[];
 }
@@ -34,6 +39,11 @@ export function buildBenchmarkPayload(
     selectedBasis: context.selectedBasis,
     selectedBackendMode: context.selectedBackendMode,
     selectedBackendName: context.selectedBackendName,
+    shots: context.shots ?? 4096,
+    optimizationLevel: context.optimizationLevel ?? 1,
+    seedTranspiler: context.seedTranspiler ?? null,
+    dynamicalDecoupling: context.dynamicalDecoupling ?? false,
+    twirling: context.twirling ?? false,
     chemicalAccuracyHa: context.chemicalAccuracyHa,
     customMolecules: [...context.customMolecules],
     entries: nextEntries,
@@ -50,6 +60,11 @@ export function buildBenchmarkSignature(
     selectedBasis: context.selectedBasis,
     selectedBackendMode: context.selectedBackendMode,
     selectedBackendName: context.selectedBackendName,
+    shots: context.shots ?? 4096,
+    optimizationLevel: context.optimizationLevel ?? 1,
+    seedTranspiler: context.seedTranspiler ?? null,
+    dynamicalDecoupling: context.dynamicalDecoupling ?? false,
+    twirling: context.twirling ?? false,
     chemicalAccuracyHa: context.chemicalAccuracyHa,
     customMolecules: context.customMolecules.map((molecule) => molecule.id),
     entries: nextEntries.map(entrySaveSignature),

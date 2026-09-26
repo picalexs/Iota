@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageErrorState, getErrorPresentation } from "@/components/ui/page-error-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,11 +11,11 @@ import {
 } from "./benchmark-history-toolbar";
 import type { BenchmarkExecutableAction } from "@/features/benchmarks/state/history-actions";
 import type { BenchmarkSortField, BenchmarkSortOrder } from "@/features/benchmarks/state/history";
-import type { SavedBenchmarkRun } from "./benchmark-storage";
+import type { BenchmarkHistoryRun } from "@/features/benchmarks/state/history";
 
 export type BenchmarkRunsContentProps = {
-  readonly savedBenchmarkRuns: readonly SavedBenchmarkRun[];
-  readonly filteredAndSortedRuns: readonly SavedBenchmarkRun[];
+  readonly savedBenchmarkRuns: readonly BenchmarkHistoryRun[];
+  readonly filteredAndSortedRuns: readonly BenchmarkHistoryRun[];
   readonly loading: boolean;
   readonly error: unknown;
   readonly refetch: () => void | Promise<void>;
@@ -35,6 +36,11 @@ export type BenchmarkRunsContentProps = {
   readonly resumableCount: number;
   readonly restartableCount: number;
   readonly cancellableCount: number;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly canGoPrevious: boolean;
+  readonly canGoNext: boolean;
   readonly clearFilters: () => void;
   readonly onUpdateSort: (field: BenchmarkSortField) => void;
   readonly onSelectStatus: (status: BenchmarkStatusFilter) => void;
@@ -47,7 +53,7 @@ export type BenchmarkRunsContentProps = {
     options: { deleteAssociatedRuns: boolean },
   ) => void | Promise<void>;
   readonly onRequestRowAction: (
-    run: SavedBenchmarkRun,
+    run: BenchmarkHistoryRun,
     action: BenchmarkExecutableAction,
   ) => void | Promise<void>;
   readonly onToggleBenchmarkSelection: (benchmarkId: string) => void;
@@ -58,6 +64,8 @@ export type BenchmarkRunsContentProps = {
   readonly onConfirmRestartSelection: () => void;
   readonly onConfirmCancelSelection: () => void;
   readonly onOpenDeleteSelection: () => void;
+  readonly onGoPreviousPage: () => void;
+  readonly onGoNextPage: () => void;
 };
 
 export function BenchmarkRunsContent({
@@ -83,6 +91,11 @@ export function BenchmarkRunsContent({
   resumableCount,
   restartableCount,
   cancellableCount,
+  page,
+  pageSize,
+  total,
+  canGoPrevious,
+  canGoNext,
   clearFilters,
   onUpdateSort,
   onSelectStatus,
@@ -100,6 +113,8 @@ export function BenchmarkRunsContent({
   onConfirmRestartSelection,
   onConfirmCancelSelection,
   onOpenDeleteSelection,
+  onGoPreviousPage,
+  onGoNextPage,
 }: BenchmarkRunsContentProps) {
   if (loading) {
     return (
@@ -144,58 +159,91 @@ export function BenchmarkRunsContent({
   }
 
   return (
-    <BenchmarkSavedRunsList
-      savedBenchmarkRuns={filteredAndSortedRuns}
-      selectedSavedBenchmarkId={null}
-      sortField={sortField}
-      sortOrder={sortOrder}
-      toolbarContent={
-        <BenchmarkRunsToolbar
-          savedBenchmarkRunsCount={savedBenchmarkRuns.length}
-          statusFilter={statusFilter}
-          backendFilter={backendFilter}
-          hasActiveFilters={hasActiveFilters}
-          creating={creating}
-          actionPending={actionPending}
-          isEditing={isEditing}
-          clearFilters={clearFilters}
-          onSelectStatus={onSelectStatus}
-          onSelectBackend={onSelectBackend}
-          onCreateNewBenchmark={onCreateNewBenchmark}
-          onToggleEdit={onToggleEdit}
-        />
-      }
-      selectionContent={
-        <BenchmarkRunsSelectionBar
-          isEditing={isEditing}
-          filteredRunsCount={filteredAndSortedRuns.length}
-          selectedCount={selectedCount}
-          allVisibleSelected={allVisibleSelected}
-          someVisibleSelected={someVisibleSelected}
-          bulkActionError={bulkActionError}
-          pausableCount={pausableCount}
-          resumableCount={resumableCount}
-          restartableCount={restartableCount}
-          cancellableCount={cancellableCount}
-          actionPending={actionPending}
-          onToggleSelectAllVisible={onToggleSelectAllVisible}
-          onClearSelection={onClearSelection}
-          onConfirmPauseSelection={onConfirmPauseSelection}
-          onResumeSelection={onResumeSelection}
-          onConfirmRestartSelection={onConfirmRestartSelection}
-          onConfirmCancelSelection={onConfirmCancelSelection}
-          onOpenDeleteSelection={onOpenDeleteSelection}
-        />
-      }
-      selectionMode={isEditing}
-      selectedRunIds={selectedRunIds}
-      disabled={creating || actionPending}
-      onCreate={onCreateNewBenchmark}
-      onLoad={onLoadBenchmark}
-      onDelete={onDeleteBenchmark}
-      onRunAction={onRequestRowAction}
-      onToggleSelected={onToggleBenchmarkSelection}
-      onSort={onUpdateSort}
-    />
+    <div className="flex flex-col gap-3">
+      <BenchmarkSavedRunsList
+        savedBenchmarkRuns={filteredAndSortedRuns}
+        selectedSavedBenchmarkId={null}
+        sortField={sortField}
+        sortOrder={sortOrder}
+        toolbarContent={
+          <BenchmarkRunsToolbar
+            savedBenchmarkRunsCount={savedBenchmarkRuns.length}
+            statusFilter={statusFilter}
+            backendFilter={backendFilter}
+            hasActiveFilters={hasActiveFilters}
+            creating={creating}
+            actionPending={actionPending}
+            isEditing={isEditing}
+            clearFilters={clearFilters}
+            onSelectStatus={onSelectStatus}
+            onSelectBackend={onSelectBackend}
+            onCreateNewBenchmark={onCreateNewBenchmark}
+            onToggleEdit={onToggleEdit}
+          />
+        }
+        selectionContent={
+          <BenchmarkRunsSelectionBar
+            isEditing={isEditing}
+            filteredRunsCount={filteredAndSortedRuns.length}
+            selectedCount={selectedCount}
+            allVisibleSelected={allVisibleSelected}
+            someVisibleSelected={someVisibleSelected}
+            bulkActionError={bulkActionError}
+            pausableCount={pausableCount}
+            resumableCount={resumableCount}
+            restartableCount={restartableCount}
+            cancellableCount={cancellableCount}
+            actionPending={actionPending}
+            onToggleSelectAllVisible={onToggleSelectAllVisible}
+            onClearSelection={onClearSelection}
+            onConfirmPauseSelection={onConfirmPauseSelection}
+            onResumeSelection={onResumeSelection}
+            onConfirmRestartSelection={onConfirmRestartSelection}
+            onConfirmCancelSelection={onConfirmCancelSelection}
+            onOpenDeleteSelection={onOpenDeleteSelection}
+          />
+        }
+        selectionMode={isEditing}
+        selectedRunIds={selectedRunIds}
+        disabled={creating || actionPending}
+        onCreate={onCreateNewBenchmark}
+        onLoad={onLoadBenchmark}
+        onDelete={onDeleteBenchmark}
+        onRunAction={onRequestRowAction}
+        onToggleSelected={onToggleBenchmarkSelection}
+        onSort={onUpdateSort}
+      />
+      {total > pageSize ? (
+        <div className="flex items-center justify-between px-1 text-sm text-muted-foreground">
+          <span>
+            Page {page + 1} of {Math.ceil(total / pageSize)} · {total} benchmarks
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Previous page"
+              disabled={!canGoPrevious || loading}
+              onClick={onGoPreviousPage}
+            >
+              <ChevronLeft className="size-4" />
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Next page"
+              disabled={!canGoNext || loading}
+              onClick={onGoNextPage}
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

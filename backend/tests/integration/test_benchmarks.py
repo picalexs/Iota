@@ -19,6 +19,11 @@ def _benchmark_payload(name: str = "Saved H2 VQE") -> dict:
         "selectedBasis": "sto-3g",
         "selectedBackendMode": "statevector",
         "selectedBackendName": None,
+        "shots": 2048,
+        "optimizationLevel": 2,
+        "seedTranspiler": 19,
+        "dynamicalDecoupling": True,
+        "twirling": False,
         "chemicalAccuracyHa": 0.0016,
         "customMolecules": [],
         "entries": [
@@ -91,6 +96,11 @@ def test_create_list_get_update_delete_benchmark(client: ASGISyncTestClient) -> 
     assert created["selectedMoleculeKeys"] == ["h2"]
     assert created["selectedAlgorithms"] == ["vqe"]
     assert created["chemicalAccuracyHa"] == pytest.approx(0.0016)
+    assert created["shots"] == 2048
+    assert created["optimizationLevel"] == 2
+    assert created["seedTranspiler"] == 19
+    assert created["dynamicalDecoupling"] is True
+    assert created["twirling"] is False
     assert created["entries"][0]["status"] == "completed"
 
     list_response = client.get(BENCHMARKS_API)
@@ -135,6 +145,39 @@ def test_benchmark_list_is_paginated(client: ASGISyncTestClient) -> None:
     assert data["total"] == 2
     assert len(data["items"]) == 1
     assert data["items"][0]["id"] in {first["id"], second["id"]}
+
+
+def test_benchmark_summary_list_is_compact_and_uses_current_run_status(
+    client: ASGISyncTestClient,
+    test_db,
+    sample_molecule,
+) -> None:
+    run = Run(
+        molecule_id=sample_molecule.id,
+        status=RunStatus.RUNNING,
+        backend_target="statevector",
+        config_json={"algorithm": "vqe", "backend_target": "statevector"},
+    )
+    test_db.add(run)
+    test_db.commit()
+    test_db.refresh(run)
+
+    payload = _benchmark_payload("Compact benchmark")
+    payload["entries"][0]["runId"] = str(run.id)
+    payload["entries"][0]["status"] = "completed"
+    created = client.post(BENCHMARKS_API, json=payload).json()
+
+    response = client.get(f"{BENCHMARKS_API}/summaries")
+
+    assert response.status_code == 200
+    summary = response.json()["items"][0]
+    assert summary["id"] == created["id"]
+    assert summary["rowCount"] == 1
+    assert summary["activeCount"] == 1
+    assert summary["completedCount"] == 0
+    assert summary["status"] == "running"
+    assert summary["associatedRunCount"] == 1
+    assert "entries" not in summary
 
 
 def test_campaign_registration_is_idempotent_and_persists_metadata(

@@ -1,13 +1,18 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { createBenchmarkRun, deleteBenchmarkRun, listBenchmarkRuns } from "@/api/benchmarks";
+import {
+  createBenchmarkRun,
+  deleteBenchmarkRun,
+  getBenchmarkRun,
+  listBenchmarkRunSummaries,
+} from "@/api/benchmarks";
 import { useBulkDeleteShortcut } from "@/components/bulk-actions/use-bulk-delete-shortcut";
 import { useBulkSelection } from "@/components/bulk-actions/use-bulk-selection";
 import {
   invalidateBenchmarkRunQueries,
   invalidateRunsQueries,
-  useListBenchmarkRuns,
+  useListBenchmarkRunSummaries,
 } from "@/hooks/use-query-hooks";
 import { BENCHMARK_ALGORITHMS, DEFAULT_CHEMICAL_ACCURACY_HA } from "@/lib/benchmark-presets";
 import {
@@ -21,28 +26,24 @@ import {
   removeSavedBenchmarksFromCache,
   runDeleteSelectedBenchmarksBatch,
   runSelectedBenchmarkActionBatch,
-  updateSavedBenchmarksInCache,
   type BenchmarkDeleteProgress,
   type BenchmarkExecutableAction,
 } from "@/features/benchmarks/state/history-actions";
 import {
   deriveBenchmarkHistorySelection,
   filterAndSortSavedBenchmarkRuns,
+  type BenchmarkHistoryRun,
   type BenchmarkSortField,
   type BenchmarkSortOrder,
 } from "@/features/benchmarks/state/history";
-import {
-  buildSavedBenchmarkRunName,
-  SAVED_BENCHMARK_LIST_LIMIT,
-  type SavedBenchmarkRun,
-} from "./benchmark-storage";
+import { buildSavedBenchmarkRunName } from "./benchmark-storage";
 import {
   type BenchmarkBulkAction,
   type BenchmarkConfirmableAction,
 } from "./benchmark-history-action-dialogs";
 
-const BENCHMARK_LIST_PARAMS = { limit: SAVED_BENCHMARK_LIST_LIMIT, offset: 0 } as const;
-const EMPTY_SAVED_BENCHMARK_RUNS: SavedBenchmarkRun[] = [];
+const BENCHMARK_LIST_PAGE_SIZE = 50;
+const EMPTY_SAVED_BENCHMARK_RUNS: BenchmarkHistoryRun[] = [];
 
 type PendingRowAction = {
   readonly runId: string;
@@ -58,6 +59,7 @@ export function useBenchmarkHistoryController() {
   const [sortOrder, setSortOrder] = useState<BenchmarkSortOrder>("desc");
   const [statusFilter, setStatusFilter] = useState<BenchmarkStatusFilter>("all");
   const [backendFilter, setBackendFilter] = useState<BenchmarkBackendFilter>("all");
+  const [page, setPage] = useState(0);
   const [deleteSelectionOpen, setDeleteSelectionOpen] = useState(false);
   const [deleteAssociatedRuns, setDeleteAssociatedRuns] = useState(false);
   const [deletingSelection, setDeletingSelection] = useState(false);
@@ -71,14 +73,21 @@ export function useBenchmarkHistoryController() {
   > | null>(null);
   const [confirmingRowAction, setConfirmingRowAction] = useState<{
     readonly action: Extract<BenchmarkBulkAction, "pause" | "restart" | "cancel">;
-    readonly run: SavedBenchmarkRun;
+    readonly run: BenchmarkHistoryRun;
   } | null>(null);
   const {
     data,
     isLoading: loading,
     error,
     refetch,
-  } = useListBenchmarkRuns(listBenchmarkRuns, BENCHMARK_LIST_PARAMS);
+  } = useListBenchmarkRunSummaries(listBenchmarkRunSummaries, {
+    limit: BENCHMARK_LIST_PAGE_SIZE,
+    offset: page * BENCHMARK_LIST_PAGE_SIZE,
+    status: statusFilter === "all" ? undefined : statusFilter,
+    backend: backendFilter === "all" ? undefined : backendFilter,
+    sort: sortField,
+    order: sortOrder,
+  });
 
   const savedBenchmarkRuns = data?.items ?? EMPTY_SAVED_BENCHMARK_RUNS;
   const filteredAndSortedRuns = useMemo(
@@ -123,6 +132,7 @@ export function useBenchmarkHistoryController() {
   });
 
   function updateSort(field: BenchmarkSortField) {
+    setPage(0);
     if (sortField === field) {
       setSortOrder((current) => (current === "asc" ? "desc" : "asc"));
       return;
@@ -133,8 +143,19 @@ export function useBenchmarkHistoryController() {
   }
 
   function clearFilters() {
+    setPage(0);
     setStatusFilter("all");
     setBackendFilter("all");
+  }
+
+  function selectStatusFilter(value: BenchmarkStatusFilter) {
+    setPage(0);
+    setStatusFilter(value);
+  }
+
+  function selectBackendFilter(value: BenchmarkBackendFilter) {
+    setPage(0);
+    setBackendFilter(value);
   }
 
   async function createNewBenchmark() {
@@ -221,7 +242,7 @@ export function useBenchmarkHistoryController() {
 
   async function handleSelectedBenchmarksAction(
     action: BenchmarkExecutableAction,
-    eligibleRuns: readonly SavedBenchmarkRun[],
+    eligibleRuns: readonly BenchmarkHistoryRun[],
   ) {
     if (eligibleRuns.length === 0) {
       return;
@@ -231,15 +252,14 @@ export function useBenchmarkHistoryController() {
     setBulkActionError(null);
 
     try {
-      const { results, updatedRuns, failedIds, partialIds } = await runSelectedBenchmarkActionBatch(
+      const fullRuns = await Promise.all(
+        eligibleRuns.map((run) => ("entries" in run ? run : getBenchmarkRun(run.id))),
+      );
+      const { results, failedIds, partialIds } = await runSelectedBenchmarkActionBatch(
         action,
-        eligibleRuns,
+        fullRuns,
       );
       const skippedIds = getSkippedSelectedBenchmarkIds(selectedRuns, eligibleRuns);
-
-      if (updatedRuns.length > 0) {
-        updateSavedBenchmarksInCache(queryClient, updatedRuns);
-      }
 
       await invalidateBenchmarkRunQueries(queryClient);
       await invalidateRunsQueries(queryClient);
@@ -262,21 +282,17 @@ export function useBenchmarkHistoryController() {
   }
 
   async function handleRowBenchmarkAction(
-    run: SavedBenchmarkRun,
+    run: BenchmarkHistoryRun,
     action: BenchmarkExecutableAction,
   ) {
     setPendingRowAction({ runId: run.id, action });
     setBulkActionError(null);
 
     try {
-      const { results, updatedRuns, failedIds, partialIds } = await runSelectedBenchmarkActionBatch(
-        action,
-        [run],
-      );
-
-      if (updatedRuns.length > 0) {
-        updateSavedBenchmarksInCache(queryClient, updatedRuns);
-      }
+      const fullRun = "entries" in run ? run : await getBenchmarkRun(run.id);
+      const { results, failedIds, partialIds } = await runSelectedBenchmarkActionBatch(action, [
+        fullRun,
+      ]);
 
       await invalidateBenchmarkRunQueries(queryClient);
       await invalidateRunsQueries(queryClient);
@@ -304,7 +320,7 @@ export function useBenchmarkHistoryController() {
     void handleSelectedBenchmarksAction(action, eligibleRuns);
   }
 
-  function requestRowAction(run: SavedBenchmarkRun, action: BenchmarkExecutableAction) {
+  function requestRowAction(run: BenchmarkHistoryRun, action: BenchmarkExecutableAction) {
     setBulkActionError(null);
     if (action === "resume") {
       void handleRowBenchmarkAction(run, action);
@@ -357,8 +373,15 @@ export function useBenchmarkHistoryController() {
     deletingSelection,
     clearFilters,
     updateSort,
-    setStatusFilter,
-    setBackendFilter,
+    setStatusFilter: selectStatusFilter,
+    setBackendFilter: selectBackendFilter,
+    page,
+    pageSize: BENCHMARK_LIST_PAGE_SIZE,
+    total: data?.total ?? 0,
+    canGoPrevious: page > 0,
+    canGoNext: (page + 1) * BENCHMARK_LIST_PAGE_SIZE < (data?.total ?? 0),
+    goToPreviousPage: () => setPage((current) => Math.max(0, current - 1)),
+    goToNextPage: () => setPage((current) => current + 1),
     createNewBenchmark,
     toggleEditing: bulkSelection.toggleEditing,
     loadBenchmark: (benchmarkId: string) => {
@@ -388,7 +411,7 @@ export function useBenchmarkHistoryController() {
       setConfirmingRowAction(null);
     },
     confirmBulkAction,
-    confirmRowAction: (run: SavedBenchmarkRun, action: BenchmarkConfirmableAction) =>
+    confirmRowAction: (run: BenchmarkHistoryRun, action: BenchmarkConfirmableAction) =>
       void handleRowBenchmarkAction(run, action),
     handleDeleteSelectionOpenChange,
     setDeleteAssociatedRuns,

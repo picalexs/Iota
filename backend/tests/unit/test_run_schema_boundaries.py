@@ -31,6 +31,9 @@ def test_legacy_run_imports_reexport_specific_schema_types() -> None:
 def test_backend_options_validate_estimator_precision() -> None:
     assert BackendOptions().estimator_precision is None
     assert BackendOptions(estimator_precision=0.125).estimator_precision == 0.125
+    assert BackendOptions(dynamical_decoupling=True, twirling=True).model_dump(
+        include={"dynamical_decoupling", "twirling"}
+    ) == {"dynamical_decoupling": True, "twirling": True}
 
     for invalid in (-0.1, float("nan"), float("inf")):
         try:

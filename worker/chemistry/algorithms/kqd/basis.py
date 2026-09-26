@@ -12,6 +12,7 @@ from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.overlap import build_overlap_matrix
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_energy import generalized_projected_ground_energy
+from worker.chemistry.projected_subspace import accept_basis_candidate
 from worker.chemistry.state_vectors import normalize_state_vector
 from worker.chemistry.time_evolution import (
     aer_pauli_time_evolution_state,
@@ -221,6 +222,7 @@ def build_krylov_basis(
     partial_energy_fn = basis_dependencies.get("partial_energy_fn", dense_krylov_partial_energy)
     emit_progress_fn = basis_dependencies.get("emit_progress_fn", emit_dense_krylov_progress)
     basis: list[np.ndarray] = []
+    orthonormal_basis: list[np.ndarray] = []
     reference = normalize_reference_fn(
         reference_state,
         error_message="KQD reference state must be non-zero",
@@ -251,7 +253,14 @@ def build_krylov_basis(
         if not np.isfinite(norm) or norm == 0.0:
             continue
 
-        basis.append(vector / norm)
+        independence_norm = accept_basis_candidate(
+            vector / norm,
+            basis=basis,
+            orthonormal_basis=orthonormal_basis,
+            overlap_threshold=1e-10,
+        )
+        if independence_norm is None:
+            continue
         partial_ground = partial_energy_fn(operator_matrix, basis)
         emit_progress_fn(
             progress_callback=progress_callback,
@@ -288,6 +297,7 @@ def build_sector_krylov_basis(
 ) -> list[np.ndarray]:
     """Build a Krylov basis inside the fixed electron sector."""
     basis: list[np.ndarray] = []
+    orthonormal_basis: list[np.ndarray] = []
     reference = normalize_reference_fn(
         reference_state,
         error_message="KQD sector reference state must be non-zero",
@@ -319,7 +329,14 @@ def build_sector_krylov_basis(
         if not np.isfinite(norm) or norm == 0.0:
             continue
 
-        basis.append(vector / norm)
+        independence_norm = accept_basis_candidate(
+            vector / norm,
+            basis=basis,
+            orthonormal_basis=orthonormal_basis,
+            overlap_threshold=1e-10,
+        )
+        if independence_norm is None:
+            continue
         partial_ground = partial_energy_fn(action, basis)
         emit_progress_fn(
             progress_callback=progress_callback,

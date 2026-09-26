@@ -148,6 +148,8 @@ export interface BackendOptions {
   shots: number;
   estimator_precision?: number | null;
   optimization_level: 0 | 1 | 2 | 3;
+  dynamical_decoupling?: boolean;
+  twirling?: boolean;
   seed_simulator: number | null;
   seed_transpiler: number | null;
   aer_method: AerMethod | null;

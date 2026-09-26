@@ -1,4 +1,8 @@
-import type { SavedBenchmarkRun } from "@/pages/benchmark/benchmark-storage";
+import type {
+  BenchmarkRunHistoryStatus,
+  SavedBenchmarkRun,
+  SavedBenchmarkRunSummary,
+} from "@/types/benchmark";
 import {
   isCancellableBenchmarkEntry,
   isPausedBenchmarkEntry,
@@ -6,16 +10,8 @@ import {
 } from "@/features/benchmarks/state/selectors";
 import { getAssociatedBenchmarkRunIds } from "@/pages/benchmark/benchmark-utils";
 
-export type BenchmarkRunHistoryStatus =
-  | "draft"
-  | "running"
-  | "paused"
-  | "finished"
-  | "partial"
-  | "failed"
-  | "cancelled"
-  | "planned"
-  | "excluded";
+export type { BenchmarkRunHistoryStatus };
+export type BenchmarkHistoryRun = SavedBenchmarkRun | SavedBenchmarkRunSummary;
 
 export type BenchmarkSortField = "name" | "rows" | "backend" | "updated" | "status";
 export type BenchmarkSortOrder = "asc" | "desc";
@@ -44,7 +40,20 @@ export function formatSavedBenchmarkDate(value: string): string {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 }
 
-export function summarizeSavedBenchmarkRows(run: SavedBenchmarkRun) {
+export function summarizeSavedBenchmarkRows(run: BenchmarkHistoryRun) {
+  if ("rowCount" in run) {
+    return {
+      total: run.rowCount,
+      done: run.completedCount,
+      active: run.activeCount,
+      paused: run.pausedCount,
+      cancelled: run.cancelledCount,
+      failed: run.failedCount,
+      planned: run.plannedCount,
+      excluded: run.excludedCount,
+    };
+  }
+
   const total = run.entries.length;
   const done = run.entries.filter((entry) => entry.status === "completed").length;
   const active = run.entries.filter((entry) =>
@@ -59,7 +68,9 @@ export function summarizeSavedBenchmarkRows(run: SavedBenchmarkRun) {
   return { total, done, active, paused, cancelled, failed, planned, excluded };
 }
 
-export function getSavedBenchmarkStatus(run: SavedBenchmarkRun): BenchmarkRunHistoryStatus {
+export function getSavedBenchmarkStatus(run: BenchmarkHistoryRun): BenchmarkRunHistoryStatus {
+  if ("rowCount" in run) return run.status;
+
   const summary = summarizeSavedBenchmarkRows(run);
   if (summary.active > 0) {
     return "running";
@@ -91,33 +102,36 @@ export function getSavedBenchmarkStatus(run: SavedBenchmarkRun): BenchmarkRunHis
   return "draft";
 }
 
-export function canPauseSavedBenchmark(run: SavedBenchmarkRun): boolean {
+export function canPauseSavedBenchmark(run: BenchmarkHistoryRun): boolean {
+  if ("rowCount" in run) return run.activeCount > 0;
   return run.entries.some(isPausableBenchmarkEntry);
 }
 
-export function canResumeSavedBenchmark(run: SavedBenchmarkRun): boolean {
+export function canResumeSavedBenchmark(run: BenchmarkHistoryRun): boolean {
+  if ("rowCount" in run) return run.pausedCount > 0;
   return run.entries.some(isPausedBenchmarkEntry);
 }
 
-export function canRestartSavedBenchmark(run: SavedBenchmarkRun): boolean {
+export function canRestartSavedBenchmark(run: BenchmarkHistoryRun): boolean {
   return canResumeSavedBenchmark(run);
 }
 
-export function canCancelSavedBenchmark(run: SavedBenchmarkRun): boolean {
+export function canCancelSavedBenchmark(run: BenchmarkHistoryRun): boolean {
+  if ("rowCount" in run) return run.activeCount > 0 || run.pausedCount > 0;
   return run.entries.some(isCancellableBenchmarkEntry);
 }
 
 export type BenchmarkHistorySelection = {
-  readonly selectedRuns: SavedBenchmarkRun[];
-  readonly pausableSelectedRuns: SavedBenchmarkRun[];
-  readonly resumableSelectedRuns: SavedBenchmarkRun[];
-  readonly restartableSelectedRuns: SavedBenchmarkRun[];
-  readonly cancellableSelectedRuns: SavedBenchmarkRun[];
+  readonly selectedRuns: BenchmarkHistoryRun[];
+  readonly pausableSelectedRuns: BenchmarkHistoryRun[];
+  readonly resumableSelectedRuns: BenchmarkHistoryRun[];
+  readonly restartableSelectedRuns: BenchmarkHistoryRun[];
+  readonly cancellableSelectedRuns: BenchmarkHistoryRun[];
   readonly associatedRunCount: number;
 };
 
 export function deriveBenchmarkHistorySelection(
-  runs: readonly SavedBenchmarkRun[],
+  runs: readonly BenchmarkHistoryRun[],
   selectedIds: ReadonlySet<string>,
 ): BenchmarkHistorySelection {
   const selectedRuns = runs.filter((run) => selectedIds.has(run.id));
@@ -129,18 +143,20 @@ export function deriveBenchmarkHistorySelection(
     restartableSelectedRuns: selectedRuns.filter(canRestartSavedBenchmark),
     cancellableSelectedRuns: selectedRuns.filter(canCancelSavedBenchmark),
     associatedRunCount: new Set(
-      selectedRuns.flatMap((run) => getAssociatedBenchmarkRunIds(run.entries)),
+      selectedRuns.flatMap((run) =>
+        "rowCount" in run ? [] : getAssociatedBenchmarkRunIds(run.entries),
+      ),
     ).size,
   };
 }
 
 export function filterAndSortSavedBenchmarkRuns(
-  runs: readonly SavedBenchmarkRun[],
+  runs: readonly BenchmarkHistoryRun[],
   statusFilter: BenchmarkRunHistoryStatus | "all",
   backendFilter: keyof typeof BENCHMARK_HISTORY_BACKEND_LABELS | "all",
   sortField: BenchmarkSortField,
   sortOrder: BenchmarkSortOrder,
-): SavedBenchmarkRun[] {
+): BenchmarkHistoryRun[] {
   const filteredRuns = runs.filter((run) => {
     if (statusFilter !== "all" && getSavedBenchmarkStatus(run) !== statusFilter) {
       return false;
@@ -167,10 +183,10 @@ const STATUS_SORT_RANK: Record<BenchmarkRunHistoryStatus, number> = {
 };
 
 export function sortSavedBenchmarkRuns(
-  runs: readonly SavedBenchmarkRun[],
+  runs: readonly BenchmarkHistoryRun[],
   sortField: BenchmarkSortField,
   sortOrder: BenchmarkSortOrder,
-): SavedBenchmarkRun[] {
+): BenchmarkHistoryRun[] {
   const factor = sortOrder === "asc" ? 1 : -1;
 
   return [...runs].sort((left, right) => {
@@ -181,7 +197,9 @@ export function sortSavedBenchmarkRuns(
         comparison = left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
         break;
       case "rows":
-        comparison = left.entries.length - right.entries.length;
+        comparison =
+          ("rowCount" in left ? left.rowCount : left.entries.length) -
+          ("rowCount" in right ? right.rowCount : right.entries.length);
         break;
       case "backend":
         comparison = (

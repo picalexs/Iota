@@ -281,9 +281,9 @@ def test_dispatch_qfd_with_statevector_backend() -> None:
     )
 
     assert result.algorithm == "qfd"
-    assert result.primary_iterations == 5
-    assert 1 <= len(result.filter_eigenvalues) <= 5
-    assert result.conditioning_summary["time_points"] == pytest.approx(5.0)
+    assert result.primary_iterations == result.conditioning_summary["time_points"]
+    assert 1 <= len(result.filter_eigenvalues) <= result.primary_iterations
+    assert result.conditioning_summary["requested_time_points"] == pytest.approx(5.0)
     assert progress_events
     assert progress_events[-1]["algorithm"] == "qfd"
     assert progress_events[-1]["stage"] == "completed"

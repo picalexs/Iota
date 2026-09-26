@@ -12,6 +12,7 @@ from worker.chemistry.hamiltonian_action import HamiltonianAction
 from worker.chemistry.overlap import build_overlap_matrix
 from worker.chemistry.progress import ProgressCallback
 from worker.chemistry.projected_energy import generalized_projected_ground_energy
+from worker.chemistry.projected_subspace import accept_basis_candidate
 from worker.chemistry.state_vectors import normalize_state_vector
 from worker.chemistry.time_evolution import (
     aer_pauli_time_evolution_state,
@@ -39,6 +40,7 @@ def build_sector_qfd_states(
     )
 
     states: list[np.ndarray] = []
+    orthonormal_basis: list[np.ndarray] = []
     total = len(time_grid)
     for index, time_point in enumerate(time_grid, start=1):
         state = (
@@ -52,7 +54,16 @@ def build_sector_qfd_states(
         norm = float(np.linalg.norm(state))
         if not np.isfinite(norm) or norm == 0.0:
             continue
-        states.append(state / norm)
+        if (
+            accept_basis_candidate(
+                state / norm,
+                basis=states,
+                orthonormal_basis=orthonormal_basis,
+                overlap_threshold=1e-10,
+            )
+            is None
+        ):
+            continue
 
         if len(states) == 1:
             partial_energy: float | None = action.expectation(states[0])
@@ -180,13 +191,25 @@ def build_dense_qfd_states(
 ) -> list[np.ndarray]:
     """Build dense QFD time-grid states and emit live progress."""
     dense_states: list[np.ndarray] = []
+    orthonormal_basis: list[np.ndarray] = []
     for index, time_point in enumerate(time_grid, start=1):
-        dense_states.append(
-            evolve_state_fn(
-                evolution_context=evolution_context,
-                time_point=float(time_point),
-            )
+        state = evolve_state_fn(
+            evolution_context=evolution_context,
+            time_point=float(time_point),
         )
+        norm = float(np.linalg.norm(state))
+        if not np.isfinite(norm) or norm == 0.0:
+            continue
+        if (
+            accept_basis_candidate(
+                state / norm,
+                basis=dense_states,
+                orthonormal_basis=orthonormal_basis,
+                overlap_threshold=1e-10,
+            )
+            is None
+        ):
+            continue
         partial_energy = partial_energy_fn(evolution_context.operator, dense_states)
         emit_progress_fn(
             progress_callback=progress_callback,

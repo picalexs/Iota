@@ -39,6 +39,20 @@ class BackendOptions(BaseModel):
         ),
     )
     optimization_level: int = Field(1, ge=0, le=3)
+    dynamical_decoupling: bool = Field(
+        False,
+        description=(
+            "Enable IBM Runtime dynamical decoupling. This is an explicit execution "
+            "variant and does not enable Runtime resilience."
+        ),
+    )
+    twirling: bool = Field(
+        False,
+        description=(
+            "Enable IBM Runtime gate and measurement twirling. This is an explicit "
+            "execution variant and does not enable Runtime resilience."
+        ),
+    )
     seed_simulator: int | None = Field(None, ge=0, le=2**32 - 1)
     seed_transpiler: int | None = Field(None, ge=0, le=2**32 - 1)
     credential_profile_id: UUID | None = Field(
@@ -363,6 +377,7 @@ class QSEAdvancedConfig(BaseModel):
     vqe_reference_optimizer_name: str | None = None
     vqe_reference_max_iterations: int | None = Field(None, ge=1)
     vqe_reference_reps: int | None = Field(None, ge=1, le=6)
+    vqe_reference_seed: int | None = Field(None, ge=0, le=2**32 - 1)
     regularization: float | None = Field(None, ge=0.0)
     overlap_threshold: float | None = Field(None, gt=0.0)
     residual_tolerance: float | None = Field(None, gt=0.0)

@@ -41,13 +41,24 @@ class SKQDCompletionPayload:
 
 def build_sqd_core_summary(sqd_result: Any) -> dict[str, Any]:
     """Build the persisted SQD core payload carried inside an SKQD result."""
+    sci_result_package = getattr(sqd_result, "sci_result_package", {})
+    sci_result_package = (
+        dict(sci_result_package) if isinstance(sci_result_package, dict) else {}
+    )
     sqd_core = {
         "algorithm": sqd_result.algorithm,
         "primary_energy": sqd_result.primary_energy,
         "primary_iterations": sqd_result.primary_iterations,
         "converged": sqd_result.converged,
-        "sci_result_package": sqd_result.sci_result_package,
+        "sci_result_package": sci_result_package,
     }
+    work_ledger = sci_result_package.get("work_ledger")
+    if isinstance(work_ledger, dict):
+        sqd_core["work_ledger"] = dict(work_ledger)
+    for key in ("postselection_summary", "subsampling_summary"):
+        value = getattr(sqd_result, key, None)
+        if isinstance(value, dict):
+            sqd_core[key] = dict(value)
     if sqd_result.circuit_artifact_policy:
         sqd_core["circuit_artifact_policy"] = sqd_result.circuit_artifact_policy
     return sqd_core

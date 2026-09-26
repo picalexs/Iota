@@ -52,7 +52,7 @@ describe("BenchmarkPage results", () => {
       expect(screen.getByLabelText("Not chemically accurate")).toBeInTheDocument(),
     );
 
-    const chemicalAccuracyInput = screen.getByDisplayValue("1.6");
+    const chemicalAccuracyInput = screen.getByLabelText("Editable chemical accuracy target");
     fireEvent.change(chemicalAccuracyInput, {
       target: { value: "20" },
     });

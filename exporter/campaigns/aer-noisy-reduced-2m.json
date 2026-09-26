@@ -1,0 +1,18 @@
+{
+  "name": "Paper custom noisy Aer reduced H2O and BeH2",
+  "campaign_id": "paper-aer-noisy-reduced-2m",
+  "molecules": [
+    {"id": "6be25a9c-afc9-40f6-991f-0acef841d1e1", "name": "Water", "key": "h2o"},
+    {"id": "66338bed-c3c3-470d-bb3c-914586b158d2", "name": "Beryllium Hydride", "key": "beh2"}
+  ],
+  "algorithms": [
+    {"id": "vqe-noisy-reduced", "label": "VQE noisy reduced", "algorithm": "vqe", "mode": "advanced", "advanced_config": {"algorithm": "vqe", "ansatz_name": "NumberPreserving", "optimizer_name": "COBYLA", "max_iterations": 128, "max_function_evaluations": 128, "reps": 1, "initial_point_strategy": "zero_plus_seeded_random", "initial_point_candidates": 1, "seed": null}},
+    {"id": "sqd-noisy-reduced", "label": "SQD noisy reduced", "algorithm": "sqd", "mode": "advanced", "seed_roles": ["algorithm", "sampling"], "advanced_config": {"algorithm": "sqd", "samples_per_batch": 256, "num_batches": 4, "max_iterations": 4, "sampling_state_source": "vqe", "sampling_vqe_ansatz_name": "NumberPreserving", "sampling_vqe_optimizer_name": "COBYLA", "sampling_vqe_max_iterations": 128, "sampling_vqe_reps": 1, "sampling_vqe_seed": null, "energy_tol": 1e-4, "occupancies_tol": 1e-4, "min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 16}},
+    {"id": "skqd-noisy-reduced", "label": "SKQD noisy reduced", "algorithm": "skqd", "mode": "advanced", "advanced_config": {"algorithm": "skqd", "samples_per_state": 512, "base_sampling_options": {"min_selected_configurations": 2, "seed": null, "symmetrize_spin": false, "max_dim": 16}, "krylov_extension_dim": 1, "sampling_mode": "sample_union_exact", "time_step": 0.2, "trotter_steps": 1, "residual_tolerance": 1e-5}}
+  ],
+  "seeds": [11, 17, 23, 29, 41],
+  "basis_set": "sto-3g",
+  "backend": {"target": "aer_simulator", "options": {"shots": 4096, "aer_method": "automatic", "optimization_level": 1}},
+  "noise_profile": {"source": "custom_preset", "preset": "depolarizing_cx", "strength": 0.01},
+  "metadata": {"paper_section": "local_noise_sensitivity", "noise": "custom_depolarizing_cx_0.01", "reduced_algorithms": ["vqe", "sqd", "skqd"]}
+}

@@ -69,6 +69,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Save the API benchmark/run response payloads under raw/.",
     )
+    parser.add_argument(
+        "--recompute-eligibility",
+        action="store_true",
+        help=(
+            "Recompute narrowly supported legacy eligibility cases from raw API evidence. "
+            "Default exports preserve persisted decisions."
+        ),
+    )
     parser.add_argument("--timeout", type=float, default=30.0, help="HTTP timeout in seconds.")
     return parser.parse_args(argv)
 
@@ -95,6 +103,7 @@ def export_source(
     base_url: str = DEFAULT_BASE_URL,
     output_dir: Path,
     include_raw: bool = False,
+    recompute_eligibility: bool = False,
     timeout: float = 30.0,
     client: QssApiClient | None = None,
 ) -> dict[str, Any]:
@@ -107,6 +116,7 @@ def export_source(
             base_url=base_url,
             client=client or QssApiClient(base_url, timeout=timeout),
             include_raw=include_raw,
+            recompute_eligibility=recompute_eligibility,
         )
     else:
         bundle = load_folder_source(input_dir or Path("."))
@@ -135,6 +145,9 @@ def export_source(
         "summaries/by_algorithm.csv",
         "summaries/by_algorithm_path.csv",
         "summaries/by_molecule.csv",
+        "summaries/by_variant.csv",
+        "summaries/by_seed.csv",
+        "summaries/field_presence.csv",
         "summaries/best_algorithm_by_molecule.csv",
     ]
     if include_raw and bundle.source_type == "api":
@@ -174,6 +187,7 @@ def main(argv: list[str] | None = None) -> int:
             base_url=args.base_url,
             output_dir=_output_dir(args),
             include_raw=args.include_raw,
+            recompute_eligibility=args.recompute_eligibility,
             timeout=max(0.1, args.timeout),
         )
     except ExporterError as exc:

@@ -185,16 +185,14 @@ export function getBenchmarkBackendOptions(
       value: "aer_simulator_backend_noise",
       label: `Aer simulator with backend noise${pendingSuffix}`,
       warning: ibmEnabled
-        ? "Uses the selected IBM backend calibration as an Aer noise reference."
+        ? ""
         : ibmUnavailableReason,
       enabled: ibmEnabled,
     },
     {
       value: "ibm_runtime",
       label: `IBM Quantum backend${pendingSuffix}`,
-      warning: ibmEnabled
-        ? "Submits benchmark jobs to the selected IBM backend through the active profile."
-        : ibmUnavailableReason,
+      ...(ibmEnabled ? {} : { warning: ibmUnavailableReason }),
       enabled: ibmEnabled,
     },
   ];
@@ -311,6 +309,7 @@ export function normalizeStoredEntry(entry: BenchmarkEntry): BenchmarkEntry {
     mode,
     easyOptions: entry.easyOptions ?? null,
     advancedConfig: entry.advancedConfig ?? null,
+    energy: entry.energy ?? null,
     currentEnergy: entry.currentEnergy ?? entry.energy ?? null,
     elapsedSeconds: entry.elapsedSeconds ?? null,
     executionMetadata: entry.executionMetadata ?? null,
@@ -458,7 +457,7 @@ export function applyEntryUpdates(
         continue;
       }
 
-      map.set(id, {
+      const nextEntry = {
         ...existing,
         status,
         energy,
@@ -469,7 +468,21 @@ export function applyEntryUpdates(
         elapsedSeconds,
         executionMetadata: update.value.executionMetadata,
         latestEventSequence: Math.max(existing.latestEventSequence, latestEventSequence),
-      });
+      };
+      if (
+        existing.status === nextEntry.status &&
+        existing.energy === nextEntry.energy &&
+        existing.currentEnergy === nextEntry.currentEnergy &&
+        existing.converged === nextEntry.converged &&
+        existing.errorMessage === nextEntry.errorMessage &&
+        existing.elapsedSeconds === nextEntry.elapsedSeconds &&
+        existing.latestEventSequence === nextEntry.latestEventSequence &&
+        JSON.stringify(existing.classicalRefs) === JSON.stringify(nextEntry.classicalRefs) &&
+        JSON.stringify(existing.executionMetadata) === JSON.stringify(nextEntry.executionMetadata)
+      ) {
+        continue;
+      }
+      map.set(id, nextEntry);
     }
   }
   return Array.from(map.values());
@@ -483,7 +496,69 @@ export function effectiveRefs(entry: BenchmarkEntry): {
   if (entry.classicalRefs) {
     return { hf: entry.classicalRefs.hf, fci: entry.classicalRefs.fci, computed: true };
   }
-  return { hf: entry.preset.references.hf, fci: entry.preset.references.fci, computed: false };
+  const presetReferences = entry.preset.references;
+  const hf = presetReferences?.hf;
+  const fci = presetReferences?.fci;
+  return {
+    hf: typeof hf === "number" && Number.isFinite(hf) ? hf : 0,
+    fci: typeof fci === "number" && Number.isFinite(fci) ? fci : null,
+    computed: false,
+  };
+}
+
+export function getBenchmarkEligibility(entry: BenchmarkEntry): {
+  eligible: boolean;
+  reason: BenchmarkEligibilityReason | null;
+} {
+  if (entry.status !== "completed") {
+    return { eligible: false, reason: "not_completed" };
+  }
+
+  const metadata = entry.executionMetadata;
+  if (metadata?.benchmarkEligible === false) {
+    const directReason = metadata.benchmarkExclusionReason;
+    if (directReason === "projected_solve_diagnostic") {
+      return { eligible: false, reason: "projected_solve_diagnostic" };
+    }
+    if (directReason === "reported_energy_invalid") {
+      return { eligible: false, reason: "reported_energy_invalid" };
+    }
+    if (directReason === "reference_provenance_unavailable") {
+      return { eligible: false, reason: "reference_provenance_unavailable" };
+    }
+    return { eligible: false, reason: "scientific_convergence_not_established" };
+  }
+  if (metadata?.reportedEnergyIsValid === false) {
+    return { eligible: false, reason: "reported_energy_invalid" };
+  }
+  if (entry.classicalRefs === null) {
+    return { eligible: false, reason: "reference_provenance_unavailable" };
+  }
+  if (metadata?.projectedSolveIsDiagnostic === true) {
+    return { eligible: false, reason: "projected_solve_diagnostic" };
+  }
+  if (metadata?.scientificConverged === false || entry.converged === false) {
+    return { eligible: false, reason: "scientific_convergence_not_established" };
+  }
+
+  return { eligible: true, reason: null };
+}
+
+export function benchmarkEligibilityMessage(reason: BenchmarkEligibilityReason | null): string {
+  switch (reason) {
+    case "not_completed":
+      return "row is not completed";
+    case "reported_energy_invalid":
+      return "reported energy is invalid";
+    case "projected_solve_diagnostic":
+      return "projected solve is diagnostic only";
+    case "scientific_convergence_not_established":
+      return "scientific convergence was not established";
+    case "reference_provenance_unavailable":
+      return "runtime CASCI reference provenance is unavailable";
+    default:
+      return "reference or energy data is unavailable";
+  }
 }
 
 export function getBenchmarkEligibility(entry: BenchmarkEntry): {

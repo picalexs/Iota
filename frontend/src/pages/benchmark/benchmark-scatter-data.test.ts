@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CompletedPoint } from "./benchmark-scatter-data";
 import {
+  buildCompletedPoints,
   buildScatterAlgorithmOptions,
   buildScatterFamilyOptions,
   buildScatterMoleculeOptions,
@@ -8,6 +9,8 @@ import {
   reconcileHiddenFilters,
   toggleHiddenFilter,
 } from "./benchmark-scatter-data";
+import { BENCHMARK_MOLECULE_PRESETS } from "@/lib/benchmark-presets";
+import type { BenchmarkEntry } from "./benchmark-utils";
 
 const points: CompletedPoint[] = [
   {
@@ -58,6 +61,29 @@ const points: CompletedPoint[] = [
 ];
 
 describe("benchmark scatter data", () => {
+  it("uses the molecule name when a persisted preset omits its formula", () => {
+    const basePreset = BENCHMARK_MOLECULE_PRESETS[0];
+    if (!basePreset) throw new Error("Expected a benchmark preset");
+    const preset = { ...basePreset, formula: null } as unknown as typeof basePreset;
+    const entry = {
+      id: "h2:vqe",
+      preset,
+      algorithm: "vqe",
+      status: "completed",
+      moleculeId: null,
+      runId: null,
+      energy: -1.151,
+      currentEnergy: -1.151,
+      converged: true,
+      errorMessage: null,
+      classicalRefs: { hf: -1.11675, fci: -1.15164 },
+      elapsedSeconds: 1,
+      latestEventSequence: 0,
+    } satisfies BenchmarkEntry;
+
+    expect(buildCompletedPoints([{ preset, rows: [entry] }], 0.0016)).toHaveLength(1);
+  });
+
   it("deduplicates filter options in point order", () => {
     expect(buildScatterFamilyOptions(points)).toEqual([
       { value: "vqe", label: "VQE" },

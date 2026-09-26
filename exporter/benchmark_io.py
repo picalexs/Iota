@@ -7,6 +7,7 @@ import csv
 import hashlib
 import json
 import math
+import re
 import statistics
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -17,11 +18,15 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v2"
+EXPORT_SCHEMA_VERSION = "qss-benchmark-export.v6"
 CANONICAL_FIELDS = (
     "benchmark_id",
     "benchmark_name",
     "entry_id",
+    "variant_id",
+    "variant_label",
+    "variant_mode",
+    "variant_config_sha256",
     "run_id",
     "molecule_id",
     "molecule",
@@ -51,6 +56,7 @@ CANONICAL_FIELDS = (
     "seed_roles",
     "seed_algorithm",
     "seed_sampling",
+    "seed_reference",
     "seed_simulator",
     "seed_transpiler",
     "status",
@@ -70,8 +76,25 @@ CANONICAL_FIELDS = (
     "scientific_converged",
     "primary_energy_source",
     "convergence_failure_reason",
+    "termination_reason",
+    "convergence_value",
+    "convergence_threshold",
+    "basis_termination_reason",
+    "basis_rank",
+    "requested_basis_rank",
+    "full_space_dimension",
+    "basis_complete",
+    "full_space_residual_available",
+    "completeness_evidence",
+    "projected_solver_converged",
+    "projected_system_stable",
+    "selected_ci_fraction",
+    "full_sector_recovered",
+    "objective_evaluations",
+    "max_function_evaluations",
     "benchmark_eligible",
     "benchmark_exclusion_reason",
+    "eligibility_source",
     "error_message",
 )
 
@@ -290,42 +313,90 @@ def _parse_seed_roles(value: Any) -> list[str]:
     return [str(item) for item in _parse_list(value) if str(item).strip()]
 
 
+def _stable_config_value(value: Any) -> Any:
+    """Remove per-run identifiers before hashing a variant configuration."""
+    if isinstance(value, Mapping):
+        return {
+            str(key): _stable_config_value(item)
+            for key, item in sorted(value.items(), key=lambda item: str(item[0]))
+            if "seed" not in str(key).lower() and str(key).lower() not in {
+                "client_request_id",
+                "clientrequestid",
+            }
+        }
+    if isinstance(value, list):
+        return [_stable_config_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_stable_config_value(item) for item in value]
+    return value
+
+
+def _variant_config_sha256(config: Mapping[str, Any] | None) -> str | None:
+    if not config:
+        return None
+    payload = _stable_config_value(config)
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _variant_metadata(
+    *,
+    entry: Mapping[str, Any] | None,
+    config: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Extract stable variant metadata without using the seed-specific entry id."""
+    entry_record = _record(entry)
+    raw_id = _text(_first(entry_record, "variant_id", "variantId"))
+    raw_label = _text(_first(entry_record, "variant_label", "variantLabel"))
+    entry_id = _text(_first(entry_record, "id", "entry_id", "entryId"))
+
+    if raw_id is None and entry_id is not None:
+        match = re.search(r":([^:]+):seed=-?\d+$", entry_id)
+        if match:
+            raw_id = match.group(1)
+    if raw_id is not None:
+        raw_id = re.sub(r":seed=-?\d+$", "", raw_id)
+    if raw_label is not None:
+        raw_label = re.sub(r"\s+seed=-?\d+$", "", raw_label).strip()
+
+    return {
+        "variant_id": raw_id,
+        "variant_label": raw_label or raw_id,
+        "variant_mode": _text(_first(entry_record, "variant_mode", "variantMode", "mode")),
+        "variant_config_sha256": _variant_config_sha256(config),
+    }
+
+
 def _backend_name(config: Mapping[str, Any]) -> str | None:
     options = _record(_first(config, "backend_options", "backendOptions"))
     return _text(_first(options, "backend_name", "backendName"))
 
 
 def _config_seed(config: Mapping[str, Any], algorithm: str | None) -> tuple[int | None, list[str]]:
-    advanced = _record(_first(config, "advanced_config", "advancedConfig"))
     algorithm = (algorithm or "").lower()
-    roles: list[str] = []
-
-    if algorithm == "vqe" and _number(_first(advanced, "seed")) is not None:
-        roles.append("algorithm")
-        return _integer(_first(advanced, "seed")), roles
-
-    if algorithm == "sqd" and _number(_first(advanced, "seed")) is not None:
-        roles.append("sampling")
-        return _integer(_first(advanced, "seed")), roles
-
-    if algorithm == "skqd":
-        sampling = _record(_first(advanced, "base_sampling_options", "baseSamplingOptions"))
-        value = _first(sampling, "seed")
-        if _number(value) is not None:
-            roles.append("sampling")
-            return _integer(value), roles
-
-    backend_options = _record(_first(config, "backend_options", "backendOptions"))
-    simulator_seed = _first(backend_options, "seed_simulator", "seedSimulator")
-    if _number(simulator_seed) is not None:
-        roles.append("simulator")
-        return _integer(simulator_seed), roles
-
-    transpiler_seed = _first(backend_options, "seed_transpiler", "seedTranspiler")
-    if _number(transpiler_seed) is not None:
-        roles.append("transpiler")
-        return _integer(transpiler_seed), roles
-
+    seed_fields = _config_seeds(config, algorithm)
+    roles = [
+        role
+        for role, field_name in (
+            ("algorithm", "seed_algorithm"),
+            ("sampling", "seed_sampling"),
+            ("reference", "seed_reference"),
+            ("simulator", "seed_simulator"),
+            ("transpiler", "seed_transpiler"),
+        )
+        if seed_fields[field_name] is not None
+    ]
+    for role, field_name in (
+        ("algorithm", "seed_algorithm"),
+        ("sampling", "seed_sampling"),
+        ("reference", "seed_reference"),
+        ("simulator", "seed_simulator"),
+        ("transpiler", "seed_transpiler"),
+    ):
+        if seed_fields[field_name] is not None:
+            return seed_fields[field_name], roles
     return None, roles
 
 
@@ -336,13 +407,16 @@ def _config_seeds(config: Mapping[str, Any], algorithm: str | None) -> dict[str,
     algorithm_name = (algorithm or "").lower()
     sampling = _record(_first(advanced, "base_sampling_options", "baseSamplingOptions"))
     return {
-        "seed_algorithm": _integer(_first(advanced, "seed"))
-        if algorithm_name == "vqe"
-        else None,
-        "seed_sampling": _integer(
+        "seed_algorithm": _integer(
             _first(sampling, "seed") if algorithm_name == "skqd" else _first(advanced, "seed")
         )
-        if algorithm_name in {"sqd", "skqd"}
+        if algorithm_name in {"vqe", "sqd", "skqd"}
+        else None,
+        "seed_sampling": _integer(_first(advanced, "sampling_vqe_seed"))
+        if algorithm_name == "sqd"
+        else None,
+        "seed_reference": _integer(_first(advanced, "vqe_reference_seed"))
+        if algorithm_name == "qse"
         else None,
         "seed_simulator": _integer(_first(options, "seed_simulator", "seedSimulator")),
         "seed_transpiler": _integer(_first(options, "seed_transpiler", "seedTranspiler")),
@@ -352,10 +426,12 @@ def _config_seeds(config: Mapping[str, Any], algorithm: str | None) -> dict[str,
 def _benchmark_quality_fields(
     *,
     result: Mapping[str, Any] | None,
+    algorithm: str | None,
     status: str,
     final_energy: float | None,
     reference_energy: float | None,
     converged: bool | None,
+    recompute_eligibility: bool = False,
 ) -> dict[str, Any]:
     """Extract scientific eligibility without deleting diagnostic results."""
     result_record = _record(result)
@@ -373,10 +449,24 @@ def _benchmark_quality_fields(
         )
     )
     explicit_eligible = _boolean(
-        _first(provenance, "benchmark_eligible", "benchmarkEligible")
+        _first(
+            provenance,
+            "benchmark_eligible",
+            "benchmarkEligible",
+            default=_first(result_record, "benchmark_eligible", "benchmarkEligible"),
+        )
     )
     explicit_exclusion_reason = _text(
-        _first(provenance, "benchmark_exclusion_reason", "benchmarkExclusionReason")
+        _first(
+            provenance,
+            "benchmark_exclusion_reason",
+            "benchmarkExclusionReason",
+            default=_first(
+                result_record,
+                "benchmark_exclusion_reason",
+                "benchmarkExclusionReason",
+            ),
+        )
     )
 
     reported_valid = _boolean(
@@ -435,8 +525,80 @@ def _benchmark_quality_fields(
     )
     reference_method = _text(_first(reference, "method", "reference_method", "referenceMethod"))
     reference_status = _text(_first(reference, "validity_status", "validityStatus"))
+    matrix_element_summary = _record(
+        _first(metrics, "matrix_element_summary", "matrixElementSummary")
+    )
+    basis_selection = _record(
+        _first(matrix_element_summary, "basis_selection", "basisSelection")
+    )
+    conditioning_summary = _record(
+        _first(metrics, "conditioning_summary", "conditioningSummary")
+    )
+    relative_residual = _number(
+        _first(
+            metrics,
+            "relative_residual",
+            "relativeResidual",
+            default=_first(convergence, "convergence_value", "convergenceValue"),
+        )
+    )
+    residual_threshold = _number(
+        _first(
+            metrics,
+            "convergence_threshold",
+            "convergenceThreshold",
+            default=_first(convergence, "convergence_threshold", "convergenceThreshold"),
+        )
+    )
+    basis_termination_reason = _text(
+        _first(
+            basis_selection,
+            "basis_termination_reason",
+            "basisTerminationReason",
+            default=_first(
+                conditioning_summary,
+                "basis_termination_reason",
+                "basisTerminationReason",
+            ),
+        )
+    )
+    qse_pool_exhausted = (
+        recompute_eligibility
+        and algorithm == "qse"
+        and status == "completed"
+        and converged is True
+        and explicit_eligible is False
+        and explicit_exclusion_reason == "scientific_convergence_not_established"
+        and _text(_first(metrics, "execution_mode", "executionMode"))
+        != "measured_matrix_elements"
+        and diagnostic is not True
+        and reported_valid is True
+        and final_energy is not None
+        and reference_energy is not None
+        and reference_status == "valid"
+        and reference_method is not None
+        and reference_method.upper() == "CASCI"
+        and scientific is None
+        and _boolean(
+            _first(convergence, "projected_solver_converged", "projectedSolverConverged")
+        )
+        is True
+        and _boolean(
+            _first(convergence, "projected_system_stable", "projectedSystemStable")
+        )
+        is True
+        and relative_residual is not None
+        and residual_threshold is not None
+        and relative_residual <= residual_threshold
+        and basis_termination_reason == "candidate_pool_exhausted"
+        and _boolean(
+            _first(basis_selection, "selected_specs_complete", "selectedSpecsComplete")
+        )
+        is True
+    )
 
     reason: str | None = None
+    eligibility_source = "persisted" if explicit_eligible is not None else "derived"
     if status != "completed":
         reason = f"status_{status}"
     elif final_energy is None or reference_energy is None:
@@ -451,7 +613,12 @@ def _benchmark_quality_fields(
         reason = "reference_provenance_invalid"
     elif reference_method is not None and reference_method.upper() != "CASCI":
         reason = "reference_method_unsupported"
-    if explicit_eligible is not None:
+    if qse_pool_exhausted:
+        scientific = True
+        failure_reason = None
+        reason = None
+        eligibility_source = "compatibility_recomputed"
+    elif explicit_eligible is not None:
         reason = None if explicit_eligible else explicit_exclusion_reason or reason
 
     return {
@@ -473,6 +640,159 @@ def _benchmark_quality_fields(
         "convergence_failure_reason": failure_reason,
         "benchmark_eligible": reason is None,
         "benchmark_exclusion_reason": reason,
+        "eligibility_source": eligibility_source,
+    }
+
+
+def _benchmark_algorithm_diagnostic_fields(
+    result: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Extract convergence and resource diagnostics without retaining raw payloads."""
+    result_record = _record(result)
+    metrics = _record(_first(result_record, "algorithm_metrics", "algorithmMetrics"))
+    convergence = _record(_first(metrics, "convergence"))
+    optimizer = _record(_first(metrics, "optimizer_diagnostics", "optimizerDiagnostics"))
+    stability = _record(_first(metrics, "stability_summary", "stabilitySummary"))
+    orthogonality = _record(_first(metrics, "orthogonality_metrics", "orthogonalityMetrics"))
+    conditioning = _record(_first(metrics, "conditioning_summary", "conditioningSummary"))
+    matrix_summary = _record(_first(metrics, "matrix_element_summary", "matrixElementSummary"))
+    basis_selection = _record(_first(matrix_summary, "basis_selection", "basisSelection"))
+    krylov = _record(
+        _first(metrics, "krylov_extension_diagnostics", "krylovExtensionDiagnostics")
+    )
+    verdict = _record(_first(krylov, "convergence_verdict", "convergenceVerdict"))
+    extension_cost = _record(_first(krylov, "extension_cost", "extensionCost"))
+    sci_package = _record(_first(metrics, "sci_result_package", "sciResultPackage"))
+    selected_ci = _record(
+        _first(
+            sci_package,
+            "best_selected_ci",
+            "bestSelectedCi",
+            default=_first(sci_package, "selected_ci", "selectedCi"),
+        )
+    )
+
+    termination_reason = _first(
+        convergence,
+        "termination_reason",
+        "terminationReason",
+        default=_first(
+            optimizer,
+            "termination_reason",
+            "terminationReason",
+            default=_first(
+                stability,
+                "termination_reason",
+                "terminationReason",
+                default=_first(conditioning, "termination_reason", "terminationReason"),
+            ),
+        ),
+    )
+    basis_rank = _first(
+        metrics,
+        "krylov_rank",
+        "basis_rank",
+        default=_first(
+            orthogonality,
+            "basis_rank",
+            default=_first(
+                matrix_summary,
+                "projected_dimension",
+                default=_first(conditioning, "basis_rank"),
+            ),
+        ),
+    )
+    requested_basis_rank = _first(
+        basis_selection,
+        "requested_dimension_cap",
+        "requestedDimensionCap",
+        default=_first(
+            matrix_summary,
+            "requested_time_points",
+            "requestedTimePoints",
+            default=_first(extension_cost, "requested_dimension", "requestedDimension"),
+        ),
+    )
+    full_space_dimension = _first(
+        matrix_summary,
+        "full_space_dimension",
+        "fullSpaceDimension",
+    )
+    basis_complete = _first(matrix_summary, "basis_complete", "basisComplete")
+    full_space_residual_available = _first(
+        matrix_summary,
+        "full_space_residual_available",
+        "fullSpaceResidualAvailable",
+    )
+    completeness_evidence = _first(
+        convergence,
+        "completeness_evidence",
+        "completenessEvidence",
+    )
+    projected_solver_converged = _first(
+        convergence,
+        "projected_solver_converged",
+        "projectedSolverConverged",
+    )
+    projected_system_stable = _first(
+        convergence,
+        "projected_system_stable",
+        "projectedSystemStable",
+    )
+    selected_ci_fraction = _first(
+        verdict,
+        "selected_ci_fraction",
+        "selectedCiFraction",
+        default=_first(selected_ci, "selected_ci_fraction", "selectedCiFraction"),
+    )
+    full_sector_recovered = _first(
+        verdict,
+        "full_sector_recovered",
+        "fullSectorRecovered",
+    )
+    return {
+        "termination_reason": _text(termination_reason),
+        "convergence_value": _json_value(
+            _first(convergence, "convergence_value", "convergenceValue")
+        ),
+        "convergence_threshold": _json_value(
+            _first(convergence, "convergence_threshold", "convergenceThreshold")
+        ),
+        "basis_termination_reason": _text(
+            _first(
+                basis_selection,
+                "basis_termination_reason",
+                "basisTerminationReason",
+                default=_first(conditioning, "basis_termination_reason"),
+            )
+        ),
+        "basis_rank": _integer(basis_rank),
+        "requested_basis_rank": _integer(requested_basis_rank),
+        "full_space_dimension": _integer(full_space_dimension),
+        "basis_complete": _boolean(basis_complete),
+        "full_space_residual_available": _boolean(full_space_residual_available),
+        "completeness_evidence": _text(completeness_evidence),
+        "projected_solver_converged": _boolean(projected_solver_converged),
+        "projected_system_stable": _boolean(projected_system_stable),
+        "selected_ci_fraction": _number(selected_ci_fraction),
+        "full_sector_recovered": _boolean(full_sector_recovered),
+        "objective_evaluations": _integer(
+            _first(
+                optimizer,
+                "objective_evaluations",
+                "objectiveEvaluations",
+                default=_first(metrics, "objective_evaluations", "objectiveEvaluations"),
+            )
+        ),
+        "max_function_evaluations": _integer(
+            _first(
+                optimizer,
+                "effective_max_function_evaluations",
+                "effectiveMaxFunctionEvaluations",
+                "max_function_evaluations",
+                "maxFunctionEvaluations",
+            )
+        ),
     }
 
 
@@ -523,6 +843,7 @@ def normalize_api_row(
     benchmark: Mapping[str, Any],
     entry: Mapping[str, Any],
     run_export: Mapping[str, Any] | None,
+    recompute_eligibility: bool = False,
 ) -> tuple[dict[str, Any], str | None]:
     """Normalize one saved benchmark entry and optional run export."""
 
@@ -541,6 +862,7 @@ def normalize_api_row(
     algorithm = _text(_first(entry, "algorithm")) or _text(_first(run, "algorithm"))
     algorithm = algorithm.lower() if algorithm is not None else None
     config = _record(_first(run, "config_json", "configJson", "config"))
+    variant_fields = _variant_metadata(entry=entry, config=config)
     execution_fields = _benchmark_execution_fields(result=result, config=config)
     entry_seed = _first(entry, "seed")
     seed, inferred_roles = _config_seed(config, algorithm)
@@ -564,17 +886,21 @@ def normalize_api_row(
     converged = _boolean(_first(result, "converged"))
     quality_fields = _benchmark_quality_fields(
         result=result,
+        algorithm=algorithm,
         status=status,
         final_energy=final_energy,
         reference_energy=reference_energy,
         converged=converged,
+        recompute_eligibility=recompute_eligibility,
     )
+    diagnostic_fields = _benchmark_algorithm_diagnostic_fields(result)
     seed_fields = _config_seeds(config, algorithm)
 
     row = {
         "benchmark_id": benchmark_id,
         "benchmark_name": benchmark_name,
         "entry_id": entry_id,
+        **variant_fields,
         "run_id": _text(_first(entry, "runId", "run_id", "runId"))
         or _text(_first(run, "id")),
         "molecule_id": _text(_first(run, "molecule_id", "moleculeId"))
@@ -587,6 +913,7 @@ def normalize_api_row(
         "backend_target": _text(_first(run, "backend_target", "backendTarget")),
         "backend_name": _backend_name(config),
         **execution_fields,
+        **diagnostic_fields,
         **quality_fields,
         "seed": seed,
         "seed_roles": seed_roles,
@@ -655,11 +982,44 @@ def normalize_folder_row(
     converged = _boolean(_first(source, "converged"))
     quality_fields = _benchmark_quality_fields(
         result=source,
+        algorithm=algorithm.lower() if algorithm else None,
         status=status,
         final_energy=final_energy,
         reference_energy=reference_energy,
         converged=converged,
     )
+    # Canonical exports already contain the quality decision and provenance.
+    # Preserve those values instead of recomputing them from the compact row.
+    for field_name in (
+        "reference_method",
+        "reference_solver_path",
+        "reference_basis",
+        "reference_backend_target",
+        "reference_validity_status",
+        "reference_hamiltonian_sha256",
+        "primary_energy_source",
+        "convergence_failure_reason",
+        "benchmark_exclusion_reason",
+        "eligibility_source",
+    ):
+        value = _text(source.get(field_name))
+        if value is not None:
+            quality_fields[field_name] = value
+    if "reference_active_space" in source:
+        active_space = _parse_list(source.get("reference_active_space"))
+        if active_space:
+            quality_fields["reference_active_space"] = [
+                _integer(item) if _integer(item) is not None else item for item in active_space
+            ]
+    for field_name in (
+        "reported_energy_is_valid",
+        "projected_solve_is_diagnostic",
+        "scientific_converged",
+        "benchmark_eligible",
+    ):
+        value = _boolean(source.get(field_name))
+        if value is not None:
+            quality_fields[field_name] = value
     seed_fields = _config_seeds(source, algorithm)
     for field_name in seed_fields:
         explicit_seed = _number(_first(source, field_name))
@@ -667,21 +1027,65 @@ def normalize_folder_row(
             seed_fields[field_name] = _integer(explicit_seed)
 
     execution_fields = _benchmark_execution_fields(result=source, config=source)
-    for field in (
+    diagnostic_fields = _benchmark_algorithm_diagnostic_fields(source)
+    for field_name, parser in (
+        ("termination_reason", _text),
+        ("basis_termination_reason", _text),
+        ("basis_rank", _integer),
+        ("requested_basis_rank", _integer),
+        ("full_space_dimension", _integer),
+        ("basis_complete", _boolean),
+        ("full_space_residual_available", _boolean),
+        ("completeness_evidence", _text),
+        ("projected_solver_converged", _boolean),
+        ("projected_system_stable", _boolean),
+        ("selected_ci_fraction", _number),
+        ("full_sector_recovered", _boolean),
+        ("objective_evaluations", _integer),
+        ("max_function_evaluations", _integer),
+    ):
+        if field_name in source:
+            diagnostic_fields[field_name] = parser(source.get(field_name))
+    for field_name in ("convergence_value", "convergence_threshold"):
+        if field_name in source:
+            diagnostic_fields[field_name] = _json_value(source.get(field_name))
+    integer_execution_fields = {
         "requested_shots",
         "effective_shots",
+        "sampler_requested_shots_total",
+    }
+    numeric_execution_fields = {
         "requested_estimator_precision",
         "effective_estimator_precision",
+    }
+    text_execution_fields = {
         "measurement_mode",
         "simulator_method",
         "noise_source",
         "noise_fingerprint",
         "actual_execution_target",
         "actual_path_class",
-        "sampler_requested_shots_total",
-    ):
+    }
+    for field in integer_execution_fields:
         if field in source:
-            execution_fields[field] = source.get(field)
+            execution_fields[field] = _integer(source.get(field))
+    for field in numeric_execution_fields:
+        if field in source:
+            execution_fields[field] = _number(source.get(field))
+    for field in text_execution_fields:
+        if field in source:
+            execution_fields[field] = _text(source.get(field))
+
+    variant_fields = _variant_metadata(entry=source, config=None)
+    for field_name in (
+        "variant_id",
+        "variant_label",
+        "variant_mode",
+        "variant_config_sha256",
+    ):
+        value = _text(source.get(field_name))
+        if value is not None:
+            variant_fields[field_name] = value
 
     canonical = {
         "benchmark_id": _text(_first(source, "benchmark_id", "benchmarkId"))
@@ -689,6 +1093,7 @@ def normalize_folder_row(
         "benchmark_name": _text(_first(source, "benchmark_name", "benchmarkName"))
         or _text(_first(benchmark, "name")),
         "entry_id": entry_id,
+        **variant_fields,
         "run_id": run_id,
         "molecule_id": _text(_first(source, "molecule_id", "moleculeId")),
         "molecule": molecule,
@@ -698,6 +1103,7 @@ def normalize_folder_row(
         "backend_target": _text(_first(source, "backend_target", "backendTarget")),
         "backend_name": _text(_first(source, "backend_name", "backendName")),
         **execution_fields,
+        **diagnostic_fields,
         **quality_fields,
         "seed": _integer(_first(source, "seed")),
         "seed_roles": _parse_seed_roles(_first(source, "seed_roles", "seedRoles")),
@@ -823,6 +1229,37 @@ def _find_folder_rows(input_dir: Path) -> Path:
     raise ExporterError(f"No benchmark rows found in {input_dir}; expected {expected}")
 
 
+def _campaign_variants(campaign: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Index campaign variants for folders that retain the campaign manifest."""
+    result: dict[str, dict[str, Any]] = {}
+    for item in _parse_list(campaign.get("algorithms")):
+        if not isinstance(item, Mapping):
+            continue
+        algorithm = _text(item.get("algorithm")) or "algorithm"
+        explicit = _text(item.get("id", item.get("variant_id", item.get("variantId"))))
+        mode = _text(item.get("mode")) or ("advanced" if item.get("advanced_config") else "easy")
+        key = explicit or f"{algorithm}-{mode}"
+        key = re.sub(r"[^a-z0-9]+", "-", key.lower()).strip("-") or "algorithm"
+        result[key] = {
+            "variant_id": key,
+            "variant_label": _text(item.get("label")) or key,
+            "variant_mode": mode,
+            "variant_config_sha256": _variant_config_sha256(
+                _record(item.get("advanced_config"))
+            ),
+        }
+    return result
+
+
+def _load_campaign_manifest(input_dir: Path) -> dict[str, Any]:
+    for candidate in (input_dir / "campaign.json", input_dir.parent / "campaign.json"):
+        if candidate.is_file():
+            value = _read_json(candidate)
+            if isinstance(value, Mapping):
+                return dict(value)
+    return {}
+
+
 def compact_benchmark(benchmark: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key in (
@@ -860,6 +1297,13 @@ def compact_benchmark(benchmark: Mapping[str, Any]) -> dict[str, Any]:
         for key in (
             "id",
             "algorithm",
+            "variant_id",
+            "variantId",
+            "variant_label",
+            "variantLabel",
+            "variant_mode",
+            "variantMode",
+            "mode",
             "status",
             "moleculeId",
             "molecule_id",
@@ -890,6 +1334,14 @@ def load_folder_source(input_dir: Path) -> SourceBundle:
         raise ExporterError(f"Expected an object in {benchmark_path}")
 
     rows_path = _find_folder_rows(input_dir)
+    campaign = _load_campaign_manifest(input_dir)
+    campaign_variants = _campaign_variants(campaign)
+    benchmark_entries = {
+        str(item.get("id", item.get("entry_id", item.get("entryId")))): item
+        for item in _parse_list(benchmark.get("entries"))
+        if isinstance(item, Mapping)
+        and item.get("id", item.get("entry_id", item.get("entryId"))) is not None
+    }
     raw_rows = (
         _submission_rows(rows_path, benchmark)
         if rows_path.name == "submission.json"
@@ -898,7 +1350,18 @@ def load_folder_source(input_dir: Path) -> SourceBundle:
     rows: list[dict[str, Any]] = []
     runtime_sources: Counter[str] = Counter()
     for index, raw_row in enumerate(raw_rows):
-        normalized, runtime_source = normalize_folder_row(raw_row, benchmark=benchmark, index=index)
+        enriched = dict(raw_row)
+        entry_id = _text(_first(enriched, "entry_id", "entryId"))
+        entry = benchmark_entries.get(entry_id or "")
+        if entry is not None:
+            for field in ("variant_id", "variantId", "variant_label", "variantLabel", "variant_mode", "variantMode", "mode"):
+                if field not in enriched and field in entry:
+                    enriched[field] = entry[field]
+        normalized_variant = _variant_metadata(entry=enriched, config=None)
+        variant_key = normalized_variant.get("variant_id")
+        if variant_key in campaign_variants:
+            enriched.update(campaign_variants[variant_key])
+        normalized, runtime_source = normalize_folder_row(enriched, benchmark=benchmark, index=index)
         rows.append(normalized)
         if runtime_source:
             runtime_sources[runtime_source] += 1
@@ -922,15 +1385,19 @@ class QssApiClient:
         base_url: str,
         *,
         timeout: float = 30.0,
+        operator_token: str | None = None,
         opener: Callable[..., Any] | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.operator_token = operator_token.strip() if operator_token else None
         self._opener = opener or urlopen
 
     def request(self, method: str, path: str, payload: Mapping[str, Any] | None = None) -> Any:
         body = None
         headers = {"Accept": "application/json"}
+        if self.operator_token:
+            headers["X-Local-Operator-Token"] = self.operator_token
         if payload is not None:
             body = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"
@@ -981,6 +1448,7 @@ def load_api_source(
     base_url: str,
     client: QssApiClient | None = None,
     include_raw: bool = False,
+    recompute_eligibility: bool = False,
 ) -> SourceBundle:
     api = client or QssApiClient(base_url)
     raw_benchmark = api.get(f"/api/benchmarks/{benchmark_id}")
@@ -1006,6 +1474,7 @@ def load_api_source(
             benchmark=benchmark,
             entry=entry,
             run_export=run_export,
+            recompute_eligibility=recompute_eligibility,
         )
         if normalized["entry_id"] == "entry-unknown":
             normalized["entry_id"] = f"entry:{index:04d}"
@@ -1047,28 +1516,35 @@ def source_signature(rows: Iterable[Mapping[str, Any]]) -> str:
 
 
 def _successful_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    return [
-        row
-        for row in rows
-        if _benchmark_row_is_eligible(row)
-        and _number(row.get("absolute_error")) is not None
-    ]
+    """Return completed rows with finite terminal energy data.
+
+    The name is retained for the compact-export API. It does not imply a
+    convergence or scientific-eligibility decision.
+    """
+
+    return _observed_rows(rows)
 
 
-def _benchmark_row_is_eligible(row: Mapping[str, Any]) -> bool:
-    """Return whether a row may contribute to benchmark comparisons."""
-    explicit = row.get("benchmark_eligible")
-    if isinstance(explicit, bool):
-        return explicit
-    if str(row.get("status") or "").lower() not in SUCCESS_STATUSES:
-        return False
-    if row.get("reported_energy_is_valid") is False:
-        return False
-    if row.get("projected_solve_is_diagnostic") is True:
-        return False
-    if row.get("scientific_converged") is False or row.get("converged") is False:
-        return False
-    return True
+def _observed_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Return completed rows with a finite, reportable terminal energy error.
+
+    Scientific eligibility is intentionally not part of this predicate. A row
+    can be useful for terminal accuracy and runtime analysis even when it did
+    not satisfy the convergence contract.
+    """
+
+    observed: list[Mapping[str, Any]] = []
+    for row in rows:
+        if str(row.get("status") or "").lower() not in SUCCESS_STATUSES:
+            continue
+        absolute_error = _number(row.get("absolute_error"))
+        if absolute_error is None:
+            final_energy = _number(row.get("final_energy"))
+            reference_energy = _number(row.get("reference_energy"))
+            if final_energy is None or reference_energy is None:
+                continue
+        observed.append(row)
+    return observed
 
 
 def _group_summary(rows: list[Mapping[str, Any]], key: str) -> list[dict[str, Any]]:
@@ -1079,16 +1555,16 @@ def _group_summary(rows: list[Mapping[str, Any]], key: str) -> list[dict[str, An
     summaries: list[dict[str, Any]] = []
     for group, group_rows in sorted(groups.items()):
         successful = _successful_rows(group_rows)
-        errors = [float(row["absolute_error"]) for row in successful if row.get("absolute_error") is not None]
+        errors = [
+            abs(float(row["absolute_error"]))
+            if _number(row.get("absolute_error")) is not None
+            else abs(float(row["final_energy"]) - float(row["reference_energy"]))
+            for row in successful
+        ]
         runtimes = [
             float(row["runtime_seconds"])
             for row in successful
-            if _number(row.get("runtime_seconds")) is not None
-        ]
-        convergence = [
-            bool(row["converged"])
-            for row in successful
-            if isinstance(row.get("converged"), bool)
+            if _number(row.get("runtime_seconds")) is not None and float(row["runtime_seconds"]) > 0
         ]
         summaries.append(
             {
@@ -1099,14 +1575,14 @@ def _group_summary(rows: list[Mapping[str, Any]], key: str) -> list[dict[str, An
                 "mean_absolute_error": statistics.mean(errors) if errors else None,
                 "median_absolute_error": statistics.median(errors) if errors else None,
                 "mean_runtime_seconds": statistics.mean(runtimes) if runtimes else None,
-                "convergence_rate": statistics.mean(convergence) if convergence else None,
+                "median_runtime_seconds": statistics.median(runtimes) if runtimes else None,
             }
         )
     return summaries
 
 
 def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
-    """Build compact summaries with explicit valid-value denominators."""
+    """Build compact summaries over completed finite terminal results."""
 
     successful = _successful_rows(rows)
     by_algorithm = _group_summary(rows, "algorithm")
@@ -1150,13 +1626,24 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
             )
 
     status_counts = Counter(str(row.get("status") or "missing") for row in rows)
+    field_presence = [
+        {
+            "field": field,
+            "present_count": sum(row.get(field) is not None for row in rows),
+            "missing_count": sum(row.get(field) is None for row in rows),
+        }
+        for field in CANONICAL_FIELDS
+    ]
     return {
         "row_count": len(rows),
         "successful_result_count": len(successful),
         "status_counts": dict(sorted(status_counts.items())),
+        "field_presence": field_presence,
         "by_algorithm": by_algorithm,
         "by_algorithm_path": by_algorithm_path,
         "by_molecule": by_molecule,
+        "by_variant": _group_summary(rows, "variant_id"),
+        "by_seed": _group_summary(rows, "seed"),
         "best_algorithm_by_molecule": best,
     }
 
@@ -1267,6 +1754,9 @@ def write_summary_files(summary: Mapping[str, Any], output_dir: Path) -> None:
     write_records_csv(summary["by_algorithm"], summaries_dir / "by_algorithm.csv")
     write_records_csv(summary["by_algorithm_path"], summaries_dir / "by_algorithm_path.csv")
     write_records_csv(summary["by_molecule"], summaries_dir / "by_molecule.csv")
+    write_records_csv(summary["by_variant"], summaries_dir / "by_variant.csv")
+    write_records_csv(summary["by_seed"], summaries_dir / "by_seed.csv")
+    write_records_csv(summary["field_presence"], summaries_dir / "field_presence.csv")
     write_records_csv(
         summary["best_algorithm_by_molecule"],
         summaries_dir / "best_algorithm_by_molecule.csv",

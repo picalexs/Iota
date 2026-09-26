@@ -60,6 +60,16 @@ export function BenchmarkPage() {
     setSelectedBackendMode,
     selectedBackendName,
     setSelectedBackendName,
+    shots,
+    setShots,
+    optimizationLevel,
+    setOptimizationLevel,
+    seedTranspiler,
+    setSeedTranspiler,
+    dynamicalDecoupling,
+    setDynamicalDecoupling,
+    twirling,
+    setTwirling,
     ensureBackendCapabilitiesLoaded,
     backendOptions,
     ibmBackends,
@@ -241,6 +251,11 @@ export function BenchmarkPage() {
         selectedBasis={selectedBasis}
         selectedBackendMode={selectedBackendMode}
         selectedBackendName={selectedBackendName}
+        shots={shots}
+        optimizationLevel={optimizationLevel}
+        seedTranspiler={seedTranspiler}
+        dynamicalDecoupling={dynamicalDecoupling}
+        twirling={twirling}
         backendOptions={backendOptions}
         ibmBackends={ibmBackends}
         backendSelectionRequired={backendSelectionRequired}
@@ -276,6 +291,11 @@ export function BenchmarkPage() {
         onBasisChange={setSelectedBasis}
         onBackendModeChange={setSelectedBackendMode}
         onBackendNameChange={setSelectedBackendName}
+        onShotsChange={setShots}
+        onOptimizationLevelChange={setOptimizationLevel}
+        onSeedTranspilerChange={setSeedTranspiler}
+        onDynamicalDecouplingChange={setDynamicalDecoupling}
+        onTwirlingChange={setTwirling}
         onBackendOptionsOpen={ensureBackendCapabilitiesLoaded}
         onChemicalAccuracyChange={setChemicalAccuracyHa}
         onAddCustomMolecule={handleAddCustomMolecule}

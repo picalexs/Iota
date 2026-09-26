@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type MouseEvent } from "react";
+import { memo, type KeyboardEvent, type MouseEvent, useCallback } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2, Clock, Loader2, Pause, XCircle } from "lucide-react";
 import {
@@ -13,13 +13,10 @@ import { containerSurfaceClassName } from "@/lib/interactive-styles";
 import type { MoleculePreset } from "@/lib/benchmark-presets";
 import { formatDuration } from "@/lib/format-duration";
 import { isTimedOutFailureMessage } from "@/lib/run-failure";
+import { assessChemicalAccuracy } from "@/lib/results/accuracy";
 import { cn } from "@/lib/utils";
 import type { BenchmarkEntry } from "./benchmark-utils";
-import {
-  assessBenchmarkEntry,
-  benchmarkEligibilityMessage,
-  getBenchmarkEligibility,
-} from "./benchmark-utils";
+import { effectiveRefs } from "./benchmark-utils";
 import { BenchmarkMoleculeActions } from "./benchmark-molecule-actions";
 import {
   BenchmarkResultRowActions,
@@ -123,7 +120,7 @@ function benchmarkStatusIndicator(entry: BenchmarkEntry) {
 function EnergyCell({ entry }: { entry: BenchmarkEntry }) {
   const { energy, status } = entry;
   const displayEnergy = status === "completed" ? energy : entry.currentEnergy;
-  if (displayEnergy === null) {
+  if (displayEnergy == null) {
     return <span className="text-muted-foreground">-</span>;
   }
   return (
@@ -189,6 +186,17 @@ function ExecutionPathCell({ entry }: { entry: BenchmarkEntry }) {
   );
 }
 
+function assessDisplayedAccuracy(entry: BenchmarkEntry, chemicalAccuracyHa: number) {
+  const refs = effectiveRefs(entry);
+  return assessChemicalAccuracy({
+    energy: entry.energy,
+    hf: refs.hf,
+    fci: refs.fci,
+    thresholdHa: chemicalAccuracyHa,
+    converged: entry.converged,
+  });
+}
+
 function ChemicalAccuracyCell({
   entry,
   chemicalAccuracyHa,
@@ -213,7 +221,7 @@ function ChemicalAccuracyCell({
   if (entry.status !== "completed") {
     return <StatusIndicator icon={Clock} label="Pending" iconClassName="text-muted-foreground" />;
   }
-  const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
+  const assessment = assessDisplayedAccuracy(entry, chemicalAccuracyHa);
   if (!assessment.isScorable) {
     const eligibility = getBenchmarkEligibility(entry);
     const message = benchmarkEligibilityMessage(eligibility.reason);
@@ -224,7 +232,7 @@ function ChemicalAccuracyCell({
           label=""
           showLabel={false}
           iconClassName="text-muted-foreground"
-          ariaLabel={`Chemical accuracy unavailable: ${message}`}
+          ariaLabel="Chemical accuracy unavailable: reference or energy data is unavailable"
         />
         <span className="text-xs text-muted-foreground">-</span>
       </div>
@@ -267,7 +275,7 @@ function completedAccuracyState(
   chemicalAccuracyHa: number,
 ): "green" | "amber" | "red" | null {
   if (entry.status !== "completed" || entry.energy === null) return null;
-  const assessment = assessBenchmarkEntry(entry, chemicalAccuracyHa);
+  const assessment = assessDisplayedAccuracy(entry, chemicalAccuracyHa);
   switch (assessment.verdict) {
     case "accurate":
       return "green";
@@ -283,7 +291,13 @@ function getDisplayReferences({ preset, rows }: BenchmarkGroupedRows) {
   if (runtimeReferences) {
     return { ...runtimeReferences, label: "CASCI active-space" };
   }
-  return { ...preset.references, label: "Preset reference" };
+  const presetHf = preset.references?.hf;
+  const presetFci = preset.references?.fci;
+  return {
+    hf: typeof presetHf === "number" && Number.isFinite(presetHf) ? presetHf : 0,
+    fci: typeof presetFci === "number" && Number.isFinite(presetFci) ? presetFci : null,
+    label: "Preset reference",
+  };
 }
 
 function runRowClassName({
@@ -314,7 +328,7 @@ function isRowInteractiveTarget(target: EventTarget | null): boolean {
   );
 }
 
-function BenchmarkResultRow({
+const BenchmarkResultRow = memo(function BenchmarkResultRow({
   entry,
   chemicalAccuracyHa,
   pendingAction = null,
@@ -413,7 +427,7 @@ function BenchmarkResultRow({
       </TableCell>
     </TableRow>
   );
-}
+});
 
 function BenchmarkResultGroup({
   preset,
@@ -506,10 +520,10 @@ export function BenchmarkResultsTable({
   onBeforeOpenRun,
 }: BenchmarkResultsTableProps) {
   const navigate = useNavigate();
-  const openRun: OpenRunHandler = (runId) => {
+  const openRun = useCallback<OpenRunHandler>((runId) => {
     onBeforeOpenRun?.();
     void navigate({ to: "/runs/$runId", params: { runId } });
-  };
+  }, [navigate, onBeforeOpenRun]);
 
   if (grouped.length === 0) {
     return (
