@@ -475,7 +475,13 @@ def _plot_population(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
         bottom = [left + value for left, value in zip(bottom, values)]
     ax.set_ylabel("Rows")
     ax.set_xticks(positions, labels)
-    ax.legend(ncol=2, frameon=False, loc="upper left")
+    ax.legend(
+        ncol=1,
+        frameon=False,
+        loc="lower left",
+        bbox_to_anchor=(0, 1.01),
+        borderaxespad=0,
+    )
     ax.grid(axis="y", alpha=0.25)
     return _save(fig, output_dir, "campaign_populations", fmt)
 
@@ -801,7 +807,7 @@ def _plot_accuracy_runtime(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
         ax.set_yscale("symlog", linthresh=0.01)
         ax.set_ylim(bottom=0)
         ax.set_xlabel("Runtime (s)")
-        ax.set_ylabel("Absolute error (mHa)")
+        ax.set_ylabel("Absolute error (mHa)" if panel_index % 3 == 0 else "")
         ax.grid(alpha=0.22, which="both")
         _panel_label(ax, f"({chr(97 + panel_index)}) {title}")
         if not panel_rows:
@@ -816,14 +822,14 @@ def _plot_accuracy_runtime(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
         loc="lower center",
         ncol=4,
         frameon=False,
-        bbox_to_anchor=(0.5, 0.01),
+        bbox_to_anchor=(0.5, 0.025),
     )
     fig.subplots_adjust(
         left=0.10,
         right=0.98,
-        bottom=0.14,
-        top=0.90,
-        hspace=0.42,
+        bottom=0.19,
+        top=0.88,
+        hspace=0.50,
         wspace=0.28,
     )
     return _save(fig, output_dir, "accuracy_runtime", fmt)
@@ -853,11 +859,11 @@ def _plot_paths(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> li
         bottom = [left + value for left, value in zip(bottom, values)]
     ax.set_ylabel("Rows")
     ax.set_xticks(positions, [_wrap_label(key, 11) for key, _ in grouped])
-    fig.subplots_adjust(left=0.10, right=0.98, bottom=0.40, top=0.98)
+    fig.subplots_adjust(left=0.10, right=0.98, bottom=0.33, top=0.98)
     fig.legend(
         frameon=False,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.01),
+        bbox_to_anchor=(0.5, 0.02),
         ncol=3,
         fontsize=6.5,
     )
