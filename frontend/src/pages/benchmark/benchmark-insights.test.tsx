@@ -938,7 +938,7 @@ describe("BenchmarkInsights", () => {
       expect(container.querySelectorAll("[data-scatter-point]")).toHaveLength(0);
     });
     expect(
-      screen.getByText(/no completed scored rows match the current chart filters/i),
+      screen.getByText(/no completed rows match the current chart filters/i),
     ).toBeInTheDocument();
 
     const allFamiliesOptionAgain = (await screen.findAllByText("All families")).find(

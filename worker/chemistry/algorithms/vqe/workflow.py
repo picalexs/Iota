@@ -286,10 +286,32 @@ def _select_initial_point_or_limit_result(
     initial_point_diagnostics: dict[str, Any],
     sector_diagnostics_fn: Callable[[np.ndarray], dict[str, Any]] | None,
 ) -> tuple[np.ndarray, dict[str, Any]] | VQEResult:
+    effective_candidates = candidate_points
+    effective_initial_point_diagnostics = initial_point_diagnostics
+    max_function_evaluations = objective.max_function_evaluations
+    remaining_evaluations = (
+        max_function_evaluations - objective.evaluation_count
+        if max_function_evaluations is not None
+        else None
+    )
+    if (
+        remaining_evaluations is not None
+        and len(candidate_points) > 1
+        and remaining_evaluations <= len(candidate_points)
+    ):
+        # Keep at least one evaluation for the optimizer. This preserves the
+        # configured total budget without letting warm-start selection consume it.
+        effective_candidates = candidate_points[:1]
+        effective_initial_point_diagnostics = {
+            **initial_point_diagnostics,
+            "initial_point_selection_evaluations": 0,
+            "initial_point_candidates_effective": 1,
+            "initial_point_selection_skipped_due_budget": True,
+        }
     try:
         initial_point, selected_initial_diagnostics = _select_initial_point(
             objective=objective,
-            candidates=candidate_points,
+            candidates=effective_candidates,
         )
     except FunctionEvaluationLimitReached as exc:
         return _build_vqe_initial_point_limit_result(
@@ -298,7 +320,7 @@ def _select_initial_point_or_limit_result(
             optimizer_name=optimizer_name,
             reps=reps,
             optimizer_diagnostics=optimizer_diagnostics,
-            initial_point_diagnostics=initial_point_diagnostics,
+            initial_point_diagnostics=effective_initial_point_diagnostics,
             best_point=objective.best_point,
             best_energy=objective.best_energy,
             candidate_points=candidate_points,
@@ -309,7 +331,7 @@ def _select_initial_point_or_limit_result(
         )
     merged_diagnostics = {
         **optimizer_diagnostics,
-        **initial_point_diagnostics,
+        **effective_initial_point_diagnostics,
         **selected_initial_diagnostics,
     }
     return initial_point, merged_diagnostics

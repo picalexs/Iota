@@ -16,6 +16,19 @@ BenchmarkBackendMode = Literal[
     "aer_simulator_backend_noise",
     "ibm_runtime",
 ]
+BenchmarkRunHistoryStatus = Literal[
+    "draft",
+    "running",
+    "paused",
+    "finished",
+    "partial",
+    "failed",
+    "cancelled",
+    "planned",
+    "excluded",
+]
+BenchmarkRunSortField = Literal["name", "rows", "backend", "updated", "status"]
+BenchmarkRunSortOrder = Literal["asc", "desc"]
 
 
 class BenchmarkRunBase(BaseModel):
@@ -71,6 +84,31 @@ class BenchmarkRunBase(BaseModel):
         max_length=255,
         validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
         serialization_alias="selectedBackendName",
+    )
+    shots: int = Field(4096, ge=1, le=1_000_000)
+    optimization_level: int = Field(
+        1,
+        ge=0,
+        le=3,
+        validation_alias=AliasChoices("optimizationLevel", "optimization_level"),
+        serialization_alias="optimizationLevel",
+    )
+    seed_transpiler: int | None = Field(
+        None,
+        ge=0,
+        le=2**32 - 1,
+        validation_alias=AliasChoices("seedTranspiler", "seed_transpiler"),
+        serialization_alias="seedTranspiler",
+    )
+    dynamical_decoupling: bool = Field(
+        False,
+        validation_alias=AliasChoices("dynamicalDecoupling", "dynamical_decoupling"),
+        serialization_alias="dynamicalDecoupling",
+    )
+    twirling: bool = Field(
+        False,
+        validation_alias=AliasChoices("twirling"),
+        serialization_alias="twirling",
     )
     chemical_accuracy_ha: float = Field(
         1.6e-3,
@@ -149,6 +187,31 @@ class BenchmarkRunUpdate(BaseModel):
         validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
         serialization_alias="selectedBackendName",
     )
+    shots: int | None = Field(None, ge=1, le=1_000_000)
+    optimization_level: int | None = Field(
+        None,
+        ge=0,
+        le=3,
+        validation_alias=AliasChoices("optimizationLevel", "optimization_level"),
+        serialization_alias="optimizationLevel",
+    )
+    seed_transpiler: int | None = Field(
+        None,
+        ge=0,
+        le=2**32 - 1,
+        validation_alias=AliasChoices("seedTranspiler", "seed_transpiler"),
+        serialization_alias="seedTranspiler",
+    )
+    dynamical_decoupling: bool | None = Field(
+        None,
+        validation_alias=AliasChoices("dynamicalDecoupling", "dynamical_decoupling"),
+        serialization_alias="dynamicalDecoupling",
+    )
+    twirling: bool | None = Field(
+        None,
+        validation_alias=AliasChoices("twirling"),
+        serialization_alias="twirling",
+    )
     chemical_accuracy_ha: float | None = Field(
         None,
         gt=0.0,
@@ -177,6 +240,77 @@ class BenchmarkRunListResponse(BaseModel):
     """Paginated benchmark batch response."""
 
     items: list[BenchmarkRunResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class BenchmarkRunSummaryResponse(BaseModel):
+    """Compact benchmark batch response for history lists."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: UUID
+    name: str
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+    selected_molecule_keys: list[str] = Field(
+        validation_alias=AliasChoices("selectedMoleculeKeys", "selected_molecule_keys"),
+        serialization_alias="selectedMoleculeKeys",
+    )
+    selected_basis: str = Field(
+        validation_alias=AliasChoices("selectedBasis", "selected_basis"),
+        serialization_alias="selectedBasis",
+    )
+    selected_backend_mode: BenchmarkBackendMode = Field(
+        validation_alias=AliasChoices("selectedBackendMode", "selected_backend_mode"),
+        serialization_alias="selectedBackendMode",
+    )
+    selected_backend_name: str | None = Field(
+        None,
+        validation_alias=AliasChoices("selectedBackendName", "selected_backend_name"),
+        serialization_alias="selectedBackendName",
+    )
+    status: BenchmarkRunHistoryStatus
+    row_count: int = Field(validation_alias=AliasChoices("rowCount", "row_count"), serialization_alias="rowCount")
+    completed_count: int = Field(
+        validation_alias=AliasChoices("completedCount", "completed_count"),
+        serialization_alias="completedCount",
+    )
+    active_count: int = Field(
+        validation_alias=AliasChoices("activeCount", "active_count"),
+        serialization_alias="activeCount",
+    )
+    paused_count: int = Field(
+        validation_alias=AliasChoices("pausedCount", "paused_count"),
+        serialization_alias="pausedCount",
+    )
+    failed_count: int = Field(
+        validation_alias=AliasChoices("failedCount", "failed_count"),
+        serialization_alias="failedCount",
+    )
+    cancelled_count: int = Field(
+        validation_alias=AliasChoices("cancelledCount", "cancelled_count"),
+        serialization_alias="cancelledCount",
+    )
+    planned_count: int = Field(
+        validation_alias=AliasChoices("plannedCount", "planned_count"),
+        serialization_alias="plannedCount",
+    )
+    excluded_count: int = Field(
+        validation_alias=AliasChoices("excludedCount", "excluded_count"),
+        serialization_alias="excludedCount",
+    )
+    associated_run_count: int = Field(
+        validation_alias=AliasChoices("associatedRunCount", "associated_run_count"),
+        serialization_alias="associatedRunCount",
+    )
+
+
+class BenchmarkRunSummaryListResponse(BaseModel):
+    """Paginated compact benchmark batch response."""
+
+    items: list[BenchmarkRunSummaryResponse]
     total: int
     limit: int
     offset: int

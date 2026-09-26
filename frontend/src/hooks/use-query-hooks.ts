@@ -11,7 +11,7 @@ import type {
   RunConfigMetadataResponse,
   UUID,
 } from "@/types/run";
-import type { BenchmarkRunListResponse } from "@/api/benchmarks";
+import type { BenchmarkRunListResponse, BenchmarkRunSummaryListResponse } from "@/api/benchmarks";
 import { fetchAllPages } from "./pagination";
 import { DEFAULT_QUERY_OPTIONS, keepPreviousQueryData } from "./query-options";
 import { benchmarkKeys, configKeys, moleculeKeys, runKeys } from "./query-keys";
@@ -71,6 +71,21 @@ export function useListBenchmarkRuns(
     queryFn: () => fetcher(params),
     ...DEFAULT_QUERY_OPTIONS,
     refetchOnMount: "always",
+    placeholderData: keepPreviousQueryData,
+  });
+}
+
+export function useListBenchmarkRunSummaries<TParams extends object>(
+  fetcher: (params?: TParams) => Promise<BenchmarkRunSummaryListResponse>,
+  params?: TParams,
+) {
+  return useQuery({
+    queryKey: benchmarkKeys.summaryList(params),
+    queryFn: () => fetcher(params),
+    ...DEFAULT_QUERY_OPTIONS,
+    refetchOnMount: "always",
+    refetchInterval: (query) =>
+      query.state.data?.items.some((summary) => summary.activeCount > 0) ? 3000 : false,
     placeholderData: keepPreviousQueryData,
   });
 }
@@ -166,10 +181,16 @@ export function invalidateRunsQueries(queryClient: QueryClient) {
 }
 
 export function invalidateBenchmarkRunQueries(queryClient: QueryClient) {
-  return queryClient.invalidateQueries({
-    queryKey: benchmarkKeys.listPrefix,
-    refetchType: "all",
-  });
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: benchmarkKeys.listPrefix,
+      refetchType: "all",
+    }),
+    queryClient.invalidateQueries({
+      queryKey: benchmarkKeys.summaryListPrefix,
+      refetchType: "all",
+    }),
+  ]);
 }
 
 export function invalidateMoleculesQueries(queryClient: QueryClient) {

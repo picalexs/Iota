@@ -430,6 +430,11 @@ def _append_qse_ignored_option_warnings(
         warnings.append(
             "QSE vqe_reference_max_iterations is ignored unless reference_method='vqe'."
         )
+    if (
+        advanced_config.reference_method != "vqe"
+        and advanced_config.vqe_reference_seed is not None
+    ):
+        warnings.append("QSE vqe_reference_seed is ignored unless reference_method='vqe'.")
 
 
 def _append_qse_guardrails(

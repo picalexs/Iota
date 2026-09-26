@@ -276,3 +276,39 @@ def test_vqe_budget_exhaustion_is_non_scientific_and_finite(monkeypatch) -> None
     assert diagnostics["budget_exhausted"] is True
     assert diagnostics["primitive_pubs"] == diagnostics["primitive_jobs"] == 3
     assert len(backend.calls) == diagnostics["primitive_pubs"]
+
+
+def test_vqe_warm_start_selection_preserves_tiny_optimizer_budget(monkeypatch) -> None:
+    backend = _Estimator()
+
+    def fake_minimize(objective, x0, method, options, bounds):
+        del method, options, bounds
+        energy = objective(np.asarray(x0, dtype=float))
+        return SimpleNamespace(
+            x=np.asarray(x0, dtype=float),
+            fun=energy,
+            success=True,
+            status=0,
+            message="converged",
+            nfev=1,
+            nit=1,
+        )
+
+    monkeypatch.setattr(vqe_solver, "minimize", fake_minimize)
+    result = run_vqe(
+        hamiltonian=SparsePauliOp.from_list([("Z", 1.0)]),
+        backend=backend,
+        config=_config(
+            max_iterations=2,
+            max_function_evaluations=2,
+            initial_point=None,
+            initial_point_strategy="zero_plus_seeded_random",
+            initial_point_candidates=3,
+        ),
+    )
+
+    diagnostics = result.optimizer_diagnostics
+    assert diagnostics["initial_point_selection_skipped_due_budget"] is True
+    assert diagnostics["initial_point_candidates_effective"] == 1
+    assert diagnostics["initial_point_selection_evaluations"] == 0
+    assert diagnostics["objective_evaluations"] == 1

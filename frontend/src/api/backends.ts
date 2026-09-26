@@ -203,6 +203,8 @@ function toApiBackendOptions(
     ...data,
     aer_method: data.aer_method ?? "automatic",
     estimator_precision: 0,
+    dynamical_decoupling: false,
+    twirling: false,
   };
 }
 

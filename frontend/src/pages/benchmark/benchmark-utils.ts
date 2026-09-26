@@ -185,16 +185,14 @@ export function getBenchmarkBackendOptions(
       value: "aer_simulator_backend_noise",
       label: `Aer simulator with backend noise${pendingSuffix}`,
       warning: ibmEnabled
-        ? "Uses the selected IBM backend calibration as an Aer noise reference."
+        ? ""
         : ibmUnavailableReason,
       enabled: ibmEnabled,
     },
     {
       value: "ibm_runtime",
       label: `IBM Quantum backend${pendingSuffix}`,
-      warning: ibmEnabled
-        ? "Submits benchmark jobs to the selected IBM backend through the active profile."
-        : ibmUnavailableReason,
+      ...(ibmEnabled ? {} : { warning: ibmUnavailableReason }),
       enabled: ibmEnabled,
     },
   ];
@@ -311,6 +309,7 @@ export function normalizeStoredEntry(entry: BenchmarkEntry): BenchmarkEntry {
     mode,
     easyOptions: entry.easyOptions ?? null,
     advancedConfig: entry.advancedConfig ?? null,
+    energy: entry.energy ?? null,
     currentEnergy: entry.currentEnergy ?? entry.energy ?? null,
     elapsedSeconds: entry.elapsedSeconds ?? null,
     executionMetadata: entry.executionMetadata ?? null,
@@ -458,7 +457,7 @@ export function applyEntryUpdates(
         continue;
       }
 
-      map.set(id, {
+      const nextEntry = {
         ...existing,
         status,
         energy,
@@ -469,7 +468,21 @@ export function applyEntryUpdates(
         elapsedSeconds,
         executionMetadata: update.value.executionMetadata,
         latestEventSequence: Math.max(existing.latestEventSequence, latestEventSequence),
-      });
+      };
+      if (
+        existing.status === nextEntry.status &&
+        existing.energy === nextEntry.energy &&
+        existing.currentEnergy === nextEntry.currentEnergy &&
+        existing.converged === nextEntry.converged &&
+        existing.errorMessage === nextEntry.errorMessage &&
+        existing.elapsedSeconds === nextEntry.elapsedSeconds &&
+        existing.latestEventSequence === nextEntry.latestEventSequence &&
+        JSON.stringify(existing.classicalRefs) === JSON.stringify(nextEntry.classicalRefs) &&
+        JSON.stringify(existing.executionMetadata) === JSON.stringify(nextEntry.executionMetadata)
+      ) {
+        continue;
+      }
+      map.set(id, nextEntry);
     }
   }
   return Array.from(map.values());
@@ -483,7 +496,14 @@ export function effectiveRefs(entry: BenchmarkEntry): {
   if (entry.classicalRefs) {
     return { hf: entry.classicalRefs.hf, fci: entry.classicalRefs.fci, computed: true };
   }
-  return { hf: entry.preset.references.hf, fci: entry.preset.references.fci, computed: false };
+  const presetReferences = entry.preset.references;
+  const hf = presetReferences?.hf;
+  const fci = presetReferences?.fci;
+  return {
+    hf: typeof hf === "number" && Number.isFinite(hf) ? hf : 0,
+    fci: typeof fci === "number" && Number.isFinite(fci) ? fci : null,
+    computed: false,
+  };
 }
 
 export function getBenchmarkEligibility(entry: BenchmarkEntry): {

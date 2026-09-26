@@ -279,7 +279,12 @@ class TestExecuteRunHappyPath:
             result = execute_run(SAMPLE_RUN_ID)
 
         assert result["algorithm"] == "qfd"
-        assert result["iterations"] == 5
+        assert result["iterations"] == result["algorithm_metrics"]["conditioning_summary"][
+            "time_points"
+        ]
+        assert result["algorithm_metrics"]["conditioning_summary"][
+            "requested_time_points"
+        ] == pytest.approx(5.0)
         assert "filter_eigenvalues" in result["algorithm_metrics"]
         assert result["backend_execution"]["execution_mode"] == "dense_classical"
         assert result["backend_execution"]["backend_primitives_used"] is False

@@ -7,6 +7,7 @@ import {
 import { cancelRun, pauseRun, restartRun, resumeRun } from "@/api/runs";
 import { benchmarkKeys } from "@/hooks/query-keys";
 import { getErrorMessage } from "@/lib/error-handler";
+import type { BenchmarkHistoryRun } from "@/features/benchmarks/state/history";
 import type { SavedBenchmarkRun } from "@/pages/benchmark/benchmark-storage";
 import { getRestartTargetRunId } from "@/features/benchmarks/state/normalization";
 import {
@@ -158,7 +159,7 @@ export function removeSavedBenchmarksFromCache(
 }
 
 export async function runDeleteSelectedBenchmarksBatch(
-  selectedRuns: readonly SavedBenchmarkRun[],
+  selectedRuns: readonly BenchmarkHistoryRun[],
   deleteAssociatedRuns: boolean,
   setDeleteProgress: (progress: BenchmarkDeleteProgress) => void,
 ): Promise<BenchmarkDeleteBatchResult> {
@@ -186,8 +187,8 @@ export async function runDeleteSelectedBenchmarksBatch(
 }
 
 export function getSkippedSelectedBenchmarkIds(
-  selectedRuns: readonly SavedBenchmarkRun[],
-  eligibleRuns: readonly SavedBenchmarkRun[],
+  selectedRuns: readonly BenchmarkHistoryRun[],
+  eligibleRuns: readonly BenchmarkHistoryRun[],
 ): string[] {
   const eligibleRunIds = new Set(eligibleRuns.map((run) => run.id));
   return selectedRuns.filter((run) => !eligibleRunIds.has(run.id)).map((run) => run.id);

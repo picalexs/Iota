@@ -18,10 +18,12 @@ from worker.chemistry.algorithms.vqe.config import resolve_vqe_config
 
 def test_build_vqe_reference_state_uses_injected_runtime_seams() -> None:
     progress_events: list[dict[str, object]] = []
+    observed_configs: list[dict[str, object]] = []
 
     def fake_run_vqe(**kwargs: object) -> SimpleNamespace:
         callback = kwargs["progress_callback"]
         assert callable(callback)
+        observed_configs.append(kwargs["config"])
         callback({"energy": -1.0})
         return SimpleNamespace(
             optimal_parameters=np.array([], dtype=float),
@@ -43,13 +45,14 @@ def test_build_vqe_reference_state_uses_injected_runtime_seams() -> None:
         hamiltonian=object(),
         backend=object(),
         vector_size=2,
-        resolved_config={"vqe_reference_reps": 1},
+        resolved_config={"vqe_reference_reps": 1, "vqe_reference_seed": 17},
         progress_callback=progress_events.append,
         run_vqe_fn=fake_run_vqe,
         build_ansatz_fn=lambda **_kwargs: QuantumCircuit(1),
     )
 
     assert np.isclose(np.linalg.norm(state), 1.0)
+    assert observed_configs[0]["seed"] == 17
     assert progress_events[0]["step"] == "reference_vqe"
     assert artifacts[0]["id"] == "qse.reference.vqe-ansatz"
     assert artifacts[0]["role"] == "reference"
@@ -60,6 +63,7 @@ def test_build_vqe_reference_state_uses_injected_runtime_seams() -> None:
         "ansatz_name": "EfficientSU2",
         "optimizer_name": "COBYLA",
         "reps": 1,
+        "seed": 17,
         "objective_evaluations": 4,
         "optimizer_iterations": 2,
         "max_function_evaluations": 8,

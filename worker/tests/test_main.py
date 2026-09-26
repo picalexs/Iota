@@ -298,6 +298,7 @@ class TestRunWorker:
         mock_settings.worker_ttl_seconds = 420
         mock_settings.log_level = "INFO"
         mock_worker = MagicMock()
+        lifecycle: list[str] = []
 
         with patch("worker.main.get_settings", return_value=mock_settings):
             with patch.object(main_module, "main") as mock_main:
@@ -305,10 +306,17 @@ class TestRunWorker:
                     main_module, "_build_redis_client", return_value="redis-conn"
                 ) as mock_build_client:
                     with patch.object(main_module, "recover_interrupted_runs") as mock_recovery:
-                        with patch(
-                            "worker.main.ResilientWorker", return_value=mock_worker
-                        ) as mock_worker_cls:
-                            main_module.run_worker()
+                        with patch.object(
+                            main_module, "dispose_worker_db_engine"
+                        ) as mock_dispose_db:
+                            mock_dispose_db.side_effect = lambda: lifecycle.append("dispose")
+                            with patch(
+                                "worker.main.ResilientWorker", return_value=mock_worker
+                            ) as mock_worker_cls:
+                                mock_worker_cls.side_effect = lambda *args, **kwargs: (
+                                    lifecycle.append("worker") or mock_worker
+                                )
+                                main_module.run_worker()
 
         mock_main.assert_called_once()
         mock_recovery.assert_called_once_with(
@@ -316,6 +324,8 @@ class TestRunWorker:
             worker_ttl_seconds=420,
         )
         mock_build_client.assert_called_once_with(blocking_worker=True)
+        mock_dispose_db.assert_called_once()
+        assert lifecycle == ["dispose", "worker"]
         mock_worker_cls.assert_called_once_with(
             ["quantum"],
             connection="redis-conn",

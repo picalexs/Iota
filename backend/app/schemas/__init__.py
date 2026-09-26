@@ -14,6 +14,8 @@ from app.schemas.benchmark import (
     BenchmarkRunCreate,
     BenchmarkRunListResponse,
     BenchmarkRunResponse,
+    BenchmarkRunSummaryListResponse,
+    BenchmarkRunSummaryResponse,
     BenchmarkRunUpdate,
 )
 from app.schemas.common import BaseORMModel, ErrorDetail, ErrorResponse
@@ -89,6 +91,8 @@ __all__ = [
     "BenchmarkRunCreate",
     "BenchmarkRunListResponse",
     "BenchmarkRunResponse",
+    "BenchmarkRunSummaryListResponse",
+    "BenchmarkRunSummaryResponse",
     "BenchmarkRunUpdate",
     # Backends
     "BackendListResponse",

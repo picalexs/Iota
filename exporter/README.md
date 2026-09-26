@@ -69,16 +69,44 @@ Each seed is a separate QSS run. The checkpoint records the seed and its roles.
 
 - `simulator` sets `backend_options.seed_simulator`.
 - `transpiler` sets `backend_options.seed_transpiler`.
-- `algorithm` sets the algorithm seed in advanced VQE, SQD, or SKQD options.
+- `algorithm` sets `advanced_config.seed` for VQE or SQD. It sets
+  `advanced_config.base_sampling_options.seed` for SKQD.
+- `sampling` sets SQD's nested VQE seed in
+  `advanced_config.sampling_vqe_seed`. Use it only when
+  `sampling_state_source` is `vqe`.
+- `reference` sets QSE's nested VQE reference seed in
+  `advanced_config.vqe_reference_seed`. Use it only when
+  `reference_method` is `vqe`.
 
-QSE, KQD, and QFD do not expose an algorithm-level seed in this workflow. Their
-default seed roles are simulator and transpiler for local targets. Set
-`seed_roles` explicitly on a variant when the campaign needs a different
-supported combination.
+KQD and QFD do not use algorithm-level randomness. QSE uses the `reference`
+role only for a VQE reference solve. QSE with an HF reference, KQD, and QFD
+use the simulator and transpiler roles for local targets. Set `seed_roles`
+explicitly on a variant to select a supported combination.
+
+The same campaign seed is written to every selected role. Use separate
+algorithm variants when you need to vary one role while holding another role
+constant. For example:
+
+```json
+{
+  "algorithm": "sqd",
+  "mode": "advanced",
+  "seed_roles": ["algorithm", "sampling"],
+  "advanced_config": {"sampling_state_source": "vqe"}
+}
+```
+
+If `noise_profile` is set at the campaign level, the exporter copies it to
+each variant that does not define its own profile.
 
 The default workflow targets `statevector` or `aer_simulator`. IBM Runtime
 submission is blocked unless the caller passes `--allow-ibm`. Do not pass that
 flag for local tests or this workflow.
+
+Backend-derived Aer noise reads IBM backend properties for a local simulation.
+It requires an active saved IBM profile and the local operator token. Set
+`QSS_LOCAL_OPERATOR_TOKEN` for the exporter process. The exporter sends the
+token in the local operator header and does not write it to campaign files.
 
 ### Noisy Aer budget
 
@@ -120,14 +148,16 @@ The exporter keeps only the fields needed for comparison and audit:
   noise provenance, and actual execution path.
 - reference method, solver path, basis, active space, validity status, and
   Hamiltonian hash;
-- scientific convergence, diagnostic status, reported energy source, exclusion
-  reason, execution generation, and restart parent.
+- convergence termination, convergence value and threshold, basis rank,
+  objective-evaluation budget, selected-CI fraction, and full-sector status;
+- convergence diagnostics, reported energy source, exclusion reason, execution
+  generation, and restart parent.
 
-The exporter keeps diagnostic rows for audit. It marks them with
-`benchmark_eligible: false`. Summaries and plots use only eligible rows.
-Eligible rows must have a completed status, a finite energy and reference,
-valid reported energy, no projected-solve diagnostic flag, and established
-scientific convergence. A finite diagnostic energy is not a benchmark result.
+The exporter retains convergence and diagnostic fields as provenance. A
+completed row with a finite terminal energy result is included in summaries
+and plots, even when its configured budget did not establish convergence.
+Rows without a completed finite terminal result are excluded from result
+aggregates.
 
 For noisy Aer Estimator runs, `requested_shots` is the nominal shot-equivalent
 budget used to derive precision. Aer Estimator precision is not a literal
@@ -139,10 +169,18 @@ The default output contains:
 - `benchmark.json`: compact benchmark metadata;
 - `runs.json` and `runs.csv`: one compact row per campaign entry;
 - `summaries/`: status-aware algorithm and molecule summaries;
+- `summaries/field_presence.csv`: present and missing counts for every exported
+  canonical field;
 - `manifest.json`: schema version, counts, runtime source, and source digest.
 
 The exporter does not include event streams or raw result payloads by default.
 Use `--include-raw` only when those API payloads are required for an audit.
+
+The exporter preserves persisted eligibility decisions by default. Use
+`--recompute-eligibility` with a benchmark-ID export only when you want the
+documented compatibility rules for legacy API results. The command records
+`eligibility_source: compatibility_recomputed` for each changed row. It does
+not change the saved benchmark or worker results.
 
 The API source uses QSS read endpoints. It does not connect to the database
 directly. This keeps API and database-backed exports consistent.
@@ -164,25 +202,85 @@ Create the same plots directly from a saved QSS benchmark:
   --output-dir output/local-h2-seeds/plots
 ```
 
-The command writes four plots and `plot_manifest.json`:
+The command writes three plots and `plot_manifest.json`:
 
 - `error_by_algorithm`: absolute or signed error distributions;
-- `convergence_by_algorithm`: scientific convergence rates;
-- `runtime_by_algorithm`: eligible-row runtime distributions;
+- `runtime_by_algorithm`: terminal-row runtime distributions;
 - `error_vs_runtime`: positive runtime and error points on log axes.
 
 Error and runtime plots group rows by algorithm and actual execution path.
-This prevents Aer sampler, Aer estimator, local classical, and diagnostic
-paths from appearing as one method.
+This prevents Aer sampler, Aer estimator, and local classical paths from
+appearing as one method.
 
-Use `--error-view signed` for signed error plots. Use `--format svg` for
-editable vector output or `--format both` for PNG and SVG. The plot writer
+Use `--error-view signed` for signed error plots. Use `--format pdf` for a
+manuscript-ready vector figure, `--format svg` for editable vector output, or
+`--format both` for PNG and SVG. The plot writer
 reserves legend space and saves with a tight bounding box to keep text visible.
 
-Rows without the required values, rows with diagnostic energies, and rows that
-did not establish scientific convergence are excluded from the relevant plot.
-The counts are reported in `plot_manifest.json`. Signed runtime plots use a
-symlog error axis so negative errors remain visible.
+Completed rows with finite terminal energy errors remain in the error and
+runtime plots, including rows that did not establish scientific convergence.
+Rows without a finite result are excluded from the relevant plot. The counts
+are reported in `plot_manifest.json`.
+Signed error plots use a symlog error axis so negative errors remain visible.
+
+## 4. Export the paper data bundle
+
+After the campaigns finish, export every paper campaign and all report
+artifacts to `exporter/output`:
+
+```sh
+.venv/bin/python -m exporter.export_paper_data \
+  --source-root output \
+  --output-dir exporter/output \
+  --format both
+```
+
+The command writes this structure:
+
+```text
+exporter/output/
+├── manifest.json
+├── campaigns/<campaign-id>/
+│   ├── benchmark.json
+│   ├── runs.json
+│   ├── runs.csv
+│   ├── summaries/
+│   └── plots/
+└── paper-report/
+    ├── statistics.json
+    ├── rows.csv
+    ├── *.tex
+    └── plots/
+```
+
+The campaign folders contain the complete compact export for each campaign.
+The campaign `plots/` folders contain the generic plots. The
+`paper-report/` folder contains the combined statistics, LaTeX fragments,
+and all figures used by the manuscript. `manifest.json` records every
+campaign, row count, and report path.
+
+The `both` format writes vector PDF and 300-dpi PNG files. The PDFs embed
+the figure fonts. The plots use marker shapes, line styles, and hatch patterns
+in addition to color. This keeps categorical differences visible in grayscale
+print.
+
+Every completed row with a finite terminal result contributes to the report.
+Non-converged finite rows remain visible as terminal results. Rows without a
+completed finite result are counted as incomplete. Convergence and diagnostic
+fields remain in the exported rows as provenance and budget information.
+
+For a previous combined paper report that contains `rows.csv`, use the
+migration input once:
+
+```sh
+.venv/bin/python -m exporter.export_paper_data \
+  --combined-report-dir /path/to/old/paper-report \
+  --output-dir exporter/output \
+  --format both
+```
+
+The lower-level `paper_report.py` command remains available for generating
+only the combined report from already exported campaign folders.
 
 ## Tests
 
@@ -203,8 +301,8 @@ The tests use fake API clients and local rows. They do not submit QSS runs.
 - `benchmark_io.py`: shared row normalization, API access, summaries, and
   manifest helpers. It defines the export eligibility contract;
 - `benchmark_plots.py`: layout-safe Matplotlib plot builders;
+- `export_paper_data.py`: export all paper campaigns and report artifacts
+  under `exporter/output`;
+- `paper_report.py`: multi-campaign statistics, LaTeX fragments, and
+  publication figures;
 - `tests/`: focused exporter tests;
-- `quantum_diag/`: older local benchmark and diagnostic tools.
-
-The older local tools remain available for development diagnostics. They are
-not required by the three-step API workflow.

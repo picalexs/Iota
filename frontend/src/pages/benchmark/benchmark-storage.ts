@@ -37,6 +37,11 @@ export interface BenchmarkWorkspaceStateSnapshot {
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   selectedBackendName: string | null;
+  shots?: number;
+  optimizationLevel?: 0 | 1 | 2 | 3;
+  seedTranspiler?: number | null;
+  dynamicalDecoupling?: boolean;
+  twirling?: boolean;
   chemicalAccuracyHa: number;
   customMolecules: MoleculeResponse[];
   entries: BenchmarkEntry[];
@@ -157,6 +162,16 @@ export function useBenchmarkStorage(
   setSelectedBackendMode: Dispatch<SetStateAction<BenchmarkBackendMode>>;
   selectedBackendName: string | null;
   setSelectedBackendName: Dispatch<SetStateAction<string | null>>;
+  shots: number;
+  setShots: Dispatch<SetStateAction<number>>;
+  optimizationLevel: 0 | 1 | 2 | 3;
+  setOptimizationLevel: Dispatch<SetStateAction<0 | 1 | 2 | 3>>;
+  seedTranspiler: number | null;
+  setSeedTranspiler: Dispatch<SetStateAction<number | null>>;
+  dynamicalDecoupling: boolean;
+  setDynamicalDecoupling: Dispatch<SetStateAction<boolean>>;
+  twirling: boolean;
+  setTwirling: Dispatch<SetStateAction<boolean>>;
   customMolecules: MoleculeResponse[];
   setCustomMolecules: Dispatch<SetStateAction<MoleculeResponse[]>>;
   chemicalAccuracyHa: number;
@@ -187,6 +202,17 @@ export function useBenchmarkStorage(
   const [selectedBackendName, setSelectedBackendName] = useState<string | null>(
     () => initialSnapshot?.selectedBackendName ?? null,
   );
+  const [shots, setShots] = useState<number>(() => initialSnapshot?.shots ?? 4096);
+  const [optimizationLevel, setOptimizationLevel] = useState<0 | 1 | 2 | 3>(
+    () => initialSnapshot?.optimizationLevel ?? 1,
+  );
+  const [seedTranspiler, setSeedTranspiler] = useState<number | null>(
+    () => initialSnapshot?.seedTranspiler ?? null,
+  );
+  const [dynamicalDecoupling, setDynamicalDecoupling] = useState<boolean>(
+    () => initialSnapshot?.dynamicalDecoupling ?? false,
+  );
+  const [twirling, setTwirling] = useState<boolean>(() => initialSnapshot?.twirling ?? false);
   const [customMolecules, setCustomMolecules] = useState<MoleculeResponse[]>(
     () => initialSnapshot?.customMolecules ?? [],
   );
@@ -225,6 +251,16 @@ export function useBenchmarkStorage(
     setSelectedBackendMode,
     selectedBackendName,
     setSelectedBackendName,
+    shots,
+    setShots,
+    optimizationLevel,
+    setOptimizationLevel,
+    seedTranspiler,
+    setSeedTranspiler,
+    dynamicalDecoupling,
+    setDynamicalDecoupling,
+    twirling,
+    setTwirling,
     customMolecules,
     setCustomMolecules,
     chemicalAccuracyHa,

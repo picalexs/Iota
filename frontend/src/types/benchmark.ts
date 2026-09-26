@@ -13,6 +13,17 @@ import type { RunExecutionMetadata } from "@/lib/results/execution-metadata";
 
 export type BenchmarkVariantMode = "simple" | "advanced";
 
+export type BenchmarkRunHistoryStatus =
+  | "draft"
+  | "running"
+  | "paused"
+  | "finished"
+  | "partial"
+  | "failed"
+  | "cancelled"
+  | "planned"
+  | "excluded";
+
 export type EntryStatus =
   | "idle"
   | "acquiring_molecule"
@@ -82,6 +93,11 @@ export function isBenchmarkBackendMode(value: unknown): value is BenchmarkBacken
 export interface BenchmarkExecutionSettings {
   mode: BenchmarkBackendMode;
   backendName: string | null;
+  shots?: number;
+  optimizationLevel?: 0 | 1 | 2 | 3;
+  seedTranspiler?: number | null;
+  dynamicalDecoupling?: boolean;
+  twirling?: boolean;
 }
 
 export interface SavedBenchmarkRun {
@@ -97,7 +113,33 @@ export interface SavedBenchmarkRun {
   selectedBasis: string;
   selectedBackendMode: BenchmarkBackendMode;
   selectedBackendName: string | null;
+  shots?: number;
+  optimizationLevel?: 0 | 1 | 2 | 3;
+  seedTranspiler?: number | null;
+  dynamicalDecoupling?: boolean;
+  twirling?: boolean;
   chemicalAccuracyHa: number;
   customMolecules: MoleculeResponse[];
   entries: BenchmarkEntry[];
+}
+
+export interface SavedBenchmarkRunSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  selectedMoleculeKeys: string[];
+  selectedBasis: string;
+  selectedBackendMode: BenchmarkBackendMode;
+  selectedBackendName: string | null;
+  status: BenchmarkRunHistoryStatus;
+  rowCount: number;
+  completedCount: number;
+  activeCount: number;
+  pausedCount: number;
+  failedCount: number;
+  cancelledCount: number;
+  plannedCount: number;
+  excludedCount: number;
+  associatedRunCount: number;
 }
