@@ -259,6 +259,11 @@ The campaign `plots/` folders contain the generic plots. The
 and all figures used by the manuscript. `manifest.json` records every
 campaign, row count, and report path.
 
+The `both` format writes vector PDF and 300-dpi PNG files. The PDFs embed
+the figure fonts. The plots use marker shapes, line styles, and hatch patterns
+in addition to color. This keeps categorical differences visible in grayscale
+print.
+
 Every completed row with a finite terminal result contributes to the report.
 Non-converged finite rows remain visible as terminal results. Rows without a
 completed finite result are counted as incomplete. Convergence and diagnostic

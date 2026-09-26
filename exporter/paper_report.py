@@ -9,6 +9,7 @@ import json
 import math
 import re
 import statistics
+import textwrap
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -19,6 +20,7 @@ matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
 try:
@@ -27,7 +29,33 @@ except ImportError:  # pragma: no cover - direct script execution
     from benchmark_io import ExporterError, load_folder_source
 
 
-REPORT_SCHEMA_VERSION = "qss-paper-report.v4"
+REPORT_SCHEMA_VERSION = "qss-paper-report.v5"
+FIGURE_WIDTH_IN = 6.85
+ALGORITHM_MARKERS = {
+    "VQE": "o",
+    "QSE": "s",
+    "KQD": "^",
+    "QFD": "D",
+    "SQD": "P",
+    "SKQD": "X",
+}
+ALGORITHM_LINESTYLES = {
+    "VQE": "-",
+    "QSE": "--",
+    "KQD": "-.",
+    "QFD": ":",
+    "SQD": (0, (5, 1)),
+    "SKQD": (0, (3, 1, 1, 1)),
+}
+ALGORITHM_HATCHES = {
+    "VQE": "",
+    "QSE": "///",
+    "KQD": "...",
+    "QFD": r"\\",
+    "SQD": "++",
+    "SKQD": "xx",
+}
+PATH_HATCHES = ("", "///", "...", r"\\", "++", "xx", "oo", "--", "||")
 PALETTE = {
     "terminal": "#0072B2",
     "VQE": "#0072B2",
@@ -123,6 +151,77 @@ def _short_molecule(value: Any) -> str:
 
 def _algorithm_label(value: Any) -> str:
     return str(value or "UNKNOWN").upper()
+
+
+def _algorithm_marker(value: Any) -> str:
+    return ALGORITHM_MARKERS.get(_algorithm_label(value), "o")
+
+
+def _algorithm_hatch(value: Any) -> str:
+    return ALGORITHM_HATCHES.get(_algorithm_label(value), "////")
+
+
+def _algorithm_linestyle(value: Any) -> Any:
+    return ALGORITHM_LINESTYLES.get(_algorithm_label(value), "-")
+
+
+def _wrap_label(value: Any, width: int = 15) -> str:
+    return "\n".join(
+        textwrap.wrap(
+            str(value),
+            width=width,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+    )
+
+
+def _panel_label(ax: Any, label: str) -> None:
+    ax.text(
+        0.02,
+        1.02,
+        label,
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontweight="bold",
+        bbox={
+            "facecolor": "white",
+            "edgecolor": "none",
+            "alpha": 0.85,
+            "pad": 1.5,
+        },
+    )
+
+
+def _algorithm_handles(algorithms: Iterable[str]) -> list[Line2D]:
+    return [
+        Line2D(
+            [0],
+            [0],
+            marker=_algorithm_marker(algorithm),
+            color=PALETTE.get(_algorithm_label(algorithm), "#555555"),
+            markerfacecolor=PALETTE.get(_algorithm_label(algorithm), "#555555"),
+            markeredgecolor="#222222",
+            linestyle="None",
+            markersize=6,
+            label=_algorithm_label(algorithm),
+        )
+        for algorithm in algorithms
+    ]
+
+
+def _algorithm_patch_handles(algorithms: Iterable[str]) -> list[Patch]:
+    return [
+        Patch(
+            facecolor=PALETTE.get(_algorithm_label(algorithm), "#777777"),
+            edgecolor="#222222",
+            hatch=_algorithm_hatch(algorithm),
+            linewidth=0.5,
+            label=_algorithm_label(algorithm),
+        )
+        for algorithm in algorithms
+    ]
 
 
 def _variant_label(row: Mapping[str, Any]) -> str:
@@ -305,13 +404,20 @@ def _apply_style() -> None:
     plt.rcParams.update(
         {
             "font.family": "DejaVu Sans",
-            "font.size": 9,
-            "axes.titlesize": 10,
-            "axes.labelsize": 9,
-            "xtick.labelsize": 8,
-            "ytick.labelsize": 8,
-            "legend.fontsize": 8,
+            "font.size": 8.5,
+            "axes.titlesize": 9,
+            "axes.labelsize": 8.5,
+            "xtick.labelsize": 7.5,
+            "ytick.labelsize": 7.5,
+            "legend.fontsize": 7,
+            "legend.title_fontsize": 7.5,
             "figure.dpi": 120,
+            "axes.linewidth": 0.7,
+            "lines.linewidth": 1.0,
+            "patch.linewidth": 0.6,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
             "savefig.facecolor": "white",
             "axes.facecolor": "white",
         }
@@ -322,6 +428,8 @@ def _save(fig: Any, output_dir: Path, name: str, output_format: str) -> list[str
     output_dir.mkdir(parents=True, exist_ok=True)
     formats = ("pdf", "png") if output_format == "both" else (output_format,)
     files: list[str] = []
+    for extension in {"pdf", "png", "svg"} - set(formats):
+        (output_dir / f"{name}.{extension}").unlink(missing_ok=True)
     for extension in formats:
         path = output_dir / f"{name}.{extension}"
         fig.savefig(path, bbox_inches="tight", pad_inches=0.12, dpi=300)
@@ -341,23 +449,33 @@ def _plot_population(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
     grouped = [(key, values) for key, values in _group_rows(rows, "campaign_label")]
     if not grouped:
         return _save(_empty("No campaign rows."), output_dir, "campaign_populations", fmt)
-    labels = [key for key, _ in grouped]
+    labels = [_wrap_label(key, 11) for key, _ in grouped]
     categories = ("observed", "incomplete")
-    colors = (PALETTE["terminal"], "#999999")
-    fig, ax = plt.subplots(figsize=(8.6, 4.8), constrained_layout=True)
+    colors = (PALETTE["terminal"], "#f2f2f2")
+    hatches = ("", "///")
+    positions = list(range(len(labels)))
+    fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 3.5))
     bottom = [0] * len(labels)
-    for category, color in zip(categories, colors):
+    for category, color, hatch in zip(categories, colors, hatches):
         values = [
             sum((_observed(row) if category == "observed" else not _observed(row)) for row in group)
             for _, group in grouped
         ]
         label = "Finite terminal result" if category == "observed" else "Incomplete or missing"
-        ax.bar(labels, values, bottom=bottom, label=label, color=color, edgecolor="white", linewidth=0.4)
+        ax.bar(
+            positions,
+            values,
+            bottom=bottom,
+            label=label,
+            color=color,
+            hatch=hatch,
+            edgecolor="#222222",
+            linewidth=0.5,
+        )
         bottom = [left + value for left, value in zip(bottom, values)]
     ax.set_ylabel("Rows")
-    ax.set_title("Campaign populations")
-    ax.tick_params(axis="x", rotation=28)
-    ax.legend(ncol=2, frameon=False)
+    ax.set_xticks(positions, labels)
+    ax.legend(ncol=2, frameon=False, loc="upper left")
     ax.grid(axis="y", alpha=0.25)
     return _save(fig, output_dir, "campaign_populations", fmt)
 
@@ -375,7 +493,7 @@ def _plot_preset(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> l
     algorithms = sorted({str(item["algorithm"]).lower() for item in groups})
     x = list(range(len(variants)))
     width = 0.78 / max(1, len(algorithms))
-    fig, axes = plt.subplots(1, 2, figsize=(10.2, 4.4), constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(FIGURE_WIDTH_IN, 3.8))
     for index, algorithm in enumerate(algorithms):
         values = []
         runtimes = []
@@ -386,21 +504,35 @@ def _plot_preset(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> l
         positions = [value - 0.39 + width / 2 + index * width for value in x]
         label = algorithm.upper()
         color = PALETTE.get(label, "#555555")
-        axes[0].bar(positions, values, width=width, label=label, color=color, alpha=0.58, edgecolor="black", linewidth=0.3)
-        axes[1].bar(positions, runtimes, width=width, label=label, color=color, alpha=0.58, edgecolor="black", linewidth=0.3)
+        hatch = _algorithm_hatch(label)
+        for ax, data in ((axes[0], values), (axes[1], runtimes)):
+            ax.bar(
+                positions,
+                data,
+                width=width,
+                label=label,
+                color=color,
+                hatch=hatch,
+                edgecolor="#222222",
+                linewidth=0.5,
+            )
     axes[0].set_ylabel("Median absolute error (mHa)")
     axes[1].set_ylabel("Median runtime (s)")
-    for ax in axes:
-        ax.set_xticks(x, [label.replace(" ", "\n") for label in variants])
+    for index, ax in enumerate(axes):
+        ax.set_xticks(x, [_wrap_label(label, 11) for label in variants])
         ax.grid(axis="y", alpha=0.25)
-    axes[0].set_title("Terminal error")
-    axes[1].set_title("Terminal runtime")
+        _panel_label(ax, f"({chr(97 + index)})")
     axes[0].set_yscale("symlog", linthresh=0.01)
     axes[0].set_ylim(bottom=0)
     axes[1].set_yscale("log")
-    axes[0].legend(frameon=False, loc="upper left")
-    axes[1].legend(frameon=False, ncol=3)
-    fig.suptitle("Preset comparison: terminal estimates", fontsize=11)
+    fig.subplots_adjust(left=0.10, right=0.98, bottom=0.25, top=0.90, wspace=0.32)
+    fig.legend(
+        handles=_algorithm_patch_handles(algorithms),
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.01),
+        ncol=3,
+        frameon=False,
+    )
     return _save(fig, output_dir, "preset_tradeoff", fmt)
 
 
@@ -408,26 +540,38 @@ def _plot_seed_sensitivity(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
     selected = [row for row in rows if row.get("campaign_id") == "paper-seed-role-study" and _observed(row) and _number(row.get("seed")) is not None]
     if not selected:
         return _save(_empty("No finite seed-role observations."), output_dir, "seed_sensitivity", fmt)
-    fig, ax = plt.subplots(figsize=(7.8, 4.8), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 3.7))
     algorithms = sorted({str(row.get("algorithm") or "").lower() for row in selected})
+    seeds = sorted({_number(row.get("seed")) for row in selected})
+    offsets = {
+        algorithm: (index - (len(algorithms) - 1) / 2) * 0.24
+        for index, algorithm in enumerate(algorithms)
+    }
     for algorithm in algorithms:
         color = PALETTE.get(algorithm.upper(), "#555555")
         points = [row for row in selected if str(row.get("algorithm") or "").lower() == algorithm]
         ax.scatter(
-            [_number(row.get("seed")) for row in points],
+            [_number(row.get("seed")) + offsets[algorithm] for row in points],
             [_error_mHa(row) for row in points],
             label=algorithm.upper(),
             color=color,
-            marker="o",
+            marker=_algorithm_marker(algorithm),
+            edgecolors="#222222",
             linewidths=0.65,
             s=42,
             alpha=0.85,
         )
     ax.set_xlabel("Campaign seed")
     ax.set_ylabel("Absolute error (mHa)")
-    ax.set_title("Seed sensitivity: finite terminal estimates")
+    ax.set_xticks(seeds, [str(int(seed)) for seed in seeds])
     ax.grid(alpha=0.25)
-    ax.legend(frameon=False, ncol=3, title="Algorithm")
+    ax.legend(
+        handles=_algorithm_handles(algorithms),
+        frameon=False,
+        ncol=3,
+        title="Algorithm",
+        loc="upper right",
+    )
     return _save(fig, output_dir, "seed_sensitivity", fmt)
 
 
@@ -444,7 +588,7 @@ def _plot_conditions(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
         return _save(_empty("No backend/noise observations."), output_dir, "backend_noise_comparison", fmt)
     conditions = sorted({str(item["campaign_label"]) for item in groups})
     algorithms = sorted({str(item["algorithm"]).lower() for item in groups})
-    fig, ax = plt.subplots(figsize=(9.0, 4.8), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 3.7))
     width = 0.78 / max(1, len(algorithms))
     x = list(range(len(conditions)))
     for index, algorithm in enumerate(algorithms):
@@ -455,14 +599,30 @@ def _plot_conditions(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
         positions = [value - 0.39 + width / 2 + index * width for value in x]
         label = algorithm.upper()
         color = PALETTE.get(label, "#555555")
-        ax.bar(positions, values, width=width, label=label, color=color, alpha=0.58, edgecolor="black", linewidth=0.3)
-    ax.set_xticks(x, [condition.replace(" ", "\n") for condition in conditions])
+        ax.bar(
+            positions,
+            values,
+            width=width,
+            label=label,
+            color=color,
+            hatch=_algorithm_hatch(label),
+            edgecolor="#222222",
+            linewidth=0.5,
+        )
+    ax.set_xticks(x, [_wrap_label(condition, 12) for condition in conditions])
     ax.set_ylabel("Median absolute error (mHa)")
-    ax.set_title("Local conditions: terminal error")
     ax.set_yscale("symlog", linthresh=0.01)
     ax.set_ylim(bottom=0)
     ax.grid(axis="y", alpha=0.25)
-    ax.legend(frameon=False, ncol=3, title="Algorithm")
+    fig.subplots_adjust(left=0.10, right=0.98, bottom=0.28, top=0.98)
+    fig.legend(
+        handles=_algorithm_patch_handles(algorithms),
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.01),
+        ncol=3,
+        frameon=False,
+        title="Algorithm",
+    )
     return _save(fig, output_dir, "backend_noise_comparison", fmt)
 
 
@@ -488,8 +648,8 @@ def _plot_heatmap(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> 
                 row_labels.append(f"{value:.2f}\nn={item['observed_count']}")
         data.append(row_values)
         labels.append(row_labels)
-    fig, ax = plt.subplots(figsize=(11.0, 4.7), constrained_layout=True)
-    cmap = plt.get_cmap("YlGnBu").copy()
+    fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 3.65))
+    cmap = plt.get_cmap("Greys").copy()
     cmap.set_bad("#f7f7f7")
     finite_values = [value for row in data for value in row if not math.isnan(value)]
     log_floor = 0.001
@@ -497,21 +657,28 @@ def _plot_heatmap(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> 
         [value if math.isnan(value) else max(log_floor, value) for value in row]
         for row in data
     ]
+    norm = LogNorm(vmin=log_floor, vmax=max(1.0, max(finite_values, default=1.0)))
     image = ax.imshow(
         plot_data,
         aspect="auto",
         cmap=cmap,
-        norm=LogNorm(vmin=log_floor, vmax=max(1.0, max(finite_values, default=1.0))),
+        norm=norm,
+        interpolation="nearest",
     )
     ax.set_xticks(range(len(molecules)), [_short_molecule(value) for value in molecules])
     ax.set_yticks(range(len(algorithms)), [value.upper() for value in algorithms])
-    ax.set_title("Statevector median terminal absolute error (mHa)")
+    ax.set_xticks([value - 0.5 for value in range(len(molecules) + 1)], minor=True)
+    ax.set_yticks([value - 0.5 for value in range(len(algorithms) + 1)], minor=True)
+    ax.grid(which="minor", color="#444444", linewidth=0.35)
+    ax.tick_params(which="minor", bottom=False, left=False)
     for i, row in enumerate(labels):
         for j, label in enumerate(row):
-            ax.text(j, i, label, ha="center", va="center", fontsize=7, color="black")
+            value = data[i][j]
+            normalized = float(norm(max(log_floor, value))) if not math.isnan(value) else 0.0
+            text_color = "white" if normalized > 0.55 else "black"
+            ax.text(j, i, label, ha="center", va="center", fontsize=7, color=text_color)
     colorbar = fig.colorbar(image, ax=ax, shrink=0.84)
     colorbar.set_label("Median finite observed error (mHa; log scale)")
-    ax.set_title("Statevector terminal error by molecule and method")
     return _save(fig, output_dir, "molecule_algorithm_heatmap", fmt)
 
 
@@ -525,7 +692,12 @@ def _plot_resource(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) ->
     if not groups or not any(value is not None for value in budget_values.values()):
         return _save(_empty("No resource-ablation observations."), output_dir, "resource_ablation", fmt)
     algorithms = sorted({str(item["algorithm"]).lower() for item in groups})
-    fig, axes = plt.subplots(len(algorithms), 2, figsize=(10.0, 3.4 * len(algorithms)), squeeze=False)
+    fig, axes = plt.subplots(
+        len(algorithms),
+        2,
+        figsize=(FIGURE_WIDTH_IN, max(3.5, 2.25 * len(algorithms))),
+        squeeze=False,
+    )
     for row_index, algorithm in enumerate(algorithms):
         algorithm_groups = [
             item for item in groups
@@ -544,8 +716,26 @@ def _plot_resource(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) ->
         ]
         color = PALETTE.get(algorithm.upper(), "#555555")
         error_ax, runtime_ax = axes[row_index]
-        error_ax.plot(budgets, observed_values, marker="o", linestyle="-", color=color)
-        runtime_ax.plot(budgets, observed_runtimes, marker="o", linestyle="-", color=color)
+        marker = _algorithm_marker(algorithm)
+        linestyle = _algorithm_linestyle(algorithm)
+        error_ax.plot(
+            budgets,
+            observed_values,
+            marker=marker,
+            linestyle=linestyle,
+            color=color,
+            markeredgecolor="#222222",
+            markeredgewidth=0.4,
+        )
+        runtime_ax.plot(
+            budgets,
+            observed_runtimes,
+            marker=marker,
+            linestyle=linestyle,
+            color=color,
+            markeredgecolor="#222222",
+            markeredgewidth=0.4,
+        )
         budget_labels = [_format_budget(value) for value in budgets]
         for ax in (error_ax, runtime_ax):
             ax.set_xscale("log")
@@ -555,19 +745,26 @@ def _plot_resource(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) ->
             ax.grid(axis="y", alpha=0.25)
         error_ax.set_ylabel("Median absolute error (mHa)")
         runtime_ax.set_ylabel("Median runtime (s)")
-        error_ax.set_title(f"{algorithm.upper()}: terminal error")
-        runtime_ax.set_title(f"{algorithm.upper()}: terminal runtime")
+        _panel_label(error_ax, f"({chr(97 + row_index * 2)}) {algorithm.upper()}")
+        _panel_label(runtime_ax, f"({chr(98 + row_index * 2)}) {algorithm.upper()}")
         error_ax.set_yscale("symlog", linthresh=0.01)
         error_ax.set_ylim(bottom=0)
         runtime_ax.set_yscale("log")
     fig.legend(
-        handles=[Line2D([0], [0], marker="o", color="#555555", linestyle="-", label="Terminal median")],
+        handles=_algorithm_handles(algorithms),
         loc="lower center",
+        ncol=min(3, max(1, len(algorithms))),
         frameon=False,
         bbox_to_anchor=(0.5, 0.01),
     )
-    fig.suptitle("Resource ablation: ordered sample budgets", fontsize=12)
-    fig.tight_layout(rect=(0, 0.06, 1, 0.95))
+    fig.subplots_adjust(
+        left=0.10,
+        right=0.98,
+        bottom=0.16,
+        top=0.90,
+        hspace=0.52,
+        wspace=0.32,
+    )
     return _save(fig, output_dir, "resource_ablation", fmt)
 
 
@@ -577,10 +774,10 @@ def _plot_accuracy_runtime(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
     if not observed:
         return _save(_empty("No finite accuracy/runtime observations."), output_dir, "accuracy_runtime", fmt)
 
-    fig, axes = plt.subplots(2, 3, figsize=(12.0, 8.4), constrained_layout=True, sharey=False)
+    fig, axes = plt.subplots(2, 3, figsize=(FIGURE_WIDTH_IN, 6.3), sharey=False)
     axes_flat = list(axes.flat)
     algorithms = sorted({str(row.get("algorithm") or "UNKNOWN").upper() for row in observed})
-    for ax, (title, campaign_ids) in zip(axes_flat, ACCURACY_RUNTIME_PANELS):
+    for panel_index, (ax, (title, campaign_ids)) in enumerate(zip(axes_flat, ACCURACY_RUNTIME_PANELS)):
         panel_rows = [row for row in observed if row.get("campaign_id") in campaign_ids]
         for algorithm in algorithms:
             color = PALETTE.get(algorithm, "#555555")
@@ -593,31 +790,42 @@ def _plot_accuracy_runtime(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
                     [_runtime_seconds(row) for row in points],
                     [_error_mHa(row) for row in points],
                     color=color,
-                    marker="o",
+                    marker=_algorithm_marker(algorithm),
+                    edgecolors="#222222",
                     linewidths=0.5,
-                    s=25,
+                    s=30,
                     alpha=0.82,
                 )
         ax.axhline(1.6, color="#666666", linestyle=":", linewidth=0.8)
         ax.set_xscale("log")
         ax.set_yscale("symlog", linthresh=0.01)
         ax.set_ylim(bottom=0)
-        ax.set_title(title)
         ax.set_xlabel("Runtime (s)")
         ax.set_ylabel("Absolute error (mHa)")
         ax.grid(alpha=0.22, which="both")
+        _panel_label(ax, f"({chr(97 + panel_index)}) {title}")
         if not panel_rows:
             ax.text(0.5, 0.5, "No finite observations", ha="center", va="center", transform=ax.transAxes)
     for ax in axes_flat[len(ACCURACY_RUNTIME_PANELS):]:
         ax.set_visible(False)
 
-    method_handles = [
-        Line2D([0], [0], marker="o", color=PALETTE.get(algorithm, "#555555"), linestyle="None", markersize=5, label=algorithm)
-        for algorithm in algorithms
-    ]
+    method_handles = _algorithm_handles(algorithms)
     threshold_handle = Line2D([0], [0], color="#666666", linestyle=":", linewidth=1, label="1.6 mHa threshold")
-    fig.legend(handles=method_handles + [threshold_handle], loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.015))
-    fig.suptitle("Accuracy versus runtime for finite terminal estimates", fontsize=12)
+    fig.legend(
+        handles=method_handles + [threshold_handle],
+        loc="lower center",
+        ncol=4,
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.01),
+    )
+    fig.subplots_adjust(
+        left=0.10,
+        right=0.98,
+        bottom=0.14,
+        top=0.90,
+        hspace=0.42,
+        wspace=0.28,
+    )
     return _save(fig, output_dir, "accuracy_runtime", fmt)
 
 
@@ -626,17 +834,33 @@ def _plot_paths(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> li
     paths = sorted({str(row.get("actual_path_class") or "unknown") for row in rows})
     if not grouped or not paths:
         return _save(_empty("No execution-path observations."), output_dir, "execution_path_distribution", fmt)
-    fig, ax = plt.subplots(figsize=(9.0, 4.8), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 4.4))
     bottom = [0] * len(grouped)
     colors = [plt.get_cmap("viridis")(index / max(1, len(paths) - 1)) for index in range(len(paths))]
-    for path, color in zip(paths, colors):
+    positions = list(range(len(grouped)))
+    for index, (path, color) in enumerate(zip(paths, colors)):
         values = [sum(str(row.get("actual_path_class") or "unknown") == path for row in rows_for_campaign) for _, rows_for_campaign in grouped]
-        ax.bar([key for key, _ in grouped], values, bottom=bottom, label=path.replace("_", " "), color=color, edgecolor="white", linewidth=0.3)
+        ax.bar(
+            positions,
+            values,
+            bottom=bottom,
+            label=_wrap_label(path.replace("_", " "), 18),
+            color=color,
+            hatch=PATH_HATCHES[index % len(PATH_HATCHES)],
+            edgecolor="#222222",
+            linewidth=0.5,
+        )
         bottom = [left + value for left, value in zip(bottom, values)]
     ax.set_ylabel("Rows")
-    ax.set_title("Observed execution paths")
-    ax.tick_params(axis="x", rotation=28)
-    ax.legend(frameon=False, bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.set_xticks(positions, [_wrap_label(key, 11) for key, _ in grouped])
+    fig.subplots_adjust(left=0.10, right=0.98, bottom=0.40, top=0.98)
+    fig.legend(
+        frameon=False,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.01),
+        ncol=3,
+        fontsize=6.5,
+    )
     return _save(fig, output_dir, "execution_path_distribution", fmt)
 
 

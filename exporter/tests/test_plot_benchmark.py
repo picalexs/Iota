@@ -104,10 +104,12 @@ def test_plot_from_folder_writes_manifest_and_all_formats(tmp_path: Path) -> Non
     assert manifest["source_row_count"] == 3
     assert manifest["plots"]["error_vs_runtime"]["plotted_count"] == 2
     assert manifest["plots"]["error_vs_runtime"]["excluded_count"] == 1
-    assert manifest["plot_schema_version"] == "qss-benchmark-plots.v4"
+    assert manifest["plot_schema_version"] == "qss-benchmark-plots.v5"
     assert manifest["population_definitions"]["terminal"].startswith("Completed rows")
     assert "validated" not in manifest["population_definitions"]
     assert len(manifest["files"]) == 6
+    assert all(filename.endswith((".pdf", ".png")) for filename in manifest["files"])
+    assert not any(filename.endswith(".svg") for filename in manifest["files"])
     for filename in manifest["files"]:
         path = output_dir / filename
         assert path.is_file()
