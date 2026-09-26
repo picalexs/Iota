@@ -88,7 +88,6 @@ def _observed(row: Mapping[str, Any]) -> bool:
     """Whether a completed row has a finite terminal energy result."""
     return (
         str(row.get("status") or "").lower() == "completed"
-        and row.get("reported_energy_is_valid") is not False
         and _error_mHa(row) is not None
     )
 

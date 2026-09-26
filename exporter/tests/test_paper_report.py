@@ -65,6 +65,7 @@ def test_finite_non_converged_row_is_terminal_observation() -> None:
     row.update(
         {
             "projected_solve_is_diagnostic": False,
+            "reported_energy_is_valid": False,
             "benchmark_exclusion_reason": "not_converged",
         }
     )

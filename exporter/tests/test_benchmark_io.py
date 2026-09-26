@@ -547,6 +547,7 @@ def test_summary_includes_completed_diagnostic_rows_as_terminal_results() -> Non
             "status": "completed",
             "absolute_error": 0.001,
             "converged": False,
+            "reported_energy_is_valid": False,
             "projected_solve_is_diagnostic": True,
             "benchmark_eligible": False,
             "benchmark_exclusion_reason": "projected_solve_diagnostic",

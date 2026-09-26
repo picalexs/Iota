@@ -1537,8 +1537,6 @@ def _observed_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]
     for row in rows:
         if str(row.get("status") or "").lower() not in SUCCESS_STATUSES:
             continue
-        if row.get("reported_energy_is_valid") is False:
-            continue
         absolute_error = _number(row.get("absolute_error"))
         if absolute_error is None:
             final_energy = _number(row.get("final_energy"))

@@ -55,7 +55,6 @@ def _observed(row: Mapping[str, Any], error_view: str = "absolute") -> bool:
 
     return (
         str(row.get("status") or "").lower() == "completed"
-        and row.get("reported_energy_is_valid") is not False
         and _error_value(row, error_view) is not None
     )
 
