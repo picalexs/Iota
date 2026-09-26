@@ -110,7 +110,7 @@ qiskit==2.3.0
     #   qiskit-ibm-runtime
 qiskit-ibm-runtime==0.45.1
     # via -r backend/requirements.in
-redis==7.4.0
+redis==8.1.0
     # via
     #   -r backend/requirements.in
     #   rq
