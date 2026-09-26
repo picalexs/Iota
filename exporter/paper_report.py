@@ -655,7 +655,7 @@ def _plot_heatmap(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> 
         data.append(row_values)
         labels.append(row_labels)
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH_IN, 3.65))
-    cmap = plt.get_cmap("cividis").copy()
+    cmap = plt.get_cmap("viridis").copy()
     cmap.set_bad("#e8e8e8")
     finite_values = [value for row in data for value in row if not math.isnan(value)]
     log_floor = 0.001
