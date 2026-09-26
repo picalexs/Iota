@@ -16,7 +16,6 @@ from matplotlib.lines import Line2D
 
 PLOT_NAMES = (
     "error_by_algorithm",
-    "convergence_by_algorithm",
     "runtime_by_algorithm",
     "error_vs_runtime",
 )
@@ -30,19 +29,6 @@ def _finite(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return result if math.isfinite(result) else None
-
-
-def _status_success(row: Mapping[str, Any]) -> bool:
-    explicit = row.get("benchmark_eligible")
-    if isinstance(explicit, bool):
-        return explicit
-    return (
-        str(row.get("status") or "").lower() == "completed"
-        and row.get("reported_energy_is_valid") is not False
-        and row.get("projected_solve_is_diagnostic") is not True
-        and row.get("scientific_converged") is not False
-        and row.get("converged") is not False
-    )
 
 
 def _group_label(row: Mapping[str, Any]) -> str:
@@ -72,14 +58,6 @@ def _observed(row: Mapping[str, Any], error_view: str = "absolute") -> bool:
         and row.get("reported_energy_is_valid") is not False
         and _error_value(row, error_view) is not None
     )
-
-
-def _observation_bucket(row: Mapping[str, Any]) -> str:
-    if _status_success(row):
-        return "validated"
-    if row.get("projected_solve_is_diagnostic") is True:
-        return "diagnostic"
-    return "unvalidated"
 
 
 def _group_values(
@@ -138,59 +116,11 @@ def _error_plot(rows: list[Mapping[str, Any]], error_view: str):
         constrained_layout=True,
     )
     _boxplot(ax, [groups[label] for label in labels], labels)
-    validated_medians = []
-    for label in labels:
-        values = [
-            value
-            for row in observed_rows
-            if _group_label(row) == label
-            and _status_success(row)
-            and (value := _error_value(row, error_view)) is not None
-        ]
-        validated_medians.append(sum(values) / len(values) if values else math.nan)
-    ax.scatter(
-        range(1, len(labels) + 1),
-        validated_medians,
-        color="#111111",
-        marker="o",
-        s=28,
-        zorder=3,
-        label="Validated median",
-    )
     ax.set_xlabel("Algorithm · execution path")
     ax.set_ylabel(f"{'Signed' if error_view == 'signed' else 'Absolute'} energy error (Ha)")
     ax.set_title("Terminal energy error by algorithm")
     ax.grid(True, axis="y", alpha=0.3)
-    ax.legend(frameon=False)
     return fig, plotted_count, excluded_count
-
-
-def _convergence_plot(rows: list[Mapping[str, Any]]):
-    groups: dict[str, list[bool]] = defaultdict(list)
-    for row in rows:
-        if not _status_success(row) and str(row.get("status") or "").lower() != "completed":
-            continue
-        scientific = row.get("scientific_converged")
-        converged = scientific if isinstance(scientific, bool) else row.get("converged")
-        if not isinstance(converged, bool):
-            continue
-        groups[_group_label(row)].append(converged)
-    groups = dict(sorted(groups.items()))
-    if not groups:
-        return _empty_figure("No completed rows with convergence data."), 0, 0
-    labels = list(groups)
-    rates = [100.0 * sum(values) / len(values) for values in groups.values()]
-    fig, ax = plt.subplots(
-        figsize=(max(7.5, 1.25 * len(labels) + 2.5), 5.2),
-        constrained_layout=True,
-    )
-    ax.bar([_safe_label(label) for label in labels], rates, color="#2a9d8f")
-    ax.set_ylim(0, 100)
-    ax.set_xlabel("Algorithm · execution path")
-    ax.set_ylabel("Convergence rate (%)")
-    ax.set_title("Convergence by algorithm")
-    ax.grid(True, axis="y", alpha=0.3)
-    return fig, sum(len(values) for values in groups.values()), 0
 
 
 def _runtime_plot(rows: list[Mapping[str, Any]]):
@@ -213,25 +143,6 @@ def _runtime_plot(rows: list[Mapping[str, Any]]):
         constrained_layout=True,
     )
     _boxplot(ax, [groups[label] for label in labels], labels)
-    validated_medians = []
-    for label in labels:
-        values = [
-            float(row["runtime_seconds"])
-            for row in observed_rows
-            if _group_label(row) == label
-            and _status_success(row)
-            and _finite(row.get("runtime_seconds")) is not None
-        ]
-        validated_medians.append(sum(values) / len(values) if values else math.nan)
-    ax.scatter(
-        range(1, len(labels) + 1),
-        validated_medians,
-        color="#111111",
-        marker="o",
-        s=28,
-        zorder=3,
-        label="Validated median",
-    )
     positive = all(value > 0 for values in groups.values() for value in values)
     if positive:
         ax.set_yscale("log")
@@ -242,7 +153,6 @@ def _runtime_plot(rows: list[Mapping[str, Any]]):
     ax.set_ylabel(ylabel)
     ax.set_title("Terminal runtime by algorithm")
     ax.grid(True, axis="y", alpha=0.3, which="both")
-    ax.legend(frameon=False)
     return fig, plotted_count, excluded_count
 
 
@@ -276,13 +186,9 @@ def _error_runtime_plot(rows: list[Mapping[str, Any]], error_view: str):
             error,
             color=colors[algorithm],
             marker=markers[molecule],
-            facecolors=(
-                colors[algorithm]
-                if _observation_bucket(row) == "validated"
-                else "none"
-            ),
+            facecolors=colors[algorithm],
             edgecolors=colors[algorithm],
-            alpha=0.85 if _observation_bucket(row) == "validated" else 0.7,
+            alpha=0.8,
             s=48,
         )
     ax.set_xscale("log")
@@ -305,11 +211,7 @@ def _error_runtime_plot(rows: list[Mapping[str, Any]], error_view: str):
         Line2D([0], [0], marker=markers[name], color="#444", linestyle="", label=name, markersize=7)
         for name in molecules
     ]
-    status_handles = [
-        Line2D([0], [0], marker="o", color="#111111", markerfacecolor="#111111", linestyle="", markersize=6, label="Validated"),
-        Line2D([0], [0], marker="o", color="#111111", markerfacecolor="white", linestyle="", markersize=6, label="Diagnostic / unvalidated"),
-    ]
-    handles = algorithm_handles + molecule_handles + status_handles
+    handles = algorithm_handles + molecule_handles
     if handles:
         ax.legend(
             handles=handles,
@@ -329,7 +231,7 @@ def render_plots(
     error_view: str = "absolute",
     output_format: str = "png",
 ) -> dict[str, Any]:
-    """Render the four compact plots and return a plot manifest."""
+    """Render the three compact plots and return a plot manifest."""
 
     if error_view not in {"absolute", "signed"}:
         raise ValueError("error_view must be absolute or signed")
@@ -338,7 +240,6 @@ def render_plots(
 
     plots = [
         ("error_by_algorithm", lambda: _error_plot(rows, error_view)),
-        ("convergence_by_algorithm", lambda: _convergence_plot(rows)),
         ("runtime_by_algorithm", lambda: _runtime_plot(rows)),
         ("error_vs_runtime", lambda: _error_runtime_plot(rows, error_view)),
     ]
@@ -355,10 +256,9 @@ def render_plots(
         }
 
     return {
-        "plot_schema_version": "qss-benchmark-plots.v3",
+        "plot_schema_version": "qss-benchmark-plots.v4",
         "population_definitions": {
-            "validated": "Rows marked benchmark_eligible.",
-            "observed": "Completed rows with finite terminal energy error; non-converged rows remain visible.",
+            "terminal": "Completed rows with finite terminal energy error; convergence flags do not filter them.",
             "excluded": "Rows without a completed finite terminal result, or without positive runtime for runtime plots.",
         },
         "error_view": error_view,

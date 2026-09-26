@@ -19,7 +19,6 @@ matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import NullFormatter
 
 try:
@@ -28,12 +27,9 @@ except ImportError:  # pragma: no cover - direct script execution
     from benchmark_io import ExporterError, load_folder_source
 
 
-REPORT_SCHEMA_VERSION = "qss-paper-report.v3"
+REPORT_SCHEMA_VERSION = "qss-paper-report.v4"
 PALETTE = {
-    "eligible": "#0072B2",
-    "diagnostic": "#E69F00",
-    "non_converged": "#D55E00",
-    "incomplete": "#999999",
+    "terminal": "#0072B2",
     "VQE": "#0072B2",
     "QSE": "#56B4E9",
     "KQD": "#009E73",
@@ -71,21 +67,8 @@ def _number(value: Any) -> float | None:
     return result if math.isfinite(result) else None
 
 
-def _eligible(row: Mapping[str, Any]) -> bool:
-    explicit = row.get("benchmark_eligible")
-    if isinstance(explicit, bool):
-        return explicit
-    return (
-        str(row.get("status") or "").lower() == "completed"
-        and row.get("reported_energy_is_valid") is not False
-        and row.get("projected_solve_is_diagnostic") is not True
-        and row.get("scientific_converged") is not False
-        and row.get("converged") is not False
-    )
-
-
 def _error_mHa(row: Mapping[str, Any]) -> float | None:
-    """Return a finite observed error for plotting, without changing eligibility."""
+    """Return a finite terminal error for plotting."""
     explicit = _number(row.get("absolute_error"))
     if explicit is not None:
         return abs(explicit) * 1000
@@ -102,24 +85,12 @@ def _runtime_seconds(row: Mapping[str, Any]) -> float | None:
 
 
 def _observed(row: Mapping[str, Any]) -> bool:
-    """Whether a completed row has finite values that can be inspected."""
+    """Whether a completed row has a finite terminal energy result."""
     return (
         str(row.get("status") or "").lower() == "completed"
         and row.get("reported_energy_is_valid") is not False
         and _error_mHa(row) is not None
-        and _runtime_seconds(row) is not None
     )
-
-
-def _observation_bucket(row: Mapping[str, Any]) -> str:
-    """Classify rows for figures without treating non-convergence as failure."""
-    if _eligible(row):
-        return "validated"
-    if not _observed(row):
-        return "incomplete"
-    if row.get("projected_solve_is_diagnostic") is True:
-        return "diagnostic"
-    return "unvalidated"
 
 
 def _campaign_id(source: Mapping[str, Any], folder: Path) -> str:
@@ -210,18 +181,6 @@ def _quantile(values: list[float], probability: float) -> float | None:
     return ordered[lower] + fraction * (ordered[upper] - ordered[lower])
 
 
-def _status_bucket(row: Mapping[str, Any]) -> str:
-    if _eligible(row):
-        return "eligible"
-    if str(row.get("status") or "").lower() != "completed":
-        return "incomplete"
-    if row.get("projected_solve_is_diagnostic") is True:
-        return "diagnostic"
-    if row.get("scientific_converged") is False or row.get("converged") is False:
-        return "non_converged"
-    return "incomplete"
-
-
 def _group_stats(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> list[dict[str, Any]]:
     groups: dict[tuple[str, ...], list[Mapping[str, Any]]] = defaultdict(list)
     for row in rows:
@@ -229,35 +188,19 @@ def _group_stats(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> li
 
     result: list[dict[str, Any]] = []
     for group_key, group_rows in sorted(groups.items()):
-        eligible = [row for row in group_rows if _eligible(row)]
-        errors = [value for row in eligible if (value := _error_mHa(row)) is not None]
-        runtimes = [value for row in eligible if (value := _runtime_seconds(row)) is not None]
         observed = [row for row in group_rows if _observed(row)]
         observed_errors = [value for row in observed if (value := _error_mHa(row)) is not None]
         observed_runtimes = [value for row in observed if (value := _runtime_seconds(row)) is not None]
-        bucket_counts = Counter(_status_bucket(row) for row in group_rows)
-        observation_counts = Counter(_observation_bucket(row) for row in group_rows)
         record: dict[str, Any] = {key: value for key, value in zip(keys, group_key)}
         record.update(
             {
                 "row_count": len(group_rows),
-                "eligible_count": len(errors),
-                "median_absolute_error_mHa": statistics.median(errors) if errors else None,
-                "q1_absolute_error_mHa": _quantile(errors, 0.25),
-                "q3_absolute_error_mHa": _quantile(errors, 0.75),
-                "median_runtime_seconds": statistics.median(runtimes) if runtimes else None,
-                "eligible": bucket_counts.get("eligible", 0),
-                "diagnostic": bucket_counts.get("diagnostic", 0),
-                "non_converged": bucket_counts.get("non_converged", 0),
-                "incomplete": bucket_counts.get("incomplete", 0),
                 "observed_count": len(observed_errors),
                 "median_observed_absolute_error_mHa": statistics.median(observed_errors) if observed_errors else None,
                 "q1_observed_absolute_error_mHa": _quantile(observed_errors, 0.25),
                 "q3_observed_absolute_error_mHa": _quantile(observed_errors, 0.75),
                 "median_observed_runtime_seconds": statistics.median(observed_runtimes) if observed_runtimes else None,
-                "validated_observation_count": observation_counts.get("validated", 0),
-                "diagnostic_observation_count": observation_counts.get("diagnostic", 0),
-                "unvalidated_observation_count": observation_counts.get("unvalidated", 0),
+                "incomplete_count": len(group_rows) - len(observed),
             }
         )
         result.append(record)
@@ -299,48 +242,23 @@ def _csv_value(value: Any) -> Any:
 def build_statistics(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     campaigns = []
     for campaign_id, campaign_rows in sorted(_group_rows(rows, "campaign_id")):
-        buckets = Counter(_status_bucket(row) for row in campaign_rows)
+        observed_count = sum(_observed(row) for row in campaign_rows)
         campaigns.append(
             {
                 "campaign_id": campaign_id,
                 "label": _campaign_label(campaign_id),
                 "row_count": len(campaign_rows),
                 "status_counts": dict(sorted(Counter(str(row.get("status") or "missing") for row in campaign_rows).items())),
-                "eligibility_counts": dict(sorted(buckets.items())),
-                "observation_counts": dict(
-                    sorted(Counter(_observation_bucket(row) for row in campaign_rows).items())
-                ),
+                "observed_count": observed_count,
+                "incomplete_count": len(campaign_rows) - observed_count,
             }
         )
-    unvalidated = [row for row in rows if _observation_bucket(row) == "unvalidated"]
-    unvalidated_reasons = Counter(
-        str(row.get("convergence_failure_reason") or "unknown")
-        for row in unvalidated
-    )
-    unvalidated_by_group = Counter(
-        (
-            str(row.get("campaign_id") or "UNKNOWN"),
-            str(row.get("algorithm") or "UNKNOWN"),
-            str(row.get("convergence_failure_reason") or "unknown"),
-        )
-        for row in unvalidated
-    )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "row_count": len(rows),
-        "eligible_row_count": sum(_eligible(row) for row in rows),
-        "observation_counts": dict(sorted(Counter(_observation_bucket(row) for row in rows).items())),
+        "observed_row_count": sum(_observed(row) for row in rows),
+        "incomplete_row_count": sum(not _observed(row) for row in rows),
         "campaigns": campaigns,
-        "unvalidated_reason_counts": dict(sorted(unvalidated_reasons.items())),
-        "unvalidated_by_campaign_algorithm": [
-            {
-                "campaign_id": campaign_id,
-                "algorithm": algorithm,
-                "convergence_failure_reason": reason,
-                "count": count,
-            }
-            for (campaign_id, algorithm, reason), count in sorted(unvalidated_by_group.items())
-        ],
         "by_campaign_algorithm": _group_stats(rows, ("campaign_id", "algorithm")),
         "by_campaign_variant": _group_stats(rows, ("campaign_id", "variant_id")),
         "by_campaign_variant_algorithm": _group_stats(rows, ("campaign_id", "variant_label", "algorithm")),
@@ -420,31 +338,29 @@ def _empty(message: str) -> Any:
     return fig
 
 
-def _plot_eligibility(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> list[str]:
+def _plot_population(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> list[str]:
     grouped = [(key, values) for key, values in _group_rows(rows, "campaign_label")]
     if not grouped:
-        return _save(_empty("No campaign rows."), output_dir, "eligibility_matrix", fmt)
+        return _save(_empty("No campaign rows."), output_dir, "campaign_populations", fmt)
     labels = [key for key, _ in grouped]
-    categories = ("validated", "diagnostic", "unvalidated", "incomplete")
-    colors = (PALETTE["eligible"], PALETTE["diagnostic"], PALETTE["non_converged"], PALETTE["incomplete"])
+    categories = ("observed", "incomplete")
+    colors = (PALETTE["terminal"], "#999999")
     fig, ax = plt.subplots(figsize=(8.6, 4.8), constrained_layout=True)
     bottom = [0] * len(labels)
     for category, color in zip(categories, colors):
-        values = [sum(_observation_bucket(row) == category for row in group) for _, group in grouped]
-        label = {
-            "validated": "Validated",
-            "diagnostic": "Diagnostic observation",
-            "unvalidated": "Unvalidated finite observation",
-            "incomplete": "Incomplete or missing",
-        }[category]
+        values = [
+            sum((_observed(row) if category == "observed" else not _observed(row)) for row in group)
+            for _, group in grouped
+        ]
+        label = "Finite terminal result" if category == "observed" else "Incomplete or missing"
         ax.bar(labels, values, bottom=bottom, label=label, color=color, edgecolor="white", linewidth=0.4)
         bottom = [left + value for left, value in zip(bottom, values)]
     ax.set_ylabel("Rows")
-    ax.set_title("Campaign populations and validation status")
+    ax.set_title("Campaign populations")
     ax.tick_params(axis="x", rotation=28)
     ax.legend(ncol=2, frameon=False)
     ax.grid(axis="y", alpha=0.25)
-    return _save(fig, output_dir, "eligibility_matrix", fmt)
+    return _save(fig, output_dir, "campaign_populations", fmt)
 
 
 def _plot_preset(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> list[str]:
@@ -464,38 +380,28 @@ def _plot_preset(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> l
     for index, algorithm in enumerate(algorithms):
         values = []
         runtimes = []
-        validated_values = []
-        validated_runtimes = []
         for variant in variants:
             item = next((record for record in groups if record["plot_variant"] == variant and str(record["algorithm"]).lower() == algorithm), None)
             values.append(item["median_observed_absolute_error_mHa"] if item else math.nan)
             runtimes.append(item["median_observed_runtime_seconds"] if item else math.nan)
-            validated_values.append(item["median_absolute_error_mHa"] if item else math.nan)
-            validated_runtimes.append(item["median_runtime_seconds"] if item else math.nan)
         positions = [value - 0.39 + width / 2 + index * width for value in x]
         label = algorithm.upper()
         color = PALETTE.get(label, "#555555")
         axes[0].bar(positions, values, width=width, label=label, color=color, alpha=0.58, edgecolor="black", linewidth=0.3)
         axes[1].bar(positions, runtimes, width=width, label=label, color=color, alpha=0.58, edgecolor="black", linewidth=0.3)
-        axes[0].scatter(positions, validated_values, color=color, edgecolors="black", linewidths=0.45, s=22, zorder=3)
-        axes[1].scatter(positions, validated_runtimes, color=color, edgecolors="black", linewidths=0.45, s=22, zorder=3)
     axes[0].set_ylabel("Median absolute error (mHa)")
     axes[1].set_ylabel("Median runtime (s)")
     for ax in axes:
         ax.set_xticks(x, [label.replace(" ", "\n") for label in variants])
         ax.grid(axis="y", alpha=0.25)
-    axes[0].set_title("Finite observed error")
-    axes[1].set_title("Finite observed runtime")
+    axes[0].set_title("Terminal error")
+    axes[1].set_title("Terminal runtime")
     axes[0].set_yscale("symlog", linthresh=0.01)
     axes[0].set_ylim(bottom=0)
     axes[1].set_yscale("log")
-    legend = [
-        Line2D([0], [0], marker="o", color="black", markerfacecolor="white", linestyle="None", markersize=5, label="Validated median"),
-        Patch(facecolor="#aaaaaa", edgecolor="black", alpha=0.58, label="All finite observations"),
-    ]
-    axes[0].legend(handles=legend, frameon=False, loc="upper left")
+    axes[0].legend(frameon=False, loc="upper left")
     axes[1].legend(frameon=False, ncol=3)
-    fig.suptitle("Preset comparison: observed estimates and validated medians", fontsize=11)
+    fig.suptitle("Preset comparison: terminal estimates", fontsize=11)
     return _save(fig, output_dir, "preset_tradeoff", fmt)
 
 
@@ -507,40 +413,22 @@ def _plot_seed_sensitivity(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
     algorithms = sorted({str(row.get("algorithm") or "").lower() for row in selected})
     for algorithm in algorithms:
         color = PALETTE.get(algorithm.upper(), "#555555")
-        for bucket, marker in (("validated", "o"), ("diagnostic", "s"), ("unvalidated", "x")):
-            points = [
-                row for row in selected
-                if str(row.get("algorithm") or "").lower() == algorithm
-                and _observation_bucket(row) == bucket
-            ]
-            if not points:
-                continue
-            scatter_args = {
-                "label": algorithm.upper() if bucket == "validated" else "_nolegend_",
-                "color": color,
-                "marker": marker,
-                "linewidths": 0.65,
-                "s": 42,
-                "alpha": 1.0 if bucket == "validated" else 0.8,
-            }
-            if bucket != "unvalidated":
-                scatter_args.update({"facecolors": color if bucket == "validated" else "none", "edgecolors": "black"})
-            ax.scatter(
-                [_number(row.get("seed")) for row in points],
-                [_error_mHa(row) for row in points],
-                **scatter_args,
-            )
+        points = [row for row in selected if str(row.get("algorithm") or "").lower() == algorithm]
+        ax.scatter(
+            [_number(row.get("seed")) for row in points],
+            [_error_mHa(row) for row in points],
+            label=algorithm.upper(),
+            color=color,
+            marker="o",
+            linewidths=0.65,
+            s=42,
+            alpha=0.85,
+        )
     ax.set_xlabel("Campaign seed")
     ax.set_ylabel("Absolute error (mHa)")
-    ax.set_title("Seed sensitivity: finite observed estimates")
+    ax.set_title("Seed sensitivity: finite terminal estimates")
     ax.grid(alpha=0.25)
-    handles = [
-        Line2D([0], [0], marker="o", color="black", markerfacecolor="black", linestyle="None", markersize=5, label="Validated"),
-        Line2D([0], [0], marker="s", color="black", markerfacecolor="white", linestyle="None", markersize=5, label="Diagnostic"),
-        Line2D([0], [0], marker="x", color="black", linestyle="None", markersize=6, label="Unvalidated"),
-    ]
-    method_handles, method_labels = ax.get_legend_handles_labels()
-    ax.legend(method_handles + handles, method_labels + [item.get_label() for item in handles], frameon=False, ncol=3)
+    ax.legend(frameon=False, ncol=3, title="Algorithm")
     return _save(fig, output_dir, "seed_sensitivity", fmt)
 
 
@@ -562,23 +450,20 @@ def _plot_conditions(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) 
     x = list(range(len(conditions)))
     for index, algorithm in enumerate(algorithms):
         values = []
-        validated_values = []
         for condition in conditions:
             item = next((record for record in groups if record["campaign_label"] == condition and str(record["algorithm"]).lower() == algorithm), None)
             values.append(item["median_observed_absolute_error_mHa"] if item else math.nan)
-            validated_values.append(item["median_absolute_error_mHa"] if item else math.nan)
         positions = [value - 0.39 + width / 2 + index * width for value in x]
         label = algorithm.upper()
         color = PALETTE.get(label, "#555555")
         ax.bar(positions, values, width=width, label=label, color=color, alpha=0.58, edgecolor="black", linewidth=0.3)
-        ax.scatter(positions, validated_values, color=color, edgecolors="black", linewidths=0.45, s=22, zorder=3)
     ax.set_xticks(x, [condition.replace(" ", "\n") for condition in conditions])
     ax.set_ylabel("Median absolute error (mHa)")
-    ax.set_title("Local conditions: finite observed error")
+    ax.set_title("Local conditions: terminal error")
     ax.set_yscale("symlog", linthresh=0.01)
     ax.set_ylim(bottom=0)
     ax.grid(axis="y", alpha=0.25)
-    ax.legend(frameon=False, ncol=3, title="Bars: all observed; dots: validated")
+    ax.legend(frameon=False, ncol=3, title="Algorithm")
     return _save(fig, output_dir, "backend_noise_comparison", fmt)
 
 
@@ -601,8 +486,7 @@ def _plot_heatmap(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> 
             if value is None or not item or item["observed_count"] == 0:
                 row_labels.append("—")
             else:
-                status = "V" if item["eligible_count"] else "U"
-                row_labels.append(f"{value:.2f}\n{status} {item['eligible_count']}/{item['observed_count']}")
+                row_labels.append(f"{value:.2f}\nn={item['observed_count']}")
         data.append(row_values)
         labels.append(row_labels)
     fig, ax = plt.subplots(figsize=(11.0, 4.7), constrained_layout=True)
@@ -622,16 +506,13 @@ def _plot_heatmap(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> 
     )
     ax.set_xticks(range(len(molecules)), [_short_molecule(value) for value in molecules])
     ax.set_yticks(range(len(algorithms)), [value.upper() for value in algorithms])
-    ax.set_title("Statevector median absolute error (mHa; eligible n)")
+    ax.set_title("Statevector median terminal absolute error (mHa)")
     for i, row in enumerate(labels):
         for j, label in enumerate(row):
             ax.text(j, i, label, ha="center", va="center", fontsize=7, color="black")
-            item = next((record for record in groups if str(record["algorithm"]).lower() == algorithms[i] and record["molecule"] == molecules[j]), None)
-            if item and item["observed_count"] and not item["eligible_count"]:
-                ax.add_patch(Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, hatch="///", edgecolor="#555555", linewidth=0.0))
     colorbar = fig.colorbar(image, ax=ax, shrink=0.84)
     colorbar.set_label("Median finite observed error (mHa; log scale)")
-    ax.set_title("Statevector error by molecule and method (V=validated, U=unvalidated)")
+    ax.set_title("Statevector terminal error by molecule and method")
     return _save(fig, output_dir, "molecule_algorithm_heatmap", fmt)
 
 
@@ -662,20 +543,10 @@ def _plot_resource(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) ->
             item["median_observed_runtime_seconds"] if item["observed_count"] else math.nan
             for item in algorithm_groups
         ]
-        validated_values = [
-            item["median_absolute_error_mHa"] if item["eligible_count"] else math.nan
-            for item in algorithm_groups
-        ]
-        validated_runtimes = [
-            item["median_runtime_seconds"] if item["eligible_count"] else math.nan
-            for item in algorithm_groups
-        ]
         color = PALETTE.get(algorithm.upper(), "#555555")
         error_ax, runtime_ax = axes[row_index]
-        error_ax.plot(budgets, observed_values, marker="x", linestyle="--", color=color, alpha=0.55)
-        runtime_ax.plot(budgets, observed_runtimes, marker="x", linestyle="--", color=color, alpha=0.55)
-        error_ax.plot(budgets, validated_values, marker="o", color=color)
-        runtime_ax.plot(budgets, validated_runtimes, marker="o", color=color)
+        error_ax.plot(budgets, observed_values, marker="o", linestyle="-", color=color)
+        runtime_ax.plot(budgets, observed_runtimes, marker="o", linestyle="-", color=color)
         budget_labels = [_format_budget(value) for value in budgets]
         for ax in (error_ax, runtime_ax):
             ax.set_xscale("log")
@@ -685,24 +556,25 @@ def _plot_resource(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) ->
             ax.grid(axis="y", alpha=0.25)
         error_ax.set_ylabel("Median absolute error (mHa)")
         runtime_ax.set_ylabel("Median runtime (s)")
-        error_ax.set_title(f"{algorithm.upper()}: finite observed error")
-        runtime_ax.set_title(f"{algorithm.upper()}: finite observed runtime")
+        error_ax.set_title(f"{algorithm.upper()}: terminal error")
+        runtime_ax.set_title(f"{algorithm.upper()}: terminal runtime")
         error_ax.set_yscale("symlog", linthresh=0.01)
         error_ax.set_ylim(bottom=0)
         runtime_ax.set_yscale("log")
-    legend = [
-        Line2D([0], [0], marker="x", color="#555555", linestyle="--", label="Finite observed median"),
-        Line2D([0], [0], marker="o", color="#555555", linestyle="-", label="Validated median"),
-    ]
-    fig.legend(handles=legend, loc="lower center", ncol=2, frameon=False, bbox_to_anchor=(0.5, 0.01))
+    fig.legend(
+        handles=[Line2D([0], [0], marker="o", color="#555555", linestyle="-", label="Terminal median")],
+        loc="lower center",
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.01),
+    )
     fig.suptitle("Resource ablation: ordered sample budgets", fontsize=12)
     fig.tight_layout(rect=(0, 0.06, 1, 0.95))
     return _save(fig, output_dir, "resource_ablation", fmt)
 
 
 def _plot_accuracy_runtime(rows: list[Mapping[str, Any]], output_dir: Path, fmt: str) -> list[str]:
-    """Show all finite estimates while keeping validation status explicit."""
-    observed = [row for row in rows if _observed(row)]
+    """Show all finite terminal estimates."""
+    observed = [row for row in rows if _observed(row) and _runtime_seconds(row) is not None]
     if not observed:
         return _save(_empty("No finite accuracy/runtime observations."), output_dir, "accuracy_runtime", fmt)
 
@@ -713,27 +585,19 @@ def _plot_accuracy_runtime(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
         panel_rows = [row for row in observed if row.get("campaign_id") in campaign_ids]
         for algorithm in algorithms:
             color = PALETTE.get(algorithm, "#555555")
-            for bucket, marker in (("validated", "o"), ("diagnostic", "s"), ("unvalidated", "x")):
-                points = [
-                    row for row in panel_rows
-                    if str(row.get("algorithm") or "UNKNOWN").upper() == algorithm
-                    and _observation_bucket(row) == bucket
-                ]
-                if not points:
-                    continue
-                scatter_args = {
-                    "color": color,
-                    "marker": marker,
-                    "linewidths": 0.5,
-                    "s": 25,
-                    "alpha": 0.78 if bucket != "validated" else 0.9,
-                }
-                if bucket != "unvalidated":
-                    scatter_args.update({"facecolors": color if bucket == "validated" else "none", "edgecolors": "black"})
+            points = [
+                row for row in panel_rows
+                if str(row.get("algorithm") or "UNKNOWN").upper() == algorithm
+            ]
+            if points:
                 ax.scatter(
                     [_runtime_seconds(row) for row in points],
                     [_error_mHa(row) for row in points],
-                    **scatter_args,
+                    color=color,
+                    marker="o",
+                    linewidths=0.5,
+                    s=25,
+                    alpha=0.82,
                 )
         ax.axhline(1.6, color="#666666", linestyle=":", linewidth=0.8)
         ax.set_xscale("log")
@@ -752,14 +616,9 @@ def _plot_accuracy_runtime(rows: list[Mapping[str, Any]], output_dir: Path, fmt:
         Line2D([0], [0], marker="o", color=PALETTE.get(algorithm, "#555555"), linestyle="None", markersize=5, label=algorithm)
         for algorithm in algorithms
     ]
-    status_handles = [
-        Line2D([0], [0], marker="o", color="black", markerfacecolor="black", linestyle="None", markersize=5, label="Validated"),
-        Line2D([0], [0], marker="s", color="black", markerfacecolor="white", linestyle="None", markersize=5, label="Diagnostic"),
-        Line2D([0], [0], marker="x", color="black", linestyle="None", markersize=6, label="Unvalidated"),
-        Line2D([0], [0], color="#666666", linestyle=":", linewidth=1, label="1.6 mHa threshold"),
-    ]
-    fig.legend(handles=method_handles + status_handles, loc="lower center", ncol=5, frameon=False, bbox_to_anchor=(0.5, -0.015))
-    fig.suptitle("Accuracy versus runtime for finite observed estimates", fontsize=12)
+    threshold_handle = Line2D([0], [0], color="#666666", linestyle=":", linewidth=1, label="1.6 mHa threshold")
+    fig.legend(handles=method_handles + [threshold_handle], loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.015))
+    fig.suptitle("Accuracy versus runtime for finite terminal estimates", fontsize=12)
     return _save(fig, output_dir, "accuracy_runtime", fmt)
 
 
@@ -788,39 +647,36 @@ def _latex_escape(value: Any) -> str:
 
 def _write_latex_fragments(stats: Mapping[str, Any], output_dir: Path) -> None:
     rows = [
-        "\\begin{tabular}{lrrrr}",
-        "Campaign & Rows & Observed & Validated & Incomplete \\\\",
+        r"\begin{tabular}{lrrr}",
+        r"Campaign & Rows & Observed & Incomplete \\",
         "\\hline",
     ]
     for campaign in stats["campaigns"]:
-        counts = campaign["observation_counts"]
-        observed = counts.get("validated", 0) + counts.get("diagnostic", 0) + counts.get("unvalidated", 0)
         rows.append(
-            f"{_latex_escape(campaign['label'])} & {campaign['row_count']} & {observed} & {counts.get('validated', 0)} & {counts.get('incomplete', 0)} "
+            f"{_latex_escape(campaign['label'])} & {campaign['row_count']} & {campaign['observed_count']} & {campaign['incomplete_count']} "
             + r"\\"
         )
     rows.append("\\end{tabular}")
     (output_dir / "campaign_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     rows = [
-        "\\begin{tabular}{@{}llrrrr@{}}",
-        "Campaign & Algorithm & Observed $n$ & Validated $n$ & Observed error & Validated error \\\\",
+        r"\begin{tabular}{@{}llrrr@{}}",
+        r"Campaign & Algorithm & Rows & Observed & Median error (mHa) \\",
         "\\hline",
     ]
     for item in stats["by_campaign_algorithm"]:
         observed_median = item["median_observed_absolute_error_mHa"]
-        validated_median = item["median_absolute_error_mHa"]
         observed_value = f"{observed_median:.3f}" if observed_median is not None else "N/A"
-        validated_value = f"{validated_median:.3f}" if validated_median is not None else "N/A"
         rows.append(
-            f"{_latex_escape(_campaign_label(item['campaign_id']))} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['observed_count']} & {item['eligible_count']} & {observed_value} & {validated_value} \\\\"
+            f"{_latex_escape(_campaign_label(item['campaign_id']))} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {observed_value} "
+            + r"\\"
         )
     rows.append("\\end{tabular}")
     (output_dir / "algorithm_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     rows = [
-        "\\begin{tabular}{@{}llrrrr@{}}",
-        "Variant & Algorithm & Rows & Observed & Validated & Obs. error (mHa) \\\\",
+        r"\begin{tabular}{@{}llrrr@{}}",
+        r"Variant & Algorithm & Rows & Observed & Median error (mHa) \\",
         "\\hline",
     ]
     for item in stats["by_campaign_variant_algorithm"]:
@@ -829,15 +685,15 @@ def _write_latex_fragments(stats: Mapping[str, Any], output_dir: Path) -> None:
         median = item["median_observed_absolute_error_mHa"]
         value = f"{median:.3f}" if median is not None else "N/A"
         rows.append(
-            f"{_latex_escape(item['variant_label'])} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {item['eligible_count']} & {value} "
+            f"{_latex_escape(item['variant_label'])} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {value} "
             + r"\\"
         )
     rows.append("\\end{tabular}")
     (output_dir / "preset_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     rows = [
-        "\\begin{tabular}{@{}lrrrr@{}}",
-        "Algorithm & Rows & Observed & Validated & Median observed error (mHa) \\\\",
+        r"\begin{tabular}{@{}lrrr@{}}",
+        r"Algorithm & Rows & Observed & Median error (mHa) \\",
         "\\hline",
     ]
     for item in stats["by_campaign_algorithm"]:
@@ -846,7 +702,7 @@ def _write_latex_fragments(stats: Mapping[str, Any], output_dir: Path) -> None:
         median = item["median_observed_absolute_error_mHa"]
         value = f"{median:.3f}" if median is not None else "N/A"
         rows.append(
-            f"{_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {item['eligible_count']} & {value} "
+            f"{_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {value} "
             + r"\\"
         )
     rows.append("\\end{tabular}")
@@ -862,10 +718,7 @@ def _accuracy_runtime_panel_counts(rows: list[Mapping[str, Any]]) -> list[dict[s
                 "panel": label,
                 "row_count": len(panel_rows),
                 "observed_count": sum(_observed(row) for row in panel_rows),
-                "validated_count": sum(_observation_bucket(row) == "validated" for row in panel_rows),
-                "diagnostic_count": sum(_observation_bucket(row) == "diagnostic" for row in panel_rows),
-                "unvalidated_count": sum(_observation_bucket(row) == "unvalidated" for row in panel_rows),
-                "incomplete_count": sum(_observation_bucket(row) == "incomplete" for row in panel_rows),
+                "incomplete_count": sum(not _observed(row) for row in panel_rows),
             }
         )
     return counts
@@ -886,7 +739,6 @@ def generate_report(input_dirs: list[Path], output_dir: Path, *, output_format: 
         ("by_campaign_variant", stats["by_campaign_variant"]),
         ("by_campaign_molecule_algorithm", stats["by_campaign_molecule_algorithm"]),
         ("by_campaign_seed", stats["by_campaign_seed"]),
-        ("unvalidated_by_campaign_algorithm", stats["unvalidated_by_campaign_algorithm"]),
         ("field_presence", stats["field_presence"]),
     ):
         _write_records(records, output_dir / f"{name}.csv")
@@ -895,7 +747,7 @@ def generate_report(input_dirs: list[Path], output_dir: Path, *, output_format: 
     plot_dir = output_dir / "plots"
     plot_files: list[str] = []
     for builder in (
-        _plot_eligibility,
+        _plot_population,
         _plot_preset,
         _plot_conditions,
         _plot_seed_sensitivity,
@@ -908,16 +760,12 @@ def generate_report(input_dirs: list[Path], output_dir: Path, *, output_format: 
     manifest = {
         "schema_version": REPORT_SCHEMA_VERSION,
         "row_count": len(rows),
-        "eligible_row_count": stats["eligible_row_count"],
+        "observed_row_count": stats["observed_row_count"],
+        "incomplete_row_count": stats["incomplete_row_count"],
         "population_definitions": {
-            "validated": "Rows marked benchmark_eligible; used for accuracy and runtime aggregates.",
-            "observed": "Completed rows with finite absolute error and positive runtime; plotted for diagnostic context.",
-            "diagnostic": "Finite observed rows marked projected_solve_is_diagnostic; excluded from validated aggregates.",
-            "unvalidated": "Finite observed rows without the validated contract, including non-converged results; not counted as eligible or as missing.",
-            "incomplete": "Rows without a finite completed estimate and runtime; not plotted as accuracy observations.",
+            "terminal": "Completed rows with a finite terminal energy result; convergence flags do not filter them.",
+            "incomplete": "Rows without a completed finite terminal energy result.",
         },
-        "observation_counts": dict(sorted(Counter(_observation_bucket(row) for row in rows).items())),
-        "unvalidated_reason_counts": stats["unvalidated_reason_counts"],
         "accuracy_runtime_panels": _accuracy_runtime_panel_counts(rows),
         "input_dirs": [str(path.expanduser().resolve()) for path in input_dirs],
         "plot_files": sorted(plot_files),

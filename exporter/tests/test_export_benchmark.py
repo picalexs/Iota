@@ -60,11 +60,11 @@ def test_export_from_api_writes_compact_default_files(tmp_path: Path) -> None:
     )
 
     assert result["row_count"] == 1
-    assert result["observed_result_count"] == 1
+    assert result["successful_result_count"] == 1
     assert (output_dir / "runs.json").is_file()
     assert (output_dir / "runs.csv").is_file()
     assert (output_dir / "summaries" / "by_algorithm.csv").is_file()
-    assert (output_dir / "summaries" / "best_observed_algorithm_by_molecule.csv").is_file()
+    assert (output_dir / "summaries" / "best_algorithm_by_molecule.csv").is_file()
     assert (output_dir / "manifest.json").is_file()
     assert not (output_dir / "raw").exists()
     payload = json.loads((output_dir / "runs.json").read_text(encoding="utf-8"))

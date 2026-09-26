@@ -150,16 +150,14 @@ The exporter keeps only the fields needed for comparison and audit:
   Hamiltonian hash;
 - convergence termination, convergence value and threshold, basis rank,
   objective-evaluation budget, selected-CI fraction, and full-sector status;
-- scientific convergence, diagnostic status, reported energy source, exclusion
-  reason, eligibility source, execution generation, and restart parent.
+- convergence diagnostics, reported energy source, exclusion reason, execution
+  generation, and restart parent.
 
-The exporter keeps diagnostic rows for audit. It marks them with
-`benchmark_eligible: false`. Aggregate summaries and the general benchmark
-plots use only eligible rows. The paper report also plots finite diagnostic
-and unvalidated observations with separate markers.
-Eligible rows must have a completed status, a finite energy and reference,
-valid reported energy, no projected-solve diagnostic flag, and established
-scientific convergence. A finite diagnostic energy is not a benchmark result.
+The exporter retains convergence and diagnostic fields as provenance. A
+completed row with a finite terminal energy result is included in summaries
+and plots, even when its configured budget did not establish convergence.
+Rows without a completed finite terminal result are excluded from result
+aggregates.
 
 For noisy Aer Estimator runs, `requested_shots` is the nominal shot-equivalent
 budget used to derive precision. Aer Estimator precision is not a literal
@@ -204,11 +202,10 @@ Create the same plots directly from a saved QSS benchmark:
   --output-dir output/local-h2-seeds/plots
 ```
 
-The command writes four plots and `plot_manifest.json`:
+The command writes three plots and `plot_manifest.json`:
 
 - `error_by_algorithm`: absolute or signed error distributions;
-- `convergence_by_algorithm`: scientific convergence rates;
-- `runtime_by_algorithm`: eligible-row runtime distributions;
+- `runtime_by_algorithm`: terminal-row runtime distributions;
 - `error_vs_runtime`: positive runtime and error points on log axes.
 
 Error and runtime plots group rows by algorithm and actual execution path.
@@ -222,9 +219,8 @@ reserves legend space and saves with a tight bounding box to keep text visible.
 
 Completed rows with finite terminal energy errors remain in the error and
 runtime plots, including rows that did not establish scientific convergence.
-Validated observations are marked separately in the plots and remain the only
-rows used for validated aggregates. Rows without a finite result are excluded
-from the relevant plot. The counts are reported in `plot_manifest.json`.
+Rows without a finite result are excluded from the relevant plot. The counts
+are reported in `plot_manifest.json`.
 Signed error plots use a symlog error axis so negative errors remain visible.
 
 ## 4. Create the paper report
@@ -244,18 +240,15 @@ Generate one reproducible report from several campaign folders:
 ```
 
 The report writes `statistics.json`, CSV summaries, LaTeX table fragments, and
-PDF/PNG figures for eligibility, accuracy versus runtime, presets, backend and
-noise conditions, seed sensitivity, molecule coverage, resources, and execution
-paths. Validated aggregate statistics use only rows with
-`benchmark_eligible: true`. Completed rows with finite error and runtime remain
-visible as diagnostic or unvalidated observations. Non-converged finite rows
-are not shown as missing values and do not enter validated aggregates. Export
-summaries also report `observed_result_count`, observed medians, and a
-best-observed algorithm summary. The report manifest defines these populations.
-The report also writes
+PDF/PNG figures for terminal results, accuracy versus runtime, presets, backend
+and noise conditions, seed sensitivity, molecule coverage, resources, and
+execution paths. Every completed row with a finite terminal result contributes
+to the report. Non-converged finite rows remain visible as terminal results.
+Rows without a completed finite result are counted as incomplete. The report
+manifest defines these populations. The report also writes
 `field_presence.csv`, which distinguishes unavailable measurements from lost
-export fields. `unvalidated_by_campaign_algorithm.csv` lists the convergence
-failure reasons behind finite unvalidated observations.
+export fields. Convergence and diagnostic fields remain in `rows.csv` for
+provenance and budget analysis.
 
 ## Tests
 

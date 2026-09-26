@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from exporter.benchmark_io import write_rows_json
-from exporter.paper_report import _observation_bucket, _observed, generate_report
+from exporter.paper_report import _observed, generate_report
 
 
 def _row(algorithm: str, *, eligible: bool, seed: int = 11) -> dict[str, object]:
@@ -47,18 +47,20 @@ def test_generate_report_writes_stats_latex_and_pdf(tmp_path: Path) -> None:
     result = generate_report([source], output, output_format="pdf")
 
     assert result["row_count"] == 2
-    assert result["eligible_row_count"] == 1
+    assert result["observed_row_count"] == 2
+    assert result["incomplete_row_count"] == 0
     assert (output / "statistics.json").is_file()
     assert (output / "campaign_summary.tex").is_file()
-    assert (output / "plots" / "eligibility_matrix.pdf").is_file()
+    assert (output / "plots" / "campaign_populations.pdf").is_file()
     assert (output / "plots" / "accuracy_runtime.pdf").is_file()
     stats = json.loads((output / "statistics.json").read_text(encoding="utf-8"))
-    assert stats["by_campaign_algorithm"][0]["eligible_count"] in {0, 1}
+    assert all(item["observed_count"] == 1 for item in stats["by_campaign_algorithm"])
     manifest = json.loads((output / "report_manifest.json").read_text(encoding="utf-8"))
-    assert "unvalidated" in manifest["population_definitions"]
+    assert "terminal" in manifest["population_definitions"]
+    assert "validated" not in manifest["population_definitions"]
 
 
-def test_finite_non_converged_row_is_unvalidated_observation() -> None:
+def test_finite_non_converged_row_is_terminal_observation() -> None:
     row = _row("vqe", eligible=False)
     row.update(
         {
@@ -68,4 +70,3 @@ def test_finite_non_converged_row_is_unvalidated_observation() -> None:
     )
 
     assert _observed(row)
-    assert _observation_bucket(row) == "unvalidated"

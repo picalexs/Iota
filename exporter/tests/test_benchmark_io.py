@@ -520,8 +520,7 @@ def test_summary_uses_successful_results_only_and_handles_all_failed() -> None:
     vqe = next(item for item in summary["by_algorithm"] if item["algorithm"] == "vqe")
     assert vqe["run_count"] == 2
     assert vqe["successful_count"] == 1
-    assert vqe["observed_count"] == 1
-    assert summary["observed_result_count"] == 1
+    assert summary["successful_result_count"] == 1
     best = summary["best_algorithm_by_molecule"][0]
     assert best["algorithm"] == "vqe"
 
@@ -532,7 +531,7 @@ def test_summary_uses_successful_results_only_and_handles_all_failed() -> None:
     assert failed_summary["best_algorithm_by_molecule"][0]["reason"]
 
 
-def test_summary_excludes_completed_diagnostic_rows_from_successes() -> None:
+def test_summary_includes_completed_diagnostic_rows_as_terminal_results() -> None:
     rows = [
         {
             "algorithm": "vqe",
@@ -556,12 +555,10 @@ def test_summary_excludes_completed_diagnostic_rows_from_successes() -> None:
 
     summary = summarize_rows(rows)
 
-    assert summary["successful_result_count"] == 1
-    assert summary["observed_result_count"] == 2
+    assert summary["successful_result_count"] == 2
     kqd = next(item for item in summary["by_algorithm"] if item["algorithm"] == "kqd")
-    assert kqd["observed_count"] == 1
-    assert summary["best_algorithm_by_molecule"][0]["algorithm"] == "vqe"
-    assert summary["best_observed_algorithm_by_molecule"][0]["algorithm"] == "kqd"
+    assert kqd["successful_count"] == 1
+    assert summary["best_algorithm_by_molecule"][0]["algorithm"] == "kqd"
 
 
 def test_manifest_warns_when_saved_backend_differs_from_actual_runs() -> None:
