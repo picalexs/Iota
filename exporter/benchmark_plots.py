@@ -53,7 +53,33 @@ def _group_label(row: Mapping[str, Any]) -> str:
 
 def _error_value(row: Mapping[str, Any], error_view: str) -> float | None:
     key = "signed_error" if error_view == "signed" else "absolute_error"
-    return _finite(row.get(key))
+    explicit = _finite(row.get(key))
+    if explicit is not None:
+        return explicit
+    final_energy = _finite(row.get("final_energy"))
+    reference_energy = _finite(row.get("reference_energy"))
+    if final_energy is None or reference_energy is None:
+        return None
+    error = final_energy - reference_energy
+    return error if error_view == "signed" else abs(error)
+
+
+def _observed(row: Mapping[str, Any], error_view: str = "absolute") -> bool:
+    """Whether a completed row has a finite terminal estimate for plotting."""
+
+    return (
+        str(row.get("status") or "").lower() == "completed"
+        and row.get("reported_energy_is_valid") is not False
+        and _error_value(row, error_view) is not None
+    )
+
+
+def _observation_bucket(row: Mapping[str, Any]) -> str:
+    if _status_success(row):
+        return "validated"
+    if row.get("projected_solve_is_diagnostic") is True:
+        return "diagnostic"
+    return "unvalidated"
 
 
 def _group_values(
@@ -100,22 +126,42 @@ def _empty_figure(message: str, *, width: float = 8.0):
 
 
 def _error_plot(rows: list[Mapping[str, Any]], error_view: str):
-    eligible_rows = [row for row in rows if _status_success(row)]
-    groups = _group_values(eligible_rows, lambda row: _error_value(row, error_view))
+    observed_rows = [row for row in rows if _observed(row, error_view)]
+    groups = _group_values(observed_rows, lambda row: _error_value(row, error_view))
     plotted_count = sum(len(values) for values in groups.values())
     excluded_count = len(rows) - plotted_count
     if not groups:
-        return _empty_figure("No eligible rows with energy-error data."), 0, len(rows)
+        return _empty_figure("No finite terminal rows with energy-error data."), 0, len(rows)
     labels = list(groups)
     fig, ax = plt.subplots(
         figsize=(max(7.5, 1.25 * len(labels) + 2.5), 5.2),
         constrained_layout=True,
     )
     _boxplot(ax, [groups[label] for label in labels], labels)
+    validated_medians = []
+    for label in labels:
+        values = [
+            value
+            for row in observed_rows
+            if _group_label(row) == label
+            and _status_success(row)
+            and (value := _error_value(row, error_view)) is not None
+        ]
+        validated_medians.append(sum(values) / len(values) if values else math.nan)
+    ax.scatter(
+        range(1, len(labels) + 1),
+        validated_medians,
+        color="#111111",
+        marker="o",
+        s=28,
+        zorder=3,
+        label="Validated median",
+    )
     ax.set_xlabel("Algorithm · execution path")
     ax.set_ylabel(f"{'Signed' if error_view == 'signed' else 'Absolute'} energy error (Ha)")
-    ax.set_title("Energy error by algorithm")
+    ax.set_title("Terminal energy error by algorithm")
     ax.grid(True, axis="y", alpha=0.3)
+    ax.legend(frameon=False)
     return fig, plotted_count, excluded_count
 
 
@@ -148,21 +194,44 @@ def _convergence_plot(rows: list[Mapping[str, Any]]):
 
 
 def _runtime_plot(rows: list[Mapping[str, Any]]):
-    eligible_rows = [row for row in rows if _status_success(row)]
+    observed_rows = [
+        row
+        for row in rows
+        if _observed(row) and (_finite(row.get("runtime_seconds")) or 0) > 0
+    ]
     groups = _group_values(
-        eligible_rows,
+        observed_rows,
         lambda row: _finite(row.get("runtime_seconds")),
     )
     plotted_count = sum(len(values) for values in groups.values())
     excluded_count = len(rows) - plotted_count
     if not groups:
-        return _empty_figure("No eligible rows with runtime data."), 0, len(rows)
+        return _empty_figure("No finite terminal rows with runtime data."), 0, len(rows)
     labels = list(groups)
     fig, ax = plt.subplots(
         figsize=(max(7.5, 1.25 * len(labels) + 2.5), 5.2),
         constrained_layout=True,
     )
     _boxplot(ax, [groups[label] for label in labels], labels)
+    validated_medians = []
+    for label in labels:
+        values = [
+            float(row["runtime_seconds"])
+            for row in observed_rows
+            if _group_label(row) == label
+            and _status_success(row)
+            and _finite(row.get("runtime_seconds")) is not None
+        ]
+        validated_medians.append(sum(values) / len(values) if values else math.nan)
+    ax.scatter(
+        range(1, len(labels) + 1),
+        validated_medians,
+        color="#111111",
+        marker="o",
+        s=28,
+        zorder=3,
+        label="Validated median",
+    )
     positive = all(value > 0 for values in groups.values() for value in values)
     if positive:
         ax.set_yscale("log")
@@ -171,13 +240,14 @@ def _runtime_plot(rows: list[Mapping[str, Any]]):
         ylabel = "Runtime (seconds)"
     ax.set_xlabel("Algorithm · execution path")
     ax.set_ylabel(ylabel)
-    ax.set_title("Runtime by algorithm")
+    ax.set_title("Terminal runtime by algorithm")
     ax.grid(True, axis="y", alpha=0.3, which="both")
+    ax.legend(frameon=False)
     return fig, plotted_count, excluded_count
 
 
 def _error_runtime_plot(rows: list[Mapping[str, Any]], error_view: str):
-    candidates = [row for row in rows if _status_success(row)]
+    candidates = [row for row in rows if _observed(row, error_view)]
     signed_view = error_view == "signed"
     plotted: list[tuple[Mapping[str, Any], float, float]] = []
     excluded = len(rows) - len(candidates)
@@ -206,7 +276,13 @@ def _error_runtime_plot(rows: list[Mapping[str, Any]], error_view: str):
             error,
             color=colors[algorithm],
             marker=markers[molecule],
-            alpha=0.8,
+            facecolors=(
+                colors[algorithm]
+                if _observation_bucket(row) == "validated"
+                else "none"
+            ),
+            edgecolors=colors[algorithm],
+            alpha=0.85 if _observation_bucket(row) == "validated" else 0.7,
             s=48,
         )
     ax.set_xscale("log")
@@ -219,7 +295,7 @@ def _error_runtime_plot(rows: list[Mapping[str, Any]], error_view: str):
         ylabel = "Absolute energy error (Ha, log scale)"
     ax.set_xlabel("Runtime (seconds, log scale)")
     ax.set_ylabel(ylabel)
-    ax.set_title("Energy error versus runtime")
+    ax.set_title("Terminal energy error versus runtime")
     ax.grid(True, alpha=0.3, which="both")
     algorithm_handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor=colors[name], label=name, markersize=7)
@@ -229,7 +305,11 @@ def _error_runtime_plot(rows: list[Mapping[str, Any]], error_view: str):
         Line2D([0], [0], marker=markers[name], color="#444", linestyle="", label=name, markersize=7)
         for name in molecules
     ]
-    handles = algorithm_handles + molecule_handles
+    status_handles = [
+        Line2D([0], [0], marker="o", color="#111111", markerfacecolor="#111111", linestyle="", markersize=6, label="Validated"),
+        Line2D([0], [0], marker="o", color="#111111", markerfacecolor="white", linestyle="", markersize=6, label="Diagnostic / unvalidated"),
+    ]
+    handles = algorithm_handles + molecule_handles + status_handles
     if handles:
         ax.legend(
             handles=handles,
@@ -275,7 +355,12 @@ def render_plots(
         }
 
     return {
-        "plot_schema_version": "qss-benchmark-plots.v2",
+        "plot_schema_version": "qss-benchmark-plots.v3",
+        "population_definitions": {
+            "validated": "Rows marked benchmark_eligible.",
+            "observed": "Completed rows with finite terminal energy error; non-converged rows remain visible.",
+            "excluded": "Rows without a completed finite terminal result, or without positive runtime for runtime plots.",
+        },
         "error_view": error_view,
         "output_format": output_format,
         "source_row_count": len(rows),

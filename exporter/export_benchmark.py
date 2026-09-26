@@ -149,6 +149,7 @@ def export_source(
         "summaries/by_seed.csv",
         "summaries/field_presence.csv",
         "summaries/best_algorithm_by_molecule.csv",
+        "summaries/best_observed_algorithm_by_molecule.csv",
     ]
     if include_raw and bundle.source_type == "api":
         files.extend(
@@ -166,6 +167,7 @@ def export_source(
         "output_dir": str(output_dir),
         "row_count": len(bundle.rows),
         "successful_result_count": summary["successful_result_count"],
+        "observed_result_count": summary["observed_result_count"],
         "files": files,
     }
     print(json.dumps(result, indent=2))

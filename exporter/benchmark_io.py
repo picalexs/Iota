@@ -1524,6 +1524,30 @@ def _successful_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any
     ]
 
 
+def _observed_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Return completed rows with a finite, reportable terminal energy error.
+
+    Scientific eligibility is intentionally not part of this predicate. A row
+    can be useful for terminal accuracy and runtime analysis even when it did
+    not satisfy the convergence contract.
+    """
+
+    observed: list[Mapping[str, Any]] = []
+    for row in rows:
+        if str(row.get("status") or "").lower() not in SUCCESS_STATUSES:
+            continue
+        if row.get("reported_energy_is_valid") is False:
+            continue
+        absolute_error = _number(row.get("absolute_error"))
+        if absolute_error is None:
+            final_energy = _number(row.get("final_energy"))
+            reference_energy = _number(row.get("reference_energy"))
+            if final_energy is None or reference_energy is None:
+                continue
+        observed.append(row)
+    return observed
+
+
 def _benchmark_row_is_eligible(row: Mapping[str, Any]) -> bool:
     """Return whether a row may contribute to benchmark comparisons."""
     explicit = row.get("benchmark_eligible")
@@ -1548,11 +1572,23 @@ def _group_summary(rows: list[Mapping[str, Any]], key: str) -> list[dict[str, An
     summaries: list[dict[str, Any]] = []
     for group, group_rows in sorted(groups.items()):
         successful = _successful_rows(group_rows)
+        observed = _observed_rows(group_rows)
         errors = [float(row["absolute_error"]) for row in successful if row.get("absolute_error") is not None]
         runtimes = [
             float(row["runtime_seconds"])
             for row in successful
             if _number(row.get("runtime_seconds")) is not None
+        ]
+        observed_errors = [
+            abs(float(row["absolute_error"]))
+            if _number(row.get("absolute_error")) is not None
+            else abs(float(row["final_energy"]) - float(row["reference_energy"]))
+            for row in observed
+        ]
+        observed_runtimes = [
+            float(row["runtime_seconds"])
+            for row in observed
+            if _number(row.get("runtime_seconds")) is not None and float(row["runtime_seconds"]) > 0
         ]
         convergence = [
             bool(row["converged"])
@@ -1568,6 +1604,11 @@ def _group_summary(rows: list[Mapping[str, Any]], key: str) -> list[dict[str, An
                 "mean_absolute_error": statistics.mean(errors) if errors else None,
                 "median_absolute_error": statistics.median(errors) if errors else None,
                 "mean_runtime_seconds": statistics.mean(runtimes) if runtimes else None,
+                "observed_count": len(observed),
+                "mean_observed_absolute_error": statistics.mean(observed_errors) if observed_errors else None,
+                "median_observed_absolute_error": statistics.median(observed_errors) if observed_errors else None,
+                "mean_observed_runtime_seconds": statistics.mean(observed_runtimes) if observed_runtimes else None,
+                "median_observed_runtime_seconds": statistics.median(observed_runtimes) if observed_runtimes else None,
                 "convergence_rate": statistics.mean(convergence) if convergence else None,
             }
         )
@@ -1578,6 +1619,7 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     """Build compact summaries with explicit valid-value denominators."""
 
     successful = _successful_rows(rows)
+    observed = _observed_rows(rows)
     by_algorithm = _group_summary(rows, "algorithm")
     by_molecule = _group_summary(rows, "molecule")
     by_algorithm_path = _group_summary(
@@ -1588,6 +1630,7 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "algorithm_path",
     )
     best: list[dict[str, Any]] = []
+    best_observed: list[dict[str, Any]] = []
     for molecule, molecule_rows in sorted(
         itertools_group(rows, "molecule"), key=lambda item: item[0]
     ):
@@ -1618,6 +1661,35 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
                 }
             )
 
+        observed_candidates = [
+            item
+            for item in _group_summary(molecule_rows, "algorithm")
+            if item["mean_observed_absolute_error"] is not None
+        ]
+        if observed_candidates:
+            winner = min(
+                observed_candidates,
+                key=lambda item: float(item["mean_observed_absolute_error"]),
+            )
+            best_observed.append(
+                {
+                    "molecule": molecule,
+                    "algorithm": winner["algorithm"],
+                    "mean_absolute_error": winner["mean_observed_absolute_error"],
+                    "observed_count": winner["observed_count"],
+                    "reason": None,
+                }
+            )
+        else:
+            best_observed.append(
+                {
+                    "molecule": molecule,
+                    "algorithm": None,
+                    "mean_absolute_error": None,
+                    "observed_count": 0,
+                    "reason": "no finite completed terminal errors",
+                }
+            )
     status_counts = Counter(str(row.get("status") or "missing") for row in rows)
     field_presence = [
         {
@@ -1643,6 +1715,7 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     return {
         "row_count": len(rows),
         "successful_result_count": len(successful),
+        "observed_result_count": len(observed),
         "status_counts": dict(sorted(status_counts.items())),
         "eligibility_counts": dict(sorted(eligibility_counts.items())),
         "field_presence": field_presence,
@@ -1652,6 +1725,7 @@ def summarize_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "by_variant": _group_summary(rows, "variant_id"),
         "by_seed": _group_summary(rows, "seed"),
         "best_algorithm_by_molecule": best,
+        "best_observed_algorithm_by_molecule": best_observed,
     }
 
 
@@ -1742,7 +1816,9 @@ def compact_manifest(bundle: SourceBundle, *, files: list[str]) -> dict[str, Any
         "source_metadata": source_metadata,
         "row_count": len(bundle.rows),
         "successful_result_count": summary["successful_result_count"],
+        "observed_result_count": summary["observed_result_count"],
         "status_counts": summary["status_counts"],
+        "eligibility_counts": summary["eligibility_counts"],
         "runtime_sources": dict(bundle.runtime_sources),
         "selected_backend_name": selected_backend,
         "actual_backend_names": actual_backends,
@@ -1770,6 +1846,10 @@ def write_summary_files(summary: Mapping[str, Any], output_dir: Path) -> None:
     write_records_csv(
         summary["best_algorithm_by_molecule"],
         summaries_dir / "best_algorithm_by_molecule.csv",
+    )
+    write_records_csv(
+        summary["best_observed_algorithm_by_molecule"],
+        summaries_dir / "best_observed_algorithm_by_molecule.csv",
     )
 
 

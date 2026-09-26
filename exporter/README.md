@@ -220,10 +220,12 @@ manuscript-ready vector figure, `--format svg` for editable vector output, or
 `--format both` for PNG and SVG. The plot writer
 reserves legend space and saves with a tight bounding box to keep text visible.
 
-Rows without the required values, rows with diagnostic energies, and rows that
-did not establish scientific convergence are excluded from the relevant plot.
-The counts are reported in `plot_manifest.json`. Signed runtime plots use a
-symlog error axis so negative errors remain visible.
+Completed rows with finite terminal energy errors remain in the error and
+runtime plots, including rows that did not establish scientific convergence.
+Validated observations are marked separately in the plots and remain the only
+rows used for validated aggregates. Rows without a finite result are excluded
+from the relevant plot. The counts are reported in `plot_manifest.json`.
+Signed error plots use a symlog error axis so negative errors remain visible.
 
 ## 4. Create the paper report
 
@@ -247,8 +249,10 @@ noise conditions, seed sensitivity, molecule coverage, resources, and execution
 paths. Validated aggregate statistics use only rows with
 `benchmark_eligible: true`. Completed rows with finite error and runtime remain
 visible as diagnostic or unvalidated observations. Non-converged finite rows
-are not shown as missing values and do not enter validated aggregates. The
-report manifest defines these populations. The report also writes
+are not shown as missing values and do not enter validated aggregates. Export
+summaries also report `observed_result_count`, observed medians, and a
+best-observed algorithm summary. The report manifest defines these populations.
+The report also writes
 `field_presence.csv`, which distinguishes unavailable measurements from lost
 export fields. `unvalidated_by_campaign_algorithm.csv` lists the convergence
 failure reasons behind finite unvalidated observations.

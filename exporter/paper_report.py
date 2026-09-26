@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover - direct script execution
     from benchmark_io import ExporterError, load_folder_source
 
 
-REPORT_SCHEMA_VERSION = "qss-paper-report.v2"
+REPORT_SCHEMA_VERSION = "qss-paper-report.v3"
 PALETTE = {
     "eligible": "#0072B2",
     "diagnostic": "#E69F00",
@@ -230,8 +230,8 @@ def _group_stats(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> li
     result: list[dict[str, Any]] = []
     for group_key, group_rows in sorted(groups.items()):
         eligible = [row for row in group_rows if _eligible(row)]
-        errors = [abs(float(row["absolute_error"])) * 1000 for row in eligible if _number(row.get("absolute_error")) is not None]
-        runtimes = [float(row["runtime_seconds"]) for row in eligible if _number(row.get("runtime_seconds")) is not None]
+        errors = [value for row in eligible if (value := _error_mHa(row)) is not None]
+        runtimes = [value for row in eligible if (value := _runtime_seconds(row)) is not None]
         observed = [row for row in group_rows if _observed(row)]
         observed_errors = [value for row in observed if (value := _error_mHa(row)) is not None]
         observed_runtimes = [value for row in observed if (value := _runtime_seconds(row)) is not None]
@@ -788,62 +788,65 @@ def _latex_escape(value: Any) -> str:
 
 def _write_latex_fragments(stats: Mapping[str, Any], output_dir: Path) -> None:
     rows = [
-        "\\begin{tabular}{lrrrrr}",
-        "Campaign & Rows & Validated & Diagnostic & Unvalidated & Incomplete \\\\",
+        "\\begin{tabular}{lrrrr}",
+        "Campaign & Rows & Observed & Validated & Incomplete \\\\",
         "\\hline",
     ]
     for campaign in stats["campaigns"]:
         counts = campaign["observation_counts"]
+        observed = counts.get("validated", 0) + counts.get("diagnostic", 0) + counts.get("unvalidated", 0)
         rows.append(
-            f"{_latex_escape(campaign['label'])} & {campaign['row_count']} & {counts.get('validated', 0)} & {counts.get('diagnostic', 0)} & {counts.get('unvalidated', 0)} & {counts.get('incomplete', 0)} "
+            f"{_latex_escape(campaign['label'])} & {campaign['row_count']} & {observed} & {counts.get('validated', 0)} & {counts.get('incomplete', 0)} "
             + r"\\"
         )
     rows.append("\\end{tabular}")
     (output_dir / "campaign_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     rows = [
-        "\\begin{tabular}{llrr}",
-        "Campaign & Algorithm & Eligible $n$ & Median error (mHa) \\\\",
+        "\\begin{tabular}{@{}llrrrr@{}}",
+        "Campaign & Algorithm & Observed $n$ & Validated $n$ & Observed error & Validated error \\\\",
         "\\hline",
     ]
     for item in stats["by_campaign_algorithm"]:
-        median = item["median_absolute_error_mHa"]
-        value = f"{median:.3f}" if median is not None else "N/A"
+        observed_median = item["median_observed_absolute_error_mHa"]
+        validated_median = item["median_absolute_error_mHa"]
+        observed_value = f"{observed_median:.3f}" if observed_median is not None else "N/A"
+        validated_value = f"{validated_median:.3f}" if validated_median is not None else "N/A"
         rows.append(
-            f"{_latex_escape(_campaign_label(item['campaign_id']))} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['eligible_count']} & {value} \\\\" 
+            f"{_latex_escape(_campaign_label(item['campaign_id']))} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['observed_count']} & {item['eligible_count']} & {observed_value} & {validated_value} \\\\"
         )
     rows.append("\\end{tabular}")
     (output_dir / "algorithm_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     rows = [
-        "\\begin{tabular}{llrrr}",
-        "Variant & Algorithm & Rows & Eligible & Median error (mHa) \\\\",
+        "\\begin{tabular}{@{}llrrrr@{}}",
+        "Variant & Algorithm & Rows & Observed & Validated & Obs. error (mHa) \\\\",
         "\\hline",
     ]
     for item in stats["by_campaign_variant_algorithm"]:
         if item["campaign_id"] != "paper-preset-comparison-4m":
             continue
-        median = item["median_absolute_error_mHa"]
+        median = item["median_observed_absolute_error_mHa"]
         value = f"{median:.3f}" if median is not None else "N/A"
         rows.append(
-            f"{_latex_escape(item['variant_label'])} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['eligible_count']} & {value} "
+            f"{_latex_escape(item['variant_label'])} & {_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {item['eligible_count']} & {value} "
             + r"\\"
         )
     rows.append("\\end{tabular}")
     (output_dir / "preset_summary.tex").write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     rows = [
-        "\\begin{tabular}{lrrr}",
-        "Algorithm & Rows & Eligible & Median error (mHa) \\\\",
+        "\\begin{tabular}{@{}lrrrr@{}}",
+        "Algorithm & Rows & Observed & Validated & Median observed error (mHa) \\\\",
         "\\hline",
     ]
     for item in stats["by_campaign_algorithm"]:
         if item["campaign_id"] != "paper-statevector-balanced-10m":
             continue
-        median = item["median_absolute_error_mHa"]
+        median = item["median_observed_absolute_error_mHa"]
         value = f"{median:.3f}" if median is not None else "N/A"
         rows.append(
-            f"{_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['eligible_count']} & {value} "
+            f"{_latex_escape(_algorithm_label(item['algorithm']))} & {item['row_count']} & {item['observed_count']} & {item['eligible_count']} & {value} "
             + r"\\"
         )
     rows.append("\\end{tabular}")
