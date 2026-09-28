@@ -24,7 +24,7 @@ pyjwt>=2.13.0
 
 python-dotenv==1.2.2
 qiskit==2.3.0
-qiskit-ibm-runtime==0.45.1
+qiskit-ibm-runtime==0.50.0
 redis>=5,<9
 
 # Job queue
