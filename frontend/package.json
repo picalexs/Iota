@@ -52,7 +52,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^15.0.0",
+    "globals": "^17.12.0",
     "jsdom": "^28.1.0",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.0.0",
