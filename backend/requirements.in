@@ -20,7 +20,7 @@ pydantic-settings>=2.14.2
 
 # Security floors for transitive runtime dependencies.
 idna>=3.15
-pyjwt>=2.13.0
+pyjwt>=2.15.1
 
 python-dotenv==1.2.2
 qiskit==2.3.0
