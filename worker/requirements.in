@@ -1,5 +1,5 @@
 rq==2.7.0
-redis>=5,<9
+redis>=8.1.0,<9
 pydantic>=2.0,<3
 pydantic-settings>=2.14.2
 
