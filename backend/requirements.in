@@ -1,36 +1,36 @@
-alembic==1.18.4
-anyio==4.14.2
+alembic==1.20.0
+anyio==4.15.1
 asyncpg>=0.29.0
 
 # Configuration and utilities
-cryptography==50.0.0
+cryptography==50.0.2
 # Core framework
-fastapi==0.135.3
+fastapi==0.142.2
 httpx==0.28.1
 
 # Data processing
 numpy>=1.24,<2.0
 
 # Database and ORM
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.13
 
 # Pydantic and validation
-pydantic>=2.0,<3
+pydantic>=2.13.5,<3
 pydantic-settings>=2.14.2
 
 # Security floors for transitive runtime dependencies.
-idna>=3.15
-pyjwt>=2.13.0
+idna>=3.20
+pyjwt>=2.15.1
 
-python-dotenv==1.2.2
-qiskit==2.3.0
-qiskit-ibm-runtime==0.45.1
+python-dotenv==1.2.4
+qiskit==2.4.2
+qiskit-ibm-runtime==0.50.0
 redis>=5,<9
 
 # Job queue
-rq==2.7.0
-rustworkx>=0.14.0
-sqlalchemy==2.0.49
+rq==2.12.0
+rustworkx>=0.18.1
+sqlalchemy==2.1.2
 sse-starlette>=2,<3
 starlette==1.7.0
-uvicorn==0.44.0
+uvicorn==0.54.0
