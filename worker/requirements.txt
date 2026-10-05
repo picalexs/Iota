@@ -151,7 +151,7 @@ qiskit-ibm-runtime==0.45.1
     # via -r worker/requirements.in
 qiskit-qasm3-import==0.6.0
     # via -r worker/requirements.in
-redis==7.4.0
+redis==8.1.0
     # via
     #   -r worker/requirements.in
     #   rq
