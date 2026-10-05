@@ -164,5 +164,5 @@ urllib3==2.7.0
     #   ibm-cloud-sdk-core
     #   qiskit-ibm-runtime
     #   requests
-uvicorn==0.44.0
+uvicorn==0.54.0
     # via -r requirements.in
