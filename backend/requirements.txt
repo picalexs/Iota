@@ -100,7 +100,7 @@ python-dateutil==2.9.0.post0
     #   croniter
     #   ibm-cloud-sdk-core
     #   qiskit-ibm-runtime
-python-dotenv==1.2.2
+python-dotenv==1.2.4
     # via
     #   -r requirements.in
     #   pydantic-settings
