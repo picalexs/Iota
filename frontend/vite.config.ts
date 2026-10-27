@@ -9,6 +9,39 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootEnvDir = path.resolve(__dirname, "..");
 const LOCAL_OPERATOR_HEADER = "X-Local-Operator-Token";
+const manualChunkGroups = {
+  react: ["react", "react-dom", "react/jsx-runtime"],
+  router: ["@tanstack/react-router"],
+  query: ["@tanstack/react-query"],
+  visx: [
+    "@visx/responsive",
+    "@visx/group",
+    "@visx/shape",
+    "@visx/scale",
+    "@visx/axis",
+    "@visx/grid",
+  ],
+  grid: ["react-grid-layout"],
+  icons: ["lucide-react"],
+} as const;
+
+function resolveManualChunk(moduleId: string): string | undefined {
+  if (!moduleId.includes("node_modules")) return undefined;
+
+  for (const [chunkName, packages] of Object.entries(manualChunkGroups)) {
+    if (
+      packages.some(
+        (packageName) =>
+          moduleId.includes(`/node_modules/${packageName}/`) ||
+          moduleId.endsWith(`/node_modules/${packageName}`),
+      )
+    ) {
+      return chunkName;
+    }
+  }
+
+  return undefined;
+}
 
 function uniqueOrigins(...values: Array<string | undefined>) {
   return values
@@ -166,21 +199,7 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            react: ["react", "react-dom", "react/jsx-runtime"],
-            router: ["@tanstack/react-router"],
-            query: ["@tanstack/react-query"],
-            visx: [
-              "@visx/responsive",
-              "@visx/group",
-              "@visx/shape",
-              "@visx/scale",
-              "@visx/axis",
-              "@visx/grid",
-            ],
-            grid: ["react-grid-layout"],
-            icons: ["lucide-react"],
-          },
+          manualChunks: resolveManualChunk,
         },
       },
     },

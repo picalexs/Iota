@@ -79,7 +79,9 @@ describe("BenchmarkPage submission", () => {
       expect(savedSubmission).toBeTruthy();
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await waitFor(() =>
+      expect((updateBenchmarkRun as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1),
+    );
 
     const submittedCallIndex = (
       updateBenchmarkRun as ReturnType<typeof vi.fn>

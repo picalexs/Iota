@@ -11,7 +11,7 @@ function randomInt(maxExclusive: number): number {
 
   const values = new Uint32Array(1);
   const limit = Math.floor(2 ** 32 / maxExclusive) * maxExclusive;
-  let value = 0;
+  let value: number;
   do {
     globalThis.crypto.getRandomValues(values);
     value = values[0] ?? 0;
