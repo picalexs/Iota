@@ -189,7 +189,7 @@ export function BenchmarkPage() {
   useEffect(() => {
     if (hydratingSavedBenchmark) return;
 
-    let rawScroll: string | null = null;
+    let rawScroll: string | null;
     try {
       rawScroll = sessionStorage.getItem(benchmarkScrollKey);
       sessionStorage.removeItem(benchmarkScrollKey);

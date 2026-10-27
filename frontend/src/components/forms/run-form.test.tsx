@@ -19,7 +19,7 @@ import type { MoleculeListResponse } from "./run-form.test-support";
 beforeEach(resetRunFormTestState);
 
 describe("RunForm shell", () => {
-  it("renders the form shell while molecules are still loading", () => {
+  it("renders the form shell while molecules are still loading", async () => {
     vi.mocked(api.fetchMolecules).mockReturnValue(neverSettles<MoleculeListResponse>());
     vi.mocked(api.fetchBasisSets).mockReturnValue(
       neverSettles<Awaited<ReturnType<typeof api.fetchBasisSets>>>(),
@@ -31,10 +31,12 @@ describe("RunForm shell", () => {
       neverSettles<Awaited<ReturnType<typeof api.fetchBackendCapabilities>>>(),
     );
     renderRunForm();
-    expect(screen.getByText("Create Simulation Run")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: /molecule/i })).toBeDisabled();
-    expect(screen.getByText(/loading molecules/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Loading molecule library\.\.\.$/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Create Simulation Run")).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /molecule/i })).toBeDisabled();
+      expect(screen.getByText(/loading molecules/i)).toBeInTheDocument();
+      expect(screen.getByText(/^Loading molecule library\.\.\.$/)).toBeInTheDocument();
+    });
   });
 
   it("renders form heading and core controls after loading", async () => {
