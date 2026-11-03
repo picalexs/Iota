@@ -26,12 +26,6 @@ Watch the [Iota application demo](https://youtu.be/lWYvvrYoys0).
 The screenshots show the application workflow, run provenance, convergence
 details, and benchmark comparison views.
 
-## Public release status
-
-This tree is not ready for public publication. The software license is now
-selected, but third-party asset review, owner review of repository controls,
-and remote branch-protection settings are still pending.
-
 ## Application layout
 
 - `backend/`: FastAPI API and database migrations.
